@@ -87,8 +87,8 @@ While parsing, use ParseCIDRv4 for IPv4 section and ParseCIDRv6 for IPv6 section
                 For example, the IPv6 of the interface is 2a0d:3a87::123/64, then the netowrk is 2a0d:3a87::/64. So that if the IPv6Net is ::980d:0/112, the real `SNAT IPNet` ( a.k.a target_network ) for NATMAP is 2a0d:3a87::980d:0/112
             When we retrive IPv4/IPv6/IPv6Net from master interface, the deprecated address will be ignored. When multiple address scaned, use the dynamic address first. If we can't retrive any address, ignore this feature (don't generate firewall rule) and wait next scan.
             If the network on the master interface changes, it will update the firewall rules accordingly.
-        4.  **SNAT pseudo-bridge:** boolean. This mode works on IPv6 SNAT NETMAP mode only. it exist on ipv4 but not valid for configuration reuse.
-            If false, do nothing. If true, Perform pseudo-bridge on SNAT Roaming master interface, but use target_network as the R network, which will be hendled by pseudo-bridge module.
+        4.  **SNAT NETMAP pseudo-bridge:** boolean. This mode works on IPv6 SNAT NETMAP mode only. it exist on ipv4 but not valid for configuration reuse.
+            If false, do nothing. If true, Perform pseudo-bridge on SNAT Roaming master interface, but use target_network as the network, which will be hendled by pseudo-bridge module.
         5.  **SNAT Excluded Network:** A network range to exclude from SNAT. If null, defaults to the server's own network range.
         *   If enabled, add SNAT firewall rules for this server, allowing clients to use the server's IP to access the external internet.
         *   Generate a rule like `-s SELF_NET/prefix -d ! "SNAT Excluded NAT"`.
