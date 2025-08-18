@@ -46,7 +46,7 @@ It's a net.IPNet Wrapper, same functionality as net.IPNet.
 Because net.IPNet doesn't support marshal/unmarshal to humen readable format, so we use a IPNetWrapper to do it.
 While parsing, use ParseCIDRv4 for IPv4 section and ParseCIDRv6 for IPv6 section to avoid incorrect Address Family type.
 ```
-# This is a pert of prompt, for reference only, don't edit or move this file. If nessesary, use copy instead of mv
+# This is a pert of prompt, for reference only, don't move this file. If nessesary, use copy instead of mv
 @prompt/IPNetWarpper.go
 ```
 
@@ -56,41 +56,47 @@ While parsing, use ParseCIDRv4 for IPv4 section and ParseCIDRv6 for IPv6 section
 *   **ID:** The unique ID of the server, allocated when added. It is not changeable.
 *   **Enabled:** A boolean indicating if this server is enabled. This value cannot be edited via the standard 'edit' API; it can only be modified using the dedicated 'SetEnable' API. When created, it will always be disabled.
 *   **IPv4:**
-    1.  **Enabled:** Whether IPv4 is enabled.
+    1.  **Enabled:** Whether IPv4/IPv6 is enabled.
     2.  **Network:** IP and mask length, like `192.168.1.1/24`. Use `IPNetWrapper` to store this to prevent potential exploits.
         *   The IP/prefix_len is a CIDR. For example, `IPNetWrapper("192.168.1.254/24")` results in `IP=192.168.1.254` and `Network=192.168.1.0/24`.
         *   When a new client is added, search for the first available IP within the network. The network and broadcast addresses (e.g., .0 and .255) are reserved, and the server's own IP is occupied. The operation fails if no IP is available.
         *   **Check:** Cannot overlap with other servers in the same VRF.
-    3.  **Pseudo-bridge master interface:** `null` to disable. A string (max length 15) to enable pseudo-bridging for IPv4/IPv6 on a specific interface. If enabled, the pseudo-bridge service will activate the feature on that interface.
+    3.  **Pseudo-bridge:** `null` to disable. A string (max length 15) to enable, and the content of the string is the master interface for the Pseudo-bridge service. This section is under IPvX, IPv4 and IPv6 has their own settings.
     4.  **SNAT:**
-        1.  **Enabled:** Enable SNAT or not.
+        1.  **Enabled:** Enable SNAT for IPv4/IPv6 or not.
         2.  **SNAT IPNet:** The IP to use for SNAT. Datatype: IPNetWrapper or null
-            If null, use MASQUERADE.
-            If an /32(ipv4) or /128(ipv6) is provided, use SNAT.
+            In SNAT section, if null, use ifconfig MASQUERADE.
+            In SNAT section, If an single IP (/32 for ipv4 or /128 for ipv6) is provided, use ifconfig SNAT mode.
             In IPv4 SNAT section, If an IPv4Net provided and len != 32, raise error for not supported.
-            In IPv6 SNAT section, If an IPv6Net provided and len != 128, use NETMAP (the mask length must be equal to the server's IPv6 mask length. otherwise raise error). The target_network is the IPv6Net if `SNAT IPNet`. It will Generate two NETMAP rules to map local ipv6 network to public ipv6 network:
+            In IPv6 SNAT section, If an IPv6Net provided and len != 128, use ifconfig NETMAP mode.
+                In NETMAP mode, the mask length must be equal to the server's IPv6 Network mask length. otherwise raise error.
+                And it will Generate two NETMAP rules to map <server_network>(Server IPv6 Network) and <target_network>(Server IPv6 SNAT IPNet):
                 1. ip6tables -t nat -A PREROUTING -s <server_network> -j NETMAP --to <target_network>
                 2. ip6tables -t nat -A PREROUTING -s <target_network> -j NETMAP --to <server_network>
-            If NETMAP Roaming enabled, don't add the firewall rules by the main thread. Let the NETMAP Roaming Service to hendle the NATMAP firewall rule.
-        3.  **SNAT NETMAP Roaming master interface:** This is an IPv6-only option, exist but not valid on ipv4. `null` to disable. A string (max length 15) to enable on an interface.
-            IPv6 pseudo-bridging must be disabled and IPv6 SNAT must works on SNAT/NETMAP mode to use this feature.
+            In conclusion, SNAT option exists on both IPv4 and IPv6 mode, but in IPv6, it supports additional NATMAP mode.
+            The `SNAT IPNet` can be static or dynamic. If dynamic(SNAT Roaming enabled), don't add the firewall rules by the main thread. Let the SNAT Roaming Service to hendle the related firewall rule.
+        3.  **SNAT Roaming:** `null` to disable. A string (max length 15) to enable, and the content of the string is the master interface for the SNAT Roaming.
+            This feature is a part of SNAT. The difference betweeh SNAT mode and SNAT Roaming Mode is SNAT mode spacify SNAT IP(Net) Manually, but SNAT Roaming Mode choose IP(Net) from master interface by SNAT Roaming Service.
+            So that it requires SNAT works on ifconfig SNAT mode or NATMAP mode. 
+            This mode are mutually exclusive with pseudo-bridge. Can't enable if Pseudo-bridge enabled.
             When this option enabled, the `SNAT IPNet` will no longer be parsed to a IP address.
-            If the length of `SNAT IPNet` is /128, it must be `::/128`. Otherwise raise an error.
-                In this case, real IPv6 is retrived from the master interface. It retrive the ipv6 from the master interface and use it as `SNAT IPNet` in firewall rule generation.
-            If the length of `SNAT IPNet` is not /128, It will be parsed to a IPv6Net offset instead.
+            In SNAT Mode, The `SNAT IPNet` must be `0.0.0.0/32` or `::/128`. Otherwise raise an error.
+                In this case, real IPv4/IPv6 for SNAT is retrived from the master interface, and use it as `SNAT IPNet` in firewall rule generation.
+            In NETMAP Mode, It will be parsed to a IPv6Net offset instead.
                 In this case, The real IPv6Net is calculated from the master interface. It retrive the ipv6 network from the master interface, add to the offset and use it as real IPv6Net ( a.k.a target_network ) fot NETMAP firewall rule generation.
                 For example, the IPv6 of the interface is 2a0d:3a87::123/64, then the netowrk is 2a0d:3a87::/64. So that if the IPv6Net is ::980d:0/112, the real `SNAT IPNet` ( a.k.a target_network ) for NATMAP is 2a0d:3a87::980d:0/112
-            When we retrive IPv6/IPv6Net from master interface, the deprecated address will be ignored. When multiple address scaned, use the dynamic address first. If we can't retrive any address, ignore this feature (don't generate firewall rule) and wait next scan.
-            The main thread do nothing. The NETMAP Roaming Service will periodically scan the IPv6 address on the master interface. If the network on the master interface changes, it will update the firewall rules accordingly.
-        4.  **SNAT NETMAP pseudo-bridge:** boolean. If false, do nothing. if true, Perform pseudo-bridge on  SNAT NETMAP Roaming master interface, but use target_network as the network, which will be hendled by pseudo-bridge module.
+            When we retrive IPv4/IPv6/IPv6Net from master interface, the deprecated address will be ignored. When multiple address scaned, use the dynamic address first. If we can't retrive any address, ignore this feature (don't generate firewall rule) and wait next scan.
+            If the network on the master interface changes, it will update the firewall rules accordingly.
+        4.  **SNAT pseudo-bridge:** boolean. This mode works on IPv6 SNAT NETMAP mode only. it exist on ipv4 but not valid for configuration reuse.
+            If false, do nothing. If true, Perform pseudo-bridge on SNAT Roaming master interface, but use target_network as the R network, which will be hendled by pseudo-bridge module.
         5.  **SNAT Excluded Network:** A network range to exclude from SNAT. If null, defaults to the server's own network range.
         *   If enabled, add SNAT firewall rules for this server, allowing clients to use the server's IP to access the external internet.
         *   Generate a rule like `-s SELF_NET/prefix -d ! "SNAT Excluded NAT"`.
-    5.  **Routed Networks:** A list of IPv4 networks. If null, defaults to the server's own network range. Must contain the server's own network range and cannot overlap with each other. This is equivalent to `AllowedIPs` for the client.
+    5.  **Routed Networks:** A list of IPv4/IPv6 networks. If null, defaults to the server's own network range. Must contain the server's own network range and cannot overlap with each other. This is equivalent to `AllowedIPs` for the client.
     6.  **Routed Networks Firewall:** A boolean. If true, add firewall rules to allow `-s [Server Network] -d [Routed Network]` and block other destination IPs (unless `Routed Networks` is `0.0.0.0/0` for IPv4 or `::/0` for IPv6).
     7.  **CommentString:** A randomly generated string. When the server is started, use `iptables`/`ip6tables` to add firewall rules with this special comment. When stopped, remove firewall rules based on the comment. The comment should be static (saved in the config file) to ensure it can be removed if the server stops unexpectedly. This is for internal use only and not visible in the API/frontend.
 *   **IPv6:**
-    *   Same as IPv4, but the IPv6 version.
+    *   Same as IPv4, but the IPv6 version. All IP/Net related setting are IPv6
 *   **Note:** At least one of IPv4 or IPv6 must be enabled.
 *   **Clients:** A list of clients belonging to this server.
 
@@ -137,23 +143,32 @@ While parsing, use ParseCIDRv4 for IPv4 section and ParseCIDRv6 for IPv6 section
 
 ### Pseudo-bridge Service
 This is a goroutine that starts with the server and handles the pseudo-bridge feature.
-This service detects ARP-request and Neighbor Solicitation packets on the specified interfaces using pcap.
-It scans through all server periodically, check the pseudo-bridge enabled and it's master interface, or NETMAP pseudo-bridge enabled and it's master interface. Sync the netowrk to local variable for ARP-Reply or na packet generation.
-Use a for loop iterate over all interface and servers. copy to PseudoBridgeWaitInterface then sync to PseudoBridgeRunningInterface. If they are different, sync PseudoBridgeWaitInterface to PseudoBridgeRunningInterface to avoid locking during arp/nd response process.
+This service has two parts: Pseudo-bridge Service Master and Interface Responder, and use two variable PseudoBridgeWaitInterface/PseudoBridgeRunningInterface to sync data between them.
 PseudoBridgeWaitInterface/PseudoBridgeRunningInterface is a list in a map in a map, [ifname][v4/v6][network1, network2, network3 ...]
-If PseudoBridgeWaitInterface and PseudoBridgeRunningInterface are same, during the comparing, it is read locked, so that it doesn't affect the arp/nd response process. PseudoBridgeRunningInterface is only locked if the PseudoBridgeWaitInterface is changed.
-While it changed, add interface to listening and firewall rules if there is new, stop listening the interface and remove firewall rules that no longer exists.
-It monitoring the interface for any incoming ARP-request and Neighbor Solicitation packet. If it asks MAC address for the ip which is in the server networks which needs to be pseudo-bridged(in the PseudoBridgeRunningInterface of the interface), it generates an ARP Reply or Neighbor Advertisement packet to reply.
+Pseudo-bridge Service Master:
+    Spawn a Interface Responder which is a new new goroutine and stop unnecessary responders when there is no need.
+    Scans through all server periodically, check the pseudo-bridge enabled and it's master interface, or SNAT pseudo-bridge enabled and it's master interface. 
+    Use a for loop to iterate over all interface and servers. copy to PseudoBridgeWaitInterface then sync to PseudoBridgeRunningInterface. 
+    During the comparing, if PseudoBridgeWaitInterface and PseudoBridgeRunningInterface are same, it is read locked, so that it doesn't affect the Interface Responder process.
+    If they are different, lock and sync PseudoBridgeWaitInterface to PseudoBridgeRunningInterface. Spawn a Interface Responder if new interface added, clean unnecessary Interface Responder if the interface no longer nessesary.
+The Interface Responder:
+    It reads from PseudoBridgeRunningInterface for ARP-Reply or Neighbor Advertisement packet generation.
+    Monitoring ARP-request and Neighbor Solicitation packets on assigned interfaces using pcap.
+    If it asks MAC address for the ip which is in the server networks which needs to be pseudo-bridged(in the PseudoBridgeRunningInterface of the interface), it generates an ARP Reply or Neighbor Advertisement packet to reply.
 
-### NETMAP Roaming Service
-This is a goroutine that starts with the server and handles the NETMAP Roaming feature.
-It scans through all server periodically, check the SNAT NETMAP Roaming enabled and it's master interface.
-Use a for loop iterate over all interface and servers. copy to NETMAPRoamingWaitInterface then sync to NETMAPRoamingRunningInterface. If they are different, sync NETMAPRoamingWaitInterface to NETMAPRoamingRunningInterface to avoid locking during roaming.
-NETMAPRoamingWaitInterface/NETMAPRoamingRunningInterface is a list in a map, [ifname] [{IPv6 address offset 1, CommentString1}, {IPv6Net offset 2,CommentString2}, {IPv6Net offset 3,CommentString3} ...]
-If NETMAPRoamingWaitInterface and NETMAPRoamingRunningInterface are same, during the comparing, it is read locked, so that it doesn't affect the roaming. Only locked if the NETMAPRoamingWaitInterface is changed.
-While it changed, add new interface to listening, and stop listening the interface no longer exists.
-It reads the IP and network from the master interface, calculate the real IPv6Net ( a.k.a target_network ) and sync the firewall rules.
-It uses netlink to detect the IP of the master interface change. If change, trigger the sync.
+### SNAT Roaming Service
+This is a goroutine that starts with the server and handles the SNAT Roaming feature.
+This service has two parts: SNAT Roaming Service Master and Interface IPNet Listener. And use two variable SNATRoamingWaitInterface/SNATRoamingRunningInterface to sync data between them.
+SNATRoamingWaitInterface/SNATRoamingRunningInterface is a list in a map, [ifname] [{IPv6 address offset 1, CommentString1}, {IPv6Net offset 2,CommentString2}, {IPv6Net offset 3,CommentString3} ...]
+SNAT Roaming Service Master:
+    Spawns a Interface IPNet Listener which is a new new goroutine, and stop unnecessary listener when there is no need.
+    Scans through all server periodically, check the SNAT Roaming enabled and it's master interface.
+    Use a for loop iterate over all interface and servers. copy to SNATRoamingWaitInterface then sync to SNATRoamingRunningInterface. 
+    During the comparing, if SNATRoamingWaitInterface and SNATRoamingRunningInterface are same, it is read locked, so that it doesn't affect the Interface IPNet Listener process.
+    If they are different, lock sync SNATRoamingWaitInterface to SNATRoamingRunningInterface. Spawn a Interface IPNet Listener if new interface added, clean unnecessary Interface IPNet Listener if the interface no longer nessesary.
+Interface IPNet Listener:
+    It detects IP/IPv6/IPv6Net changed with netlink on assigned interface. If change, trigger the sync.
+    If the IP/IPv6/IPv6Net changed, calculate the real IPv6Net ( a.k.a target_network ) and add/update/delete the firewall rules for IPv4 SNAT/IPv6 SNAT/IPv6 SNAT NETMAP.
 
 ### Some Golang code to calculate the public key:
 
@@ -197,7 +212,7 @@ func PrivToPublic(privateKeyB64 string) (string, error) {
 
 This is an example OpenAPI v3 for this backend
 ```
-# This is a pert of prompt, for reference only, don't edit or move this file. If nessesary, use copy instead of mv
+# This is a pert of prompt, for reference only, don't move this file. If nessesary, use copy instead of mv
 @prompt/API_SPEC.yaml
 ```
 
