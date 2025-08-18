@@ -1,0 +1,1021 @@
+openapi: 3.0.3
+info:
+  title: WireGuard Panel API
+  description: |
+    A RESTful API for managing a WireGuard server panel.
+    The API has a three-level hierarchy: Interfaces -> Servers -> Clients.
+    Authentication is handled via session cookies.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api
+    description: Development server (Assuming default Site URL Prefix '/' and API Prefix '/api')
+tags:
+  - name: Service
+    description: Operations related to service configuration and authentication.
+  - name: Interfaces
+    description: Manage WireGuard interfaces.
+  - name: Servers
+    description: Manage servers within a WireGuard interface.
+  - name: Clients
+    description: Manage clients belonging to a server.
+paths:
+  /service/login:
+    post:
+      tags:
+        - Service
+      summary: Log in to the service
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                  format: password
+              required:
+                - username
+                - password
+      responses:
+        '200':
+          description: Login successful. Session cookie is set.
+          headers:
+            Set-Cookie:
+              description: Session token cookie.
+              schema:
+                type: string
+        '401':
+          description: Invalid credentials.
+  /service/logout:
+    post:
+      tags:
+        - Service
+      summary: Log out from the service
+      operationId: logout
+      responses:
+        '204':
+          description: Logout successful. Session cookie is cleared.
+      security:
+        - cookieAuth: []
+  /service/config:
+    get:
+      tags:
+        - Service
+      summary: Get Service Configuration
+      description: Retrieves the current service configuration, excluding sensitive data like the password hash.
+      operationId: getServiceConfig
+      responses:
+        '200':
+          description: Successful retrieval of service configuration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceConfig'
+      security:
+        - cookieAuth: []
+  /service/password:
+    put:
+      tags:
+        - Service
+      summary: Set a New Password
+      description: Updates the login password for the service. The change is persisted to the configuration file.
+      operationId: setServicePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  format: password
+                  description: The new password.
+              required:
+                - password
+      responses:
+        '204':
+          description: Password updated successfully.
+        '401':
+          description: Unauthorized.
+      security:
+        - cookieAuth: []
+  /interfaces:
+    get:
+      tags:
+        - Interfaces
+      summary: List all Interfaces
+      operationId: listInterfaces
+      responses:
+        '200':
+          description: An array of WireGuard interfaces.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Interface'
+      security:
+        - cookieAuth: []
+    post:
+      tags:
+        - Interfaces
+      summary: Create a new Interface
+      operationId: createInterface
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InterfaceCreate'
+      responses:
+        '201':
+          description: Interface created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Interface'
+        '409':
+          description: Conflict, e.g. ifname already exists.
+      security:
+        - cookieAuth: []
+  /interfaces/{ifId}:
+    parameters:
+      - $ref: '#/components/parameters/ifId'
+    get:
+      tags:
+        - Interfaces
+      summary: Get Interface Details
+      operationId: getInterface
+      responses:
+        '200':
+          description: The details of the specified interface, including its public key and a full list of its associated servers.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Interface'
+        '404':
+          description: Interface not found.
+      security:
+        - cookieAuth: []
+    put:
+      tags:
+        - Interfaces
+      summary: Edit an Interface
+      description: |
+        Edits an interface's properties.
+        - Changing `mtu` will apply `ip link set dev $IFNAME mtu $NEW_MTU`.
+        - Changing `vrfName`, `fwMark`, `port`, or `privateKey` will trigger a regeneration and sync of the WireGuard config file (`wg syncconf`).
+        - When `vrfName` is changed, a check is performed to ensure no child server's network overlaps with another network in the target VRF.
+      operationId: editInterface
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InterfaceUpdate'
+      responses:
+        '200':
+          description: Interface updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Interface'
+        '404':
+          description: Interface not found.
+        '409':
+          description: Conflict, e.g. VRF network overlap detected.
+      security:
+        - cookieAuth: []
+    delete:
+      tags:
+        - Interfaces
+      summary: Delete an Interface
+      description: Deletes an interface and all of its associated servers and clients.
+      operationId: deleteInterface
+      responses:
+        '204':
+          description: Interface deleted successfully.
+        '404':
+          description: Interface not found.
+      security:
+        - cookieAuth: []
+  /interfaces/{ifId}/servers:
+    parameters:
+      - $ref: '#/components/parameters/ifId'
+    get:
+      tags:
+        - Servers
+      summary: List Servers for an Interface
+      operationId: listServers
+      responses:
+        '200':
+          description: An array of servers for the specified interface.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Server'
+        '404':
+          description: Interface not found.
+      security:
+        - cookieAuth: []
+    post:
+      tags:
+        - Servers
+      summary: Create a new Server
+      operationId: createServer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServerCreate'
+      responses:
+        '201':
+          description: Server created successfully. New servers are always created as disabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Server'
+        '400':
+          description: Invalid input (e.g., neither IPv4 nor IPv6 enabled).
+        '404':
+          description: Interface not found.
+        '409':
+          description: Conflict, e.g. network overlaps with another server in the same VRF.
+      security:
+        - cookieAuth: []
+  /interfaces/{ifId}/servers/{serverId}:
+    parameters:
+      - $ref: '#/components/parameters/ifId'
+      - $ref: '#/components/parameters/serverId'
+    get:
+      tags:
+        - Servers
+      summary: Get Server Details
+      operationId: getServer
+      responses:
+        '200':
+          description: The details of the specified server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Server'
+        '404':
+          description: Server or Interface not found.
+      security:
+        - cookieAuth: []
+    put:
+      tags:
+        - Servers
+      summary: Edit a Server
+      description: |
+        Edits server properties.
+        - If `network` is changed, a check is performed to ensure all existing client IPs are still valid within the new network range.
+        - If `network`, `routedNetworks`, or `snat` settings are changed, old firewall rules are removed and new ones are applied.
+      operationId: editServer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServerUpdate'
+      responses:
+        '200':
+          description: Server updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Server'
+        '404':
+          description: Server or Interface not found.
+        '409':
+          description: Conflict, e.g., client IP shifting results in an out-of-range address, or network overlap.
+      security:
+        - cookieAuth: []
+    delete:
+      tags:
+        - Servers
+      summary: Delete a Server
+      description: Disables the server (removes IPs, firewall rules, clients from wg conf), then deletes the server and all its associated clients from the configuration.
+      operationId: deleteServer
+      responses:
+        '204':
+          description: Server deleted successfully.
+        '404':
+          description: Server or Interface not found.
+      security:
+        - cookieAuth: []
+  /interfaces/{ifId}/servers/{serverId}/set-enable:
+    parameters:
+      - $ref: '#/components/parameters/ifId'
+      - $ref: '#/components/parameters/serverId'
+    post:
+      tags:
+        - Servers
+      summary: Enable or Disable a Server
+      description: Enables (adds IP address to interface, adds firewall rules, syncs config) or disables (removes IP address, firewall rules, syncs config) the server.
+      operationId: setServerEnable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetEnableRequest'
+      responses:
+        '204':
+          description: Server state updated successfully.
+        '404':
+          description: Server or Interface not found.
+      security:
+        - cookieAuth: []
+  /interfaces/{ifId}/servers/{serverId}/move:
+    parameters:
+      - $ref: '#/components/parameters/ifId'
+      - $ref: '#/components/parameters/serverId'
+    post:
+      tags:
+        - Servers
+      summary: Move a Server to another Interface
+      description: Moves the server configuration to a different WireGuard interface. Syncs the configuration on both the old and new interfaces.
+      operationId: moveServer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newInterfaceId:
+                  type: string
+                  description: The ID of the destination interface.
+              required:
+                - newInterfaceId
+      responses:
+        '204':
+          description: Server moved successfully.
+        '404':
+          description: Source or destination Interface, or Server not found.
+      security:
+        - cookieAuth: []
+  /interfaces/{ifId}/servers/{serverId}/clients:
+    parameters:
+      - $ref: '#/components/parameters/ifId'
+      - $ref: '#/components/parameters/serverId'
+    get:
+      tags:
+        - Servers
+        - Clients
+      summary: Get a Server's Clients with Live State (GetClients)
+      operationId: getServerClients
+      description: Retrieves all clients for a server, including their live WireGuard state (last handshake, data transfer).
+      responses:
+        '200':
+          description: An array of clients with their state.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClientWithState'
+        '404':
+          description: Server or Interface not found.
+      security:
+        - cookieAuth: []
+    post:
+      tags:
+        - Clients
+      summary: Create a new Client
+      operationId: createClient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientCreate'
+      responses:
+        '201':
+          description: Client created successfully. New clients are always created as disabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '404':
+          description: Server or Interface not found.
+        '409':
+          description: Conflict, e.g., no available IPs in the server network, manually assigned IP is invalid/taken, or neither IPv4 nor IPv6 requested.
+      security:
+        - cookieAuth: []
+  /interfaces/{ifId}/servers/{serverId}/clients/{clientId}:
+    parameters:
+      - $ref: '#/components/parameters/ifId'
+      - $ref: '#/components/parameters/serverId'
+      - $ref: '#/components/parameters/clientId'
+    get:
+      tags:
+        - Clients
+      summary: Get Client Details
+      operationId: getClient
+      responses:
+        '200':
+          description: The details of the specified client. Public key is returned (calculated if necessary).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '404':
+          description: Client, Server, or Interface not found.
+      security:
+        - cookieAuth: []
+    put:
+      tags:
+        - Clients
+      summary: Edit a Client
+      description: Edits client properties. Changing IP addresses, keys, or preshared key will cause the WireGuard interface config to be regenerated and synced.
+      operationId: editClient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientUpdate'
+      responses:
+        '200':
+          description: Client updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '404':
+          description: Client, Server, or Interface not found.
+      security:
+        - cookieAuth: []
+    delete:
+      tags:
+        - Clients
+      summary: Delete a Client
+      description: Disables the client (removes peer from wg conf and syncs), then deletes the client from configuration.
+      operationId: deleteClient
+      responses:
+        '204':
+          description: Client deleted successfully.
+        '404':
+          description: Client, Server, or Interface not found.
+      security:
+        - cookieAuth: []
+  /interfaces/{ifId}/servers/{serverId}/clients/{clientId}/set-enable:
+    parameters:
+      - $ref: '#/components/parameters/ifId'
+      - $ref: '#/components/parameters/serverId'
+      - $ref: '#/components/parameters/clientId'
+    post:
+      tags:
+        - Clients
+      summary: Enable or Disable a Client
+      description: Includes (enable) or excludes (disable) the client as a peer in the WireGuard interface configuration and syncs the interface.
+      operationId: setClientEnable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetEnableRequest'
+      responses:
+        '204':
+          description: Client state updated successfully.
+        '404':
+          description: Client, Server, or Interface not found.
+      security:
+        - cookieAuth: []
+  /interfaces/{ifId}/servers/{serverId}/clients/{clientId}/state:
+    parameters:
+      - $ref: '#/components/parameters/ifId'
+      - $ref: '#/components/parameters/serverId'
+      - $ref: '#/components/parameters/clientId'
+    get:
+      tags:
+        - Clients
+      summary: Get Client's Live WireGuard State (GetWGState)
+      operationId: getClientWGState
+      responses:
+        '200':
+          description: Live state data for the client (handshake, transfer, endpoint). Values may be null if the client has not connected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WGState'
+        '404':
+          description: Client, Server, or Interface not found.
+      security:
+        - cookieAuth: []
+  /interfaces/{ifId}/servers/{serverId}/clients/{clientId}/config:
+    parameters:
+      - $ref: '#/components/parameters/ifId'
+      - $ref: '#/components/parameters/serverId'
+      - $ref: '#/components/parameters/clientId'
+    get:
+      tags:
+        - Clients
+      summary: Get Client's WireGuard Config File (GetConfig)
+      operationId: getClientConfig
+      responses:
+        '200':
+          description: The WireGuard configuration file content for the client.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  [Interface]
+                  PrivateKey = [privkey is not available for this client]
+                  Address = 10.100.0.2/32, fd00::2/128
+                  DNS = 8.8.8.8, 1.1.1.1
+
+                  [Peer]
+                  PublicKey = ...server public key...
+                  PresharedKey = ...preshared key...
+                  AllowedIPs = 0.0.0.0/0, ::/0
+                  Endpoint = my.server.com:51820
+                  PersistentKeepalive = 25
+        '404':
+          description: Client, Server, or Interface not found.
+      security:
+        - cookieAuth: []
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session_token
+  parameters:
+    ifId:
+      name: ifId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: The unique ID of the interface.
+    serverId:
+      name: serverId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: The unique ID of the server.
+    clientId:
+      name: clientId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: The unique ID of the client.
+  schemas:
+    SetEnableRequest:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: The desired state (true for enabled, false for disabled).
+      required:
+        - enabled
+    WGState:
+      type: object
+      description: Live statistics from the WireGuard interface.
+      properties:
+        latestHandshake:
+          type: string
+          format: date-time
+          description: The timestamp of the last handshake. Nullable if never connected.
+          nullable: true
+        endpoint:
+          type: string
+          example: "22.33.44.55:6789"
+          description: The IP:port of the peer endpoint. Nullable if never connected.
+          nullable: true
+        transferRx:
+          type: integer
+          format: int64
+          description: Total bytes received.
+          nullable: true
+        transferTx:
+          type: integer
+          format: int64
+          description: Total bytes transmitted.
+          nullable: true
+    ServiceConfig:
+      type: object
+      properties:
+        wireguardConfigPath:
+          type: string
+          description: The path to store WireGuard interface configs.
+          example: "/etc/wireguard"
+        user:
+          type: string
+          description: The login username.
+          example: "admin"
+        listenIP:
+          type: string
+          description: The listen IP for the service.
+          example: "0.0.0.0"
+        listenPort:
+          type: integer
+          description: The listen port for the service.
+          example: 8080
+        siteUrlPrefix:
+          type: string
+          description: The prefix for the site URL. Default is '/'.
+          example: "/"
+        apiPrefix:
+          type: string
+          description: The prefix for backend APIs, appended to siteUrlPrefix. Default is '/api'.
+          example: "/api"
+    Interface:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique ID of the interface. Allocated on creation.
+          readOnly: true
+        ifname:
+          type: string
+          description: A short name for the interface. The actual device name will be `wg-[ifname]`. Must be unique.
+          pattern: '^[A-Za-z0-9_-]{1,12}$'
+          example: 'prod'
+        vrfName:
+          type: string
+          description: The VRF (Virtual Routing and Forwarding) to which this interface belongs. If null, not in a VRF.
+          nullable: true
+          example: 'vrf-red'
+        fwMark:
+          type: string
+          description: The FwMark for the WireGuard interface. Can be decimal or hexadecimal (e.g., '0xca6c'). If null, not set.
+          nullable: true
+          example: "51820"
+        endpoint:
+          type: string
+          description: The public endpoint (IP or domain name) of the WireGuard interface.
+          example: "vpn.example.com"
+        port:
+          type: integer
+          description: The listen port of the WireGuard interface.
+          example: 51820
+        mtu:
+          type: integer
+          description: MTU for the WireGuard interface.
+          example: 1420
+        publicKey:
+          type: string
+          description: The public key of the interface, derived from the private key.
+          readOnly: true
+        servers:
+          type: array
+          description: List of servers belonging to this interface. Included on a GET request for a single interface.
+          items:
+            $ref: '#/components/schemas/Server'
+          readOnly: true
+      required:
+        - id
+        - ifname
+        - endpoint
+        - port
+        - publicKey
+    InterfaceCreate:
+      type: object
+      properties:
+        ifname:
+          type: string
+          description: A short name for the interface. The actual device name will be `wg-[ifname]`. Must be unique.
+          pattern: '^[A-Za-z0-9_-]{1,12}$'
+          example: 'prod'
+        vrfName:
+          type: string
+          description: The VRF to which this interface belongs.
+          nullable: true
+        fwMark:
+          type: string
+          description: The FwMark for the WireGuard interface. Can be decimal or hexadecimal.
+          nullable: true
+        endpoint:
+          type: string
+          description: The public endpoint (IP or domain name) of the WireGuard interface.
+          example: "vpn.example.com"
+        port:
+          type: integer
+          description: The listen port of the WireGuard interface.
+          example: 51820
+        mtu:
+          type: integer
+          description: MTU for the WireGuard interface.
+          default: 1420
+        privateKey:
+          type: string
+          description: The private key for the interface. If null, a new key will be generated.
+          nullable: true
+          writeOnly: true
+      required:
+        - ifname
+        - endpoint
+        - port
+    InterfaceUpdate:
+      type: object
+      properties:
+        ifname:
+          type: string
+          description: A short name for the interface.
+          pattern: '^[A-Za-z0-9_-]{1,12}$'
+        vrfName:
+          type: string
+          description: The VRF to which this interface belongs.
+          nullable: true
+        fwMark:
+          type: string
+          description: The FwMark for the WireGuard interface. Can be decimal or hexadecimal.
+          nullable: true
+        endpoint:
+          type: string
+          description: The public endpoint of the WireGuard interface.
+        port:
+          type: integer
+          description: The listen port of the WireGuard interface.
+        mtu:
+          type: integer
+          description: MTU for the WireGuard interface.
+        privateKey:
+          type: string
+          description: The private key for the interface. If provided, the key will be updated. Set to null to keep unchanged.
+          nullable: true
+          writeOnly: true
+    SnatConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Enable Source NAT for clients.
+        snatIpNet:
+          type: string
+          nullable: true
+          description: |
+            IP/Network to use for SNAT, in CIDR notation. The behavior depends on the IP version and format:
+            - **`null`**: use MASQUERADE.
+            - **IPv4**: An `IPv4/32` uses SNAT. Any other mask length is invalid.
+            - **IPv6**: An `IPv6/128` uses SNAT. A network with a mask matching the server's network prefix uses NETMAP.
+            - **IPv6 with Roaming**: `::/128` uses a dynamic public IP from the master interface. An `IPv6Net` (e.g., `::a:b:c:d/112`) is used as an offset from the master interface's dynamic network.
+          example: "203.0.113.5/32"
+        snatExcludedNetwork:
+          type: string
+          description: Network range to exclude from SNAT in CIDR notation. If null, defaults to the server's own network range.
+          nullable: true
+          example: "192.168.0.0/16"
+        snatNETMAPRoamingMasterInterface:
+          type: string
+          maxLength: 15
+          nullable: true
+          description: "**IPv6-only:** Enables NETMAP roaming. The service will monitor this interface for IP changes and update NAT rules automatically. IPv6 `pseudoBridgeMasterInterface` must be disabled to use this."
+          example: "eth0"
+        snatNETMAPPseudoBridge:
+          type: boolean
+          description: "**IPv6-only:** If true, enables pseudo-bridging for the NETMAP target network on the roaming master interface."
+          default: false
+    ServerNetworkConfig:
+      type: object
+      description: Configuration for network settings (IPv4 or IPv6) on a server.
+      properties:
+        enabled:
+          type: boolean
+          description: Whether this IP version is enabled for the server.
+        network:
+          type: string
+          description: The server's network in CIDR notation (e.g., 10.0.0.1/24 or fd00::1/64). Defines the server's IP and the pool for clients.
+          example: "10.0.0.1/24"
+        pseudoBridgeMasterInterface:
+          type: string
+          maxLength: 15
+          nullable: true
+          description: If set, enables a pseudo-bridge on the specified interface to handle ARP (IPv4) or Neighbor Discovery (IPv6) requests for client IPs.
+          example: "br-lan"
+        snat:
+          $ref: '#/components/schemas/SnatConfig'
+        routedNetworks:
+          type: array
+          items:
+            type: string
+            description: A network in CIDR notation (e.g., 10.0.0.0/24).
+          description: List of networks to route for clients (equivalent to AllowedIPs). If null, defaults to server's own network range. Must contain server's own network range if specified.
+          example: ["10.0.0.0/24", "172.16.0.0/16"]
+          nullable: true
+        routedNetworksFirewall:
+          type: boolean
+          description: If true, add firewall rules to strictly allow traffic only to the specified routed networks (unless 0.0.0.0/0 or ::/0 is used).
+    Server:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: string
+        enabled:
+          type: boolean
+          readOnly: true
+          description: Reflects the current operational state of the server. Use the set-enable endpoint to change. Defaults to false on creation.
+        dns:
+          type: array
+          items:
+            type: string
+            format: ip
+          description: "List of DNS servers configured for clients of this server. If null, DNS row is omitted from client config."
+          nullable: true
+          example: ["1.1.1.1", "8.8.8.8"]
+        ipv4:
+          $ref: '#/components/schemas/ServerNetworkConfig'
+        ipv6:
+          $ref: '#/components/schemas/ServerNetworkConfig'
+        commentString:
+          type: string
+          readOnly: true
+          description: Randomly generated, static string used to identify and manage firewall rules associated with this server.
+      required:
+        - id
+        - name
+        - enabled
+        - commentString
+    ServerCreate:
+      type: object
+      description: At least one of ipv4 or ipv6 must be enabled and configured.
+      properties:
+        name:
+          type: string
+          example: "Default Server"
+        dns:
+          type: array
+          items:
+            type: string
+            format: ip
+          description: "List of DNS servers to be used by clients. Can be null."
+          nullable: true
+          example: ["1.1.1.1", "1.0.0.1"]
+        ipv4:
+          $ref: '#/components/schemas/ServerNetworkConfig'
+        ipv6:
+          $ref: '#/components/schemas/ServerNetworkConfig'
+      required:
+        - name
+    ServerUpdate:
+      type: object
+      description: At least one of ipv4 or ipv6 must be enabled and configured.
+      properties:
+        name:
+          type: string
+        dns:
+          type: array
+          items:
+            type: string
+            format: ip
+          description: "List of DNS servers to be used by clients. Can be null."
+          nullable: true
+        ipv4:
+          $ref: '#/components/schemas/ServerNetworkConfig'
+        ipv6:
+          $ref: '#/components/schemas/ServerNetworkConfig'
+    Client:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: string
+        enabled:
+          type: boolean
+          readOnly: true
+          description: Reflects the current state of the client. Use the set-enable endpoint to change. Defaults to false on creation.
+        ip:
+          type: string
+          format: ipv4
+          nullable: true
+          description: Assigned IPv4 address. Calculated at runtime from an internal offset and not stored directly.
+          readOnly: true
+          example: "10.0.0.2"
+        ipv6:
+          type: string
+          format: ipv6
+          nullable: true
+          description: Assigned IPv6 address. Calculated at runtime from an internal offset and not stored directly.
+          readOnly: true
+          example: "fd00::2"
+        dns:
+          type: array
+          items:
+            type: string
+            format: ip
+          description: "Client-specific DNS servers. If null, the client inherits DNS settings from its parent server. If set (even as an empty array `[]`), it overrides the server's setting."
+          nullable: true
+        publicKey:
+          type: string
+          readOnly: true
+          description: The public key of the client. Derived from private key if available.
+        presharedKey:
+          type: string
+          nullable: true
+          description: Preshared key, if used. This is not returned by GET requests for security, only settable.
+          writeOnly: true
+        keepalive:
+          type: integer
+          nullable: true
+          description: PersistentKeepalive interval in seconds.
+      required:
+        - id
+        - name
+        - enabled
+        - publicKey
+    ClientCreate:
+      type: object
+      description: At least one of ip or ipv6 must be specified ('auto' or a valid IP address).
+      properties:
+        name:
+          type: string
+          example: "John's Laptop"
+        ip:
+          type: string
+          nullable: true
+          description: "Desired IPv4. 'auto' for auto-allocation, a specific valid IP, or null to disable IPv4."
+          example: "auto"
+        ipv6:
+          type: string
+          nullable: true
+          description: "Desired IPv6. 'auto' for auto-allocation, a specific valid IP, or null to disable IPv6."
+        dns:
+          type: array
+          items:
+            type: string
+            format: ip
+          description: "Client-specific DNS servers. If null, inherit from the server. If set, it overrides."
+          nullable: true
+        privateKey:
+          type: string
+          nullable: true
+          writeOnly: true
+          description: Client's private key. If provided, `publicKey` is ignored. If both are null, a new keypair is generated.
+        publicKey:
+          type: string
+          nullable: true
+          description: Client's public key. Used only if `privateKey` is null.
+        presharedKey:
+          type: string
+          nullable: true
+          description: Optional preshared key. If null, one will not be used.
+        keepalive:
+          type: integer
+          nullable: true
+          description: PersistentKeepalive interval in seconds.
+      required:
+        - name
+    ClientUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        ip:
+          type: string
+          nullable: true
+          description: "Change the client's IPv4 address. Provide a specific valid IP, or null to disable IPv4 for this client."
+          example: "10.0.0.10"
+        ipv6:
+          type: string
+          nullable: true
+          description: "Change the client's IPv6 address. Provide a specific valid IP, or null to disable IPv6 for this client."
+        dns:
+          type: array
+          items:
+            type: string
+            format: ip
+          description: "Client-specific DNS servers. If null, inherit from the server. If set, it overrides."
+          nullable: true
+        privateKey:
+          type: string
+          nullable: true
+          writeOnly: true
+          description: Update the private key.
+        publicKey:
+          type: string
+          nullable: true
+          description: Update the public key (ignored if privateKey is provided).
+        presharedKey:
+          type: string
+          nullable: true
+          description: Update the preshared key. Set to an empty string `""` to remove.
+        keepalive:
+          type: integer
+          nullable: true
+          description: PersistentKeepalive interval in seconds.
+    ClientWithState:
+      description: Combines the static client configuration with its live WireGuard state.
+      allOf:
+        - $ref: '#/components/schemas/Client'
+        - $ref: '#/components/schemas/WGState'
