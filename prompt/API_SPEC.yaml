@@ -765,20 +765,22 @@ components:
             - **`null`**: use MASQUERADE.
             - **IPv4**: An `IPv4/32` uses SNAT. Any other mask length is invalid.
             - **IPv6**: An `IPv6/128` uses SNAT. A network with a mask matching the server's network prefix uses NETMAP.
-            - **IPv6 with Roaming**: `::/128` uses a dynamic public IP from the master interface. An `IPv6Net` (e.g., `::a:b:c:d/112`) is used as an offset from the master interface's dynamic network.
+            When roaming is enabled:
+            - **IPv4**: Must be `0.0.0.0/32` to use a dynamic public IP from the master interface.
+            - **IPv6**: `::/128` uses a dynamic public IP. An `IPv6Net` (e.g., `::a:b:c:d/112`) is used as an offset from the master interface's dynamic network.
           example: "203.0.113.5/32"
         snatExcludedNetwork:
           type: string
           description: Network range to exclude from SNAT in CIDR notation. If null, defaults to the server's own network range.
           nullable: true
           example: "192.168.0.0/16"
-        snatNETMAPRoamingMasterInterface:
+        roamingMasterInterface:
           type: string
           maxLength: 15
           nullable: true
-          description: "**IPv6-only:** Enables NETMAP roaming. The service will monitor this interface for IP changes and update NAT rules automatically. IPv6 `pseudoBridgeMasterInterface` must be disabled to use this."
+          description: "Enables SNAT roaming. The service will monitor this interface for IP changes and update NAT rules automatically. Mutually exclusive with `pseudoBridgeMasterInterface`."
           example: "eth0"
-        snatNETMAPPseudoBridge:
+        roamingPseudoBridge:
           type: boolean
           description: "**IPv6-only:** If true, enables pseudo-bridging for the NETMAP target network on the roaming master interface."
           default: false

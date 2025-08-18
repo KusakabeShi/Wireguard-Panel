@@ -1,12 +1,12 @@
 # WG-Panel
 
-WG-Panel is a web-based management panel for WireGuard
-I want to to vibe coding with AI coding assistants like Gemini-CLI and Claude Code to implement this full-stack application.
-This project is currently in the early stages of development.
+WG-Panel is a web-based management panel for WireGuard  
+I want to to vibe coding with AI coding assistants like Gemini-CLI and Claude Code to implement this full-stack application.  
+This project is currently in the early stages of development.  
 
 ## Project Goal
 
-The main objective is to create a comprehensive and user-friendly web interface to manage a WireGuard server. This includes configuring interfaces, managing server settings, and handling individual client configurations through a clean and intuitive UI.
+The main objective is to create a comprehensive and user-friendly web interface to manage a WireGuard server. This includes configuring interfaces, managing server settings, and handling individual client configurations through a clean and intuitive UI.  
 
 ## Key Features
 
