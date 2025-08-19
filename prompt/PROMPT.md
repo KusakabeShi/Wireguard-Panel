@@ -64,6 +64,9 @@ While parsing, use ParseCIDRv4 for IPv4 section and ParseCIDRv6 for IPv6 section
     3.  **Pseudo-bridge:** `null` to disable. A string (max length 15) to enable, and the content of the string is the master interface for the Pseudo-bridge service. This section is under IPvX, IPv4 and IPv6 has their own settings.
     4.  **SNAT:**
         1.  **Enabled:** Enable SNAT for IPv4/IPv6 or not.
+            SNAT are mutually exclusive with pseudo-bridge, because SNAT uses server's own IP as source address instead of client IP, but pseudo-bridge make clients IP to appear on the local network.
+            SNAT can't be enabled if pseudo-bridge enabled. Raise eror if both enabled. SNAT need to uses it's own `SNAT NETMAP pseudo-bridge` instead.
+            Add a hint in frontend if user enable both.
         2.  **SNAT IPNet:** The IP to use for SNAT. Datatype: IPNetWrapper or null
             In SNAT section, if null, use ifconfig MASQUERADE.
             In SNAT section, If an single IP (/32 for ipv4 or /128 for ipv6) is provided, use ifconfig SNAT mode.
@@ -78,7 +81,6 @@ While parsing, use ParseCIDRv4 for IPv4 section and ParseCIDRv6 for IPv6 section
         3.  **SNAT Roaming:** `null` to disable. A string (max length 15) to enable, and the content of the string is the master interface for the SNAT Roaming.
             This feature is a part of SNAT. The difference betweeh SNAT mode and SNAT Roaming Mode is SNAT mode spacify SNAT IP(Net) Manually, but SNAT Roaming Mode choose IP(Net) from master interface by SNAT Roaming Service.
             So that it requires SNAT works on ifconfig SNAT mode or NATMAP mode. 
-            This mode are mutually exclusive with pseudo-bridge. Can't enable if Pseudo-bridge enabled.
             When this option enabled, the `SNAT IPNet` will no longer be parsed to a IP address.
             In SNAT Mode, The `SNAT IPNet` must be `0.0.0.0/32` or `::/128`. Otherwise raise an error.
                 In this case, real IPv4/IPv6 for SNAT is retrived from the master interface, and use it as `SNAT IPNet` in firewall rule generation.

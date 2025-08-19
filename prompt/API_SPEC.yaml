@@ -799,7 +799,7 @@ components:
           type: string
           maxLength: 15
           nullable: true
-          description: If set, enables a pseudo-bridge on the specified interface to handle ARP (IPv4) or Neighbor Discovery (IPv6) requests for client IPs.
+          description: If set, enables a pseudo-bridge on the specified interface to handle ARP (IPv4) or Neighbor Discovery (IPv6) requests for client IPs. Mutually exclusive with SNAT.
           example: "br-lan"
         snat:
           $ref: '#/components/schemas/SnatConfig'
@@ -838,15 +838,10 @@ components:
           $ref: '#/components/schemas/ServerNetworkConfig'
         ipv6:
           $ref: '#/components/schemas/ServerNetworkConfig'
-        commentString:
-          type: string
-          readOnly: true
-          description: Randomly generated, static string used to identify and manage firewall rules associated with this server.
       required:
         - id
         - name
         - enabled
-        - commentString
     ServerCreate:
       type: object
       description: At least one of ipv4 or ipv6 must be enabled and configured.
