@@ -5,6 +5,7 @@ I'm going to implement a WireGuard server panel:
 *   **Description:** This is a WireGuard server management service, which has a three-level hierarchy: Interface, Server, and Client.
     *   Clients belong to a server, and servers belong to an interface.
 *   **API:** Provide a RESTful API, with separate modules in different files.
+*   **Frontend:** Serve a static sites for frontend files.
 *   **Authentication:** Username/password with session cookies stored in server memory. When the server closes, sessions are persisted to a `session.json` file.
 *   **Parameters:**
     *   `-c [configpath]`: Optional. If not provided, defaults to `./config.json`. If the file does not exist, it will be created with a random password, which is then printed to the console.
@@ -16,9 +17,10 @@ I'm going to implement a WireGuard server panel:
 *   **WireGuardConfigPath:** The path to store the configuration of WireGuard interfaces. Default value: `/etc/wireguard`.
 *   **User:** The username for the service.
 *   **Password:** The bcrypt-hashed password.
-*   **ListenIP:** The listen IP for the service.
-*   **ListenPort:** The listen port for the service.
-*   **SiteURLPrefix:** The prefix for backend APIs. Default: `/`.
+*   **ListenIP:** The listen IP for the service, default "::"
+*   **ListenPort:** The listen port for the service. default 5000
+*   **SiteURLPrefix:** The prefix to serve frontend static files. Default: `/`.
+*   **SiteFrontendPath:** The file path of frontend files. Default: `./frontend/build`
 *   **APIPrefix:** The prefix for backend APIs, appended to the `SiteURLPrefix`. Default: `/api`. For example, if `SiteURLPrefix` is `/wgpanel`, the full API path becomes `/wgpanel/api`.
 
 ### Interface:

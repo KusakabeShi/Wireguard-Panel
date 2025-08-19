@@ -1,7 +1,7 @@
 I'm going to implement a wireguard server panel:
 This is an example OpenAPI v3 for this backend:
 ```
-read API_SPEC.yaml
+@prompt/API_SPEC.yaml
 ```
 Write the frontend for this project:
 Programming language: React(frontend) with Material UI
@@ -22,5 +22,5 @@ Create the webpage depicted in the provided screenshot, don't contain the browse
 The replica should maintain the exact visual layout, including the positioning of all elements, typography, and color scheme.
 Ensure all interactive components function as they do in the original design.
 ```
-read wg_panrl.png
+@prompt/wg_panel.png
 ```
