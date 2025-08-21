@@ -1,0 +1,81 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Start React Dev Server",
+            "type": "shell",
+            "command": "npm",
+            "args": ["start"],
+            "options": {
+                "cwd": "${workspaceFolder}/frontend",
+                "env": {
+                    "GENERATE_SOURCEMAP": "true",
+                    "BROWSER": "none",
+                    "HOST": "0.0.0.0"
+                }
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^.*$",
+                    "file": 1,
+                    "location": 2,
+                    "message": 3
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "Compiling\\.\\.\\.|Starting the development server\\.\\.\\.",
+                    "endsPattern": "Compiled successfully!|webpack compiled with \\d+ warning|Failed to compile\\."
+                }
+            }
+        },
+        {
+            "label": "Start React Dev Server Remote",
+            "type": "shell",
+            "command": "npm",
+            "args": ["start"],
+            "options": {
+                "cwd": "${workspaceFolder}/frontend",
+                "env": {
+                    "GENERATE_SOURCEMAP": "true",
+                    "BROWSER": "none",
+                    "HOST": "0.0.0.0",
+                    "PORT": "3000",
+                    "DANGEROUSLY_DISABLE_HOST_CHECK": "true"
+                }
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^.*$",
+                    "file": 1,
+                    "location": 2,
+                    "message": 3
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "Compiling\\.\\.\\.|Starting the development server\\.\\.\\.",
+                    "endsPattern": "Compiled successfully!|webpack compiled with \\d+ warning|Failed to compile\\."
+                }
+            }
+        }
+    ]
+}

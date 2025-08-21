@@ -95,7 +95,7 @@ While parsing, use ParseCIDRv4 for IPv4 section and ParseCIDRv6 for IPv6 section
             If false, do nothing. If true, Perform pseudo-bridge on SNAT Roaming master interface, but use target_network as the network, which will be hendled by pseudo-bridge module.
         5.  **SNAT Excluded Network:** A network range to exclude from SNAT. If null, defaults to the server's own network range.
         *   If enabled, add SNAT firewall rules for this server, allowing clients to use the server's IP to access the external internet.
-        *   Generate a rule like `-s SELF_NET/prefix -d ! "SNAT Excluded NAT"`.
+        *   Generate a rule like `-s SELF_NET/prefix ! -d "SNAT Excluded NAT"`.
     5.  **Routed Networks:** A list of IPv4/IPv6 networks. If null, defaults to the server's own network range. Must contain the server's own network range and cannot overlap with each other. This is equivalent to `AllowedIPs` for the client.
     6.  **Routed Networks Firewall:** A boolean. If true, add firewall rules to allow `-s [Server Network] -d [Routed Network]` and block other destination IPs (unless `Routed Networks` is `0.0.0.0/0` for IPv4 or `::/0` for IPv6).
     7.  **CommentString:** A randomly generated string. When the server is started, use `iptables`/`ip6tables` to add firewall rules with this special comment. When stopped, remove firewall rules based on the comment. The comment should be static (saved in the config file) to ensure it can be removed if the server stops unexpectedly. This is for internal use only and transparent to the API/frontend.
