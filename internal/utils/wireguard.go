@@ -40,11 +40,11 @@ func GenerateWGKeyPair() (privateKey, publicKey string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	
+
 	publicKey, err = PrivToPublic(privateKey)
 	if err != nil {
 		return "", "", err
 	}
-	
+
 	return privateKey, publicKey, nil
 }

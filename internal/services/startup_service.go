@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"wg-panel/internal/config"
+	"wg-panel/internal/internalservice"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
 )
@@ -12,10 +13,10 @@ import (
 type StartupService struct {
 	cfg *config.Config
 	wg  *WireGuardService
-	fw  *FirewallService
+	fw  *internalservice.FirewallService
 }
 
-func NewStartupService(cfg *config.Config, wgService *WireGuardService, firewallService *FirewallService) *StartupService {
+func NewStartupService(cfg *config.Config, wgService *WireGuardService, firewallService *internalservice.FirewallService) *StartupService {
 	return &StartupService{
 		cfg: cfg,
 		wg:  wgService,
@@ -39,7 +40,7 @@ func (s *StartupService) InitializeInterfaces() error {
 			// Continue with other interfaces even if one fails
 			continue
 		}
-		log.Printf("Successfully initialized interface wg-%s", iface.Ifname)
+		log.Printf("Successfully initialized interface %s", iface.Ifname)
 	}
 
 	return nil

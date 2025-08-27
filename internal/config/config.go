@@ -3,10 +3,12 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 	"time"
 
+	"wg-panel/internal/internalservice"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
 )
@@ -32,7 +34,9 @@ type Config struct {
 	Sessions            map[string]*Session          `json:"sessions"`
 
 	// For thread safety
-	mu sync.RWMutex `json:"-"`
+	mu  sync.RWMutex                        `json:"-"`
+	pbs internalservice.PseudoBridgeService `json:"-"`
+	srs internalservice.SNATRoamingService  `json:"-"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -189,4 +193,153 @@ func (c *Config) CleanExpiredSessions() {
 			delete(c.Sessions, token)
 		}
 	}
+}
+
+func (c *Config) CheckNetworkOverlapsInVRF(vrfName *string, skipedIfaceID *string, skipedServerID *string, network *models.IPNetWrapper) error {
+	// Get all interfaces in the target VRF
+	if network == nil {
+		return nil
+	}
+	for _, iface := range c.GetAllInterfaces() {
+		if iface.VRFName != vrfName {
+			continue
+		}
+
+		if skipedIfaceID != nil && iface.ID == *skipedIfaceID {
+			continue
+		}
+
+		// Check for network overlaps among child servers
+		for _, server := range iface.Servers {
+			if skipedServerID != nil && server.ID == *skipedServerID {
+				continue
+			}
+			switch network.Version {
+			case 4:
+				if server.IPv4 != nil && server.IPv4.Network != nil && server.IPv4.Network.IsOverlap(network) {
+					return fmt.Errorf("network %v is overlapped with %v at server %v in interface %v", network, server.IPv4.Network, server.Name, iface.Ifname)
+				}
+			case 6:
+				if server.IPv6 != nil && server.IPv6.Network != nil && server.IPv6.Network.IsOverlap(network) {
+					return fmt.Errorf("network %v is overlapped with %v at server %v in interface %v", network, server.IPv6.Network, server.Name, iface.Ifname)
+				}
+			}
+		}
+
+	}
+	return nil
+}
+
+func (c *Config) SyncToInternalService() {
+	c.mu.RLock()
+	srsConfig := make(map[string]map[string]*models.ServerNetworkConfig)
+	pbsConfig := make(map[string]internalservice.ResponderNetworks)
+	for _, iface := range c.GetAllInterfaces() {
+		// Check for network overlaps among child servers
+		for _, server := range iface.Servers {
+			if server.IPv4 != nil && server.IPv4.Enabled {
+				if server.IPv4.Network != nil &&
+					server.IPv4.PseudoBridgeMasterInterface != nil &&
+					*server.IPv4.PseudoBridgeMasterInterface != "" {
+					ifname := *server.IPv4.PseudoBridgeMasterInterface
+					network := server.IPv4.Network
+					addPbsConf(pbsConfig, "v4", ifname, network)
+				}
+				if server.IPv4.Snat != nil && server.IPv4.Snat.Enabled &&
+					server.IPv4.Snat.SnatIPNet != nil &&
+					server.IPv4.Snat.RoamingPseudoBridge &&
+					server.IPv4.Snat.RoamingMasterInterface != nil &&
+					*server.IPv4.Snat.RoamingMasterInterface != "" {
+					ifname := *server.IPv4.Snat.RoamingMasterInterface
+					network := server.IPv4.Snat.SnatIPNet
+					zerov4, _ := models.ParseCIDR("0.0.0.0/32")
+					if network.Equal(zerov4) {
+						//addPbsConf(pbsConfig, "v4o", ifname, network)
+						addSrsConf(srsConfig, ifname, server.IPv4)
+					} else {
+						log.Printf("non 0.0.0.0/32 address for snat roaming for if: %v server: %v at interface %v", iface.Ifname, server.Name, ifname)
+					}
+
+				}
+			}
+			if server.IPv6 != nil && server.IPv6.Enabled {
+				if server.IPv6.Network != nil &&
+					server.IPv6.PseudoBridgeMasterInterface != nil &&
+					*server.IPv6.PseudoBridgeMasterInterface != "" {
+					ifname := *server.IPv6.PseudoBridgeMasterInterface
+					network := server.IPv6.Network
+					addPbsConf(pbsConfig, "v6", ifname, network)
+				}
+				if server.IPv6.Snat != nil && server.IPv6.Snat.Enabled && server.IPv6.Snat.SnatIPNet != nil &&
+					server.IPv6.Snat.RoamingPseudoBridge &&
+					server.IPv6.Snat.RoamingMasterInterface != nil &&
+					*server.IPv6.Snat.RoamingMasterInterface != "" {
+					ifname := *server.IPv6.Snat.RoamingMasterInterface
+					network := server.IPv6.Snat.SnatIPNet
+					zerov6, _ := models.ParseCIDR("::/128")
+					if network.Equal(zerov6) {
+						//addPbsConf(pbsConfig, "v6o", ifname, network)
+						addSrsConf(srsConfig, ifname, server.IPv6)
+					} else {
+						if server.IPv6.Network != nil {
+							if server.IPv6.Network.Masklen() == network.Masklen() {
+								addPbsConf(pbsConfig, "v6o", ifname, network)
+								addSrsConf(srsConfig, ifname, server.IPv6)
+							} else {
+								log.Printf("error to set snat roaming for if: %v server: %v at interface %v, network.Masklen= %v which is not /128 for SNAT mode, nor same as server network: %v for NETMAP mode", iface.Ifname, server.Name, ifname, network.Masklen(), server.IPv6.Network.String())
+							}
+						}
+						log.Printf("error to set snat roaming for if: %v server: %v at interface %v, network.Masklen= %v which is not /128 for SNAT mode, nor same as server network: %v for NETMAP mode", iface.Ifname, server.Name, ifname, network.Masklen(), "nil")
+					}
+				}
+			}
+		}
+	}
+	c.mu.RUnlock()
+	c.pbs.UpdateConfiguration(pbsConfig)
+	c.srs.UpdateConfiguration(srsConfig)
+}
+
+func addSrsConf(srsConfig map[string]map[string]*models.ServerNetworkConfig, ifname string, network *models.ServerNetworkConfig) {
+	if network == nil {
+		return
+	}
+	key := network.CommentString
+	if key == "" {
+		log.Printf("empty network.CommentString!")
+		return
+	}
+	oldrn, ok := srsConfig[ifname]
+	if !ok {
+		oldrn = make(map[string]*models.ServerNetworkConfig)
+		srsConfig[ifname] = oldrn
+	}
+
+	oldrn[key] = network.Copy()
+	srsConfig[ifname] = oldrn
+}
+
+func addPbsConf(pbsConfig map[string]internalservice.ResponderNetworks, target string, ifname string, network *models.IPNetWrapper) {
+	if network == nil {
+		return
+	}
+	oldrn, ok := pbsConfig[ifname]
+	if !ok {
+		oldrn = internalservice.ResponderNetworks{}
+	}
+	network_copy := &models.IPNetWrapper{}
+
+	*network_copy = *network
+	switch target {
+	case "v4":
+		oldrn.V4Networks = append(oldrn.V4Networks, *network_copy)
+	case "v6":
+		oldrn.V6Networks = append(oldrn.V6Networks, *network_copy)
+	case "v4o":
+		oldrn.V4Offsets = append(oldrn.V4Offsets, *network_copy)
+	case "v6o":
+		oldrn.V6Offsets = append(oldrn.V6Offsets, *network_copy)
+	}
+
+	pbsConfig[ifname] = oldrn
 }

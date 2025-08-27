@@ -151,28 +151,37 @@ This service has two parts: Pseudo-bridge Service Master and Interface Responder
 PseudoBridgeWaitInterface/PseudoBridgeRunningInterface is a list in a map in a map, [ifname][v4/v6][network1, network2, network3 ...]
 Pseudo-bridge Service Master:
     Spawn a Interface Responder which is a new new goroutine and stop unnecessary responders when there is no need.
-    Scans through all server periodically, check the pseudo-bridge enabled and it's master interface, or SNAT pseudo-bridge enabled and it's master interface. 
-    Use a for loop to iterate over all interface and servers. copy to PseudoBridgeWaitInterface then sync to PseudoBridgeRunningInterface. 
-    During the comparing, if PseudoBridgeWaitInterface and PseudoBridgeRunningInterface are same, it is read locked, so that it doesn't affect the Interface Responder process.
-    If they are different, lock and sync PseudoBridgeWaitInterface to PseudoBridgeRunningInterface. Spawn a Interface Responder if new interface added, clean unnecessary Interface Responder if the interface no longer nessesary.
+    Event driven, Start/Update and Stop.
+    Update: get a PseudoBridgeWaitInterface then sync to PseudoBridgeRunningInterface. 
+    During the comparing, get the interface and networks changes. if PseudoBridgeWaitInterface and PseudoBridgeRunningInterface are same, it is read locked, and do nothing.
+    If they are different, lock and sync PseudoBridgeWaitInterface to PseudoBridgeRunningInterface. Spawn a Interface Responder if new interface added, clean unnecessary Interface Responder if the interface no longer nessesary, and update the networks to existing responders.
 The Interface Responder:
-    It reads from PseudoBridgeRunningInterface for ARP-Reply or Neighbor Advertisement packet generation.
+    It reads from networks for ARP-Reply or Neighbor Advertisement packet generation.
     Monitoring ARP-request and Neighbor Solicitation packets on assigned interfaces using pcap.
     If it asks MAC address for the ip which is in the server networks which needs to be pseudo-bridged(in the PseudoBridgeRunningInterface of the interface), it generates an ARP Reply or Neighbor Advertisement packet to reply.
+    Event-driven, With Start, Update, Stop events.
+    Start: Start monitoring on the interface. If interface not exist, wait 5 second and try again. If the device vanished during running, wait 5 second and try again.
+    Update: Update the networks
+    Stop: Stop the Responder.
 
 ### SNAT Roaming Service
 This is a goroutine that starts with the server and handles the SNAT Roaming feature.
 This service has two parts: SNAT Roaming Service Master and Interface IPNet Listener. And use two variable SNATRoamingWaitInterface/SNATRoamingRunningInterface to sync data between them.
-SNATRoamingWaitInterface/SNATRoamingRunningInterface is a list in a map, [ifname] [{IPv6 address offset 1, CommentString1}, {IPv6Net offset 2,CommentString2}, {IPv6Net offset 3,CommentString3} ...]
+SNATRoamingWaitInterface/SNATRoamingRunningInterface is a list in a map, [ifname] [{IPv6Net offset 1, CommentString1}, {IPv6Net offset 2,CommentString2}, {IPv6Net offset 3,CommentString3} ...]
 SNAT Roaming Service Master:
     Spawns a Interface IPNet Listener which is a new new goroutine, and stop unnecessary listener when there is no need.
-    Scans through all server periodically, check the SNAT Roaming enabled and it's master interface.
-    Use a for loop iterate over all interface and servers. copy to SNATRoamingWaitInterface then sync to SNATRoamingRunningInterface. 
-    During the comparing, if SNATRoamingWaitInterface and SNATRoamingRunningInterface are same, it is read locked, so that it doesn't affect the Interface IPNet Listener process.
-    If they are different, lock sync SNATRoamingWaitInterface to SNATRoamingRunningInterface. Spawn a Interface IPNet Listener if new interface added, clean unnecessary Interface IPNet Listener if the interface no longer nessesary.
+    Event driven, Start/Update and Stop.
+    Update: get a SNATRoamingWaitInterface then sync to SNATRoamingRunningInterface. 
+    During the comparing, get the interface and IPv6Net offset changes. if SNATRoamingWaitInterface and SNATRoamingRunningInterface are same, it is read locked, and do nothing.
+    If they are different, lock sync SNATRoamingWaitInterface to SNATRoamingRunningInterface. Spawn a Interface IPNet Listener if new interface added, clean unnecessary Interface IPNet Listener if the interface no longer nessesary, and update IPv6Net offset to existing listeners.
 Interface IPNet Listener:
     It detects IP/IPv6/IPv6Net changed with netlink on assigned interface. If change, trigger the sync.
     If the IP/IPv6/IPv6Net changed, calculate the real IPv6Net ( a.k.a target_network ) and add/update/delete the firewall rules for IPv4 SNAT/IPv6 SNAT/IPv6 SNAT NETMAP.
+    Event-driven, With Start, Update, Stop events.
+    Start: Start monitoring on the interface. If interface not exist, wait 5 second and try again. If the device vanished during running, wait 5 second and try again.
+    Update: Update the IPv6Net offsets
+    Stop: Stop the Responder.
+    
 
 ### Some Golang code to calculate the public key:
 

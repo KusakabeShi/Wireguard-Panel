@@ -2,7 +2,9 @@ package services
 
 import (
 	"fmt"
-	"regexp"
+	"net"
+	"os"
+	"path/filepath"
 
 	"wg-panel/internal/config"
 	"wg-panel/internal/models"
@@ -25,15 +27,20 @@ func NewInterfaceService(cfg *config.Config, wgService *WireGuardService) *Inter
 
 func (s *InterfaceService) CreateInterface(req InterfaceCreateRequest) (*models.Interface, error) {
 	// Validate ifname
-	if !isValidIfname(req.Ifname) {
+	if !utils.IsValidIfname(req.Ifname) {
 		return nil, fmt.Errorf("invalid ifname: must match ^[A-Za-z0-9_-]{1,12}$")
 	}
 
-	// Check if ifname already exists
+	// Check if ifname already exists in configuration
 	for _, iface := range s.cfg.GetAllInterfaces() {
 		if iface.Ifname == req.Ifname {
 			return nil, fmt.Errorf("interface with ifname '%s' already exists", req.Ifname)
 		}
+	}
+
+	// Check if ifname is available in OS and filesystem
+	if err := s.CheckIfNameAvailable(req.Ifname); err != nil {
+		return nil, err
 	}
 
 	// Generate private key if not provided
@@ -50,6 +57,11 @@ func (s *InterfaceService) CreateInterface(req InterfaceCreateRequest) (*models.
 	publicKey, err := utils.PrivToPublic(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate public key: %v", err)
+	}
+
+	// Check if UDP port is available
+	if err := s.CheckUDPPortAvailable(req.Port); err != nil {
+		return nil, err
 	}
 
 	// Set defaults
@@ -110,23 +122,33 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 
 	// Update fields
 	if req.Ifname != "" && req.Ifname != iface.Ifname {
-		if !isValidIfname(req.Ifname) {
+		if !utils.IsValidIfname(req.Ifname) {
 			return nil, fmt.Errorf("invalid ifname: must match ^[A-Za-z0-9_-]{1,12}$")
 		}
-		// Check if new ifname already exists
+		// Check if new ifname already exists in configuration
 		for _, otherIface := range s.cfg.GetAllInterfaces() {
 			if otherIface.ID != id && otherIface.Ifname == req.Ifname {
 				return nil, fmt.Errorf("interface with ifname '%s' already exists", req.Ifname)
 			}
 		}
+		// Check if ifname is available in OS and filesystem
+		if err := s.CheckIfNameAvailable(req.Ifname); err != nil {
+			return nil, err
+		}
 		iface.Ifname = req.Ifname
 	}
 
-	if req.VRFName != nil && (iface.VRFName == nil || *req.VRFName != *iface.VRFName) {
+	if req.VRFName != iface.VRFName {
 		// Check for network overlaps when changing VRF
-		if err := s.checkVRFNetworkOverlaps(iface, req.VRFName); err != nil {
-			return nil, err
+		for _, server := range iface.Servers {
+			if err := s.cfg.CheckNetworkOverlapsInVRF(req.VRFName, nil, nil, server.GetNetwork(4)); err != nil {
+				return nil, err
+			}
+			if err := s.cfg.CheckNetworkOverlapsInVRF(req.VRFName, nil, nil, server.GetNetwork(6)); err != nil {
+				return nil, err
+			}
 		}
+
 		iface.VRFName = req.VRFName
 		needsWGRegeneration = true
 	}
@@ -141,6 +163,10 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 	}
 
 	if req.Port > 0 && req.Port != iface.Port {
+		// Check if UDP port is available
+		if err := s.CheckUDPPortAvailable(req.Port); err != nil {
+			return nil, err
+		}
 		iface.Port = req.Port
 		needsWGRegeneration = true
 	}
@@ -195,48 +221,6 @@ func (s *InterfaceService) DeleteInterface(id string) error {
 	return s.cfg.Save()
 }
 
-func (s *InterfaceService) checkVRFNetworkOverlaps(iface *models.Interface, newVRFName *string) error {
-	// Get all interfaces in the target VRF
-	for _, otherIface := range s.cfg.GetAllInterfaces() {
-		if otherIface.ID == iface.ID {
-			continue
-		}
-
-		// Check if other interface is in the same VRF
-		if (newVRFName == nil && otherIface.VRFName == nil) ||
-			(newVRFName != nil && otherIface.VRFName != nil && *newVRFName == *otherIface.VRFName) {
-			
-			// Check for network overlaps among child servers
-			for _, server := range iface.Servers {
-				for _, otherServer := range otherIface.Servers {
-					if s.serverNetworksOverlap(server, otherServer) {
-						return fmt.Errorf("server network overlap detected in VRF")
-					}
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func (s *InterfaceService) serverNetworksOverlap(s1, s2 *models.Server) bool {
-	if s1.IPv4 != nil && s2.IPv4 != nil && s1.IPv4.Enabled && s2.IPv4.Enabled {
-		if s1.IPv4.Network != nil && s2.IPv4.Network != nil {
-			if s1.IPv4.Network.IsOverlap(s2.IPv4.Network) {
-				return true
-			}
-		}
-	}
-	if s1.IPv6 != nil && s2.IPv6 != nil && s1.IPv6.Enabled && s2.IPv6.Enabled {
-		if s1.IPv6.Network != nil && s2.IPv6.Network != nil {
-			if s1.IPv6.Network.IsOverlap(s2.IPv6.Network) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func (s *InterfaceService) sanitizeInterface(iface *models.Interface) *models.Interface {
 	// Create a copy without the private key
 	result := *iface
@@ -244,9 +228,35 @@ func (s *InterfaceService) sanitizeInterface(iface *models.Interface) *models.In
 	return &result
 }
 
-func isValidIfname(ifname string) bool {
-	matched, _ := regexp.MatchString("^[A-Za-z0-9_-]{1,12}$", ifname)
-	return matched
+func (s *InterfaceService) CheckIfNameAvailable(ifname string) error {
+	// Check if interface exists in OS
+	if _, err := net.InterfaceByName(ifname); err == nil {
+		return fmt.Errorf("interface '%s' already exists in OS", ifname)
+	}
+
+	// Check if WireGuard config file exists
+	configPath := filepath.Join(s.cfg.WireGuardConfigPath, ifname+".conf")
+	if _, err := os.Stat(configPath); err == nil {
+		return fmt.Errorf("WireGuard config file '%s' already exists", configPath)
+	}
+
+	return nil
+}
+
+func (s *InterfaceService) CheckUDPPortAvailable(port int) error {
+	// Try to bind to the UDP port
+	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return fmt.Errorf("failed to resolve UDP address: %v", err)
+	}
+
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		return fmt.Errorf("UDP port %d is not available: %v", port, err)
+	}
+	defer conn.Close()
+
+	return nil
 }
 
 type InterfaceCreateRequest struct {

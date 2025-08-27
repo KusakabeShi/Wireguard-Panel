@@ -778,7 +778,7 @@ components:
           type: string
           maxLength: 15
           nullable: true
-          description: "Enables SNAT roaming. The service will monitor this interface for IP changes and update NAT rules automatically. Mutually exclusive with `pseudoBridgeMasterInterface`."
+          description: "Enables SNAT roaming. The service will monitor this interface for IP changes and update NAT rules automatically."
           example: "eth0"
         roamingPseudoBridge:
           type: boolean
@@ -799,7 +799,7 @@ components:
           type: string
           maxLength: 15
           nullable: true
-          description: If set, enables a pseudo-bridge on the specified interface to handle ARP (IPv4) or Neighbor Discovery (IPv6) requests for client IPs. Mutually exclusive with SNAT.
+          description: If set, enables a pseudo-bridge on the specified interface to handle ARP (IPv4) or Neighbor Discovery (IPv6) requests for client IPs.
           example: "br-lan"
         snat:
           $ref: '#/components/schemas/SnatConfig'

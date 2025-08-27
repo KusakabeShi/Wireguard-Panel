@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 
 	"wg-panel/internal/config"
+	"wg-panel/internal/internalservice"
 	"wg-panel/internal/models"
 	"wg-panel/internal/server"
-	"wg-panel/internal/services"
 	"wg-panel/internal/utils"
 
 	"golang.org/x/crypto/bcrypt"
@@ -47,17 +47,14 @@ func main() {
 	}
 
 	// Initialize services
-	pseudoBridgeService := services.NewPseudoBridgeService()
-	snatRoamingService := services.NewSNATRoamingService()
-
-	// Start background services
-	go pseudoBridgeService.Start()
-	go snatRoamingService.Start()
+	firewallService := internalservice.NewFirewallService()
+	pseudoBridgeService := internalservice.NewPseudoBridgeService()
+	snatRoamingService := internalservice.NewSNATRoamingService(pseudoBridgeService, firewallService)
 
 	// Start HTTP server
 	srv := server.NewServer(cfg, pseudoBridgeService, snatRoamingService)
 	log.Printf("Starting WireGuard Panel on %s:%d", cfg.ListenIP, cfg.ListenPort)
-	log.Fatal(srv.Start())
+	log.Fatal(srv.Start(firewallService))
 }
 
 func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, error) {
@@ -82,16 +79,16 @@ func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, e
 
 		cfg := &config.Config{
 			WireGuardConfigPath: "/etc/wireguard",
-			User:               "admin",
-			Password:           string(hashedPassword),
-			ListenIP:           "0.0.0.0",
-			ListenPort:         5000,
-			SiteURLPrefix:      "/",
-			SiteFrontendPath:   "./frontend/build",
-			APIPrefix:          "/api",
-			ServerId:           serverId,
-			Interfaces:         make(map[string]*models.Interface),
-			Sessions:           make(map[string]*config.Session),
+			User:                "admin",
+			Password:            string(hashedPassword),
+			ListenIP:            "0.0.0.0",
+			ListenPort:          5000,
+			SiteURLPrefix:       "/",
+			SiteFrontendPath:    "./frontend/build",
+			APIPrefix:           "/api",
+			ServerId:            serverId,
+			Interfaces:          make(map[string]*models.Interface),
+			Sessions:            make(map[string]*config.Session),
 		}
 
 		if err := saveConfig(configPath, cfg); err != nil {

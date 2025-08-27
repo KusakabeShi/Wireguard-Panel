@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -45,7 +46,7 @@ func ParseCIDR(cidr string) (*IPNetWrapper, error) {
 	}, nil
 }
 
-func ParseCIDRAf(cidr string, af int) (ipnet *IPNetWrapper, err error) {
+func ParseCIDRAf(af int, cidr string) (ipnet *IPNetWrapper, err error) {
 	ipnet, err = ParseCIDRFromIP(cidr)
 	if err != nil {
 		return
@@ -63,7 +64,7 @@ func ParseCIDRFromIP(cidr string) (*IPNetWrapper, error) {
 			return nil, err
 		}
 		if ip.To4() != nil {
-
+			cidr = cidr + "/32"
 		} else {
 			cidr = cidr + "/128"
 		}
@@ -72,7 +73,7 @@ func ParseCIDRFromIP(cidr string) (*IPNetWrapper, error) {
 	return ipnet, err
 }
 
-func ParseCIDRFromIPAf(cidr string, af int) (ipnet *IPNetWrapper, err error) {
+func ParseCIDRFromIPAf(af int, cidr string) (ipnet *IPNetWrapper, err error) {
 	ipnet, err = ParseCIDRFromIP(cidr)
 	if err != nil {
 		return
@@ -210,6 +211,63 @@ func (w *IPNetWrapper) GetByOffset(offset IPWrapper) (*IPNetWrapper, error) {
 	}, nil
 }
 
+func (w *IPNetWrapper) GetNetByOffset(offset *IPNetWrapper) (*IPNetWrapper, error) {
+	// Get smaller block of networks from w based on offset.
+	// Example: w= 2a0d:3a87::/64. offset= ::980d:0/112, returns 2a0d:3a87::980d:0/112
+	// Raise error if offset is not aligned, like w= 2a0d:3a87::/64. offset= ::980d:0/96, returns 2a0d:3a87::980d:0/96 but 2a0d:3a87::980d:0/96 is not a valid base network
+	if w == nil {
+		return nil, fmt.Errorf("w is nil")
+	}
+	if offset == nil {
+		return w, nil
+	}
+	if w.Version != offset.Version {
+		return nil, fmt.Errorf("w and offset in different address family")
+	}
+	if offset.Masklen() < w.Masklen() {
+		return nil, fmt.Errorf("offset masklen is smaller than original masklen")
+	}
+
+	// Check that offset network is properly aligned within the base network
+	err := w.CheckOffsetValid(IPWrapper(offset.IP))
+	if err != nil {
+		return nil, fmt.Errorf("offset network not valid within base network: %v", err)
+	}
+
+	// Verify that the offset network's base IP is properly aligned for its mask
+	offsetMask := net.CIDRMask(offset.Masklen(), len(offset.IP)*8)
+	if !offset.IP.Equal(offset.IP.Mask(offsetMask)) {
+		return nil, fmt.Errorf("offset network %s is not properly aligned for its mask", offset.String())
+	}
+
+	new_IP, err := w.GetByOffset(IPWrapper(offset.IP))
+	if err != nil {
+		return nil, err
+	}
+	var bits int
+	if new_IP.Version == 4 {
+		bits = 32
+	} else {
+		bits = 128
+	}
+	mask := net.CIDRMask(offset.Masklen(), bits)
+	resultIP := new_IP.IP.Mask(mask)
+
+	// Verify the result is within the original network bounds
+	if !w.BaseNet.Contains(resultIP) {
+		return nil, fmt.Errorf("resulting network %s/%d exceeds original network bounds %s", resultIP, offset.Masklen(), w.BaseNet.String())
+	}
+
+	return &IPNetWrapper{
+		Version: new_IP.Version,
+		IP:      new_IP.IP,
+		BaseNet: net.IPNet{
+			IP:   resultIP,
+			Mask: mask,
+		},
+	}, nil
+}
+
 func (w *IPNetWrapper) IsOverlap(w2 *IPNetWrapper) bool {
 	if w == nil || w2 == nil {
 		return false
@@ -316,5 +374,27 @@ func (w *IPNetWrapper) Equal(w2 *IPNetWrapper) bool {
 	if w.Masklen() != w2.Masklen() {
 		return false
 	}
+	return true
+}
+
+func NetworksEqual(s1, s2 []IPNetWrapper) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+	// Sort both slices
+	sort.Slice(s1, func(i, j int) bool {
+		return IPNetLess(&s1[i], &s1[j])
+	})
+	sort.Slice(s2, func(i, j int) bool {
+		return IPNetLess(&s2[i], &s2[j])
+	})
+
+	// Compare each element
+	for i := 0; i < len(s1); i++ {
+		if !s1[i].Equal(&s2[i]) {
+			return false
+		}
+	}
+
 	return true
 }

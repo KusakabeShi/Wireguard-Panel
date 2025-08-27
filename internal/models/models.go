@@ -15,13 +15,23 @@ type SnatConfig struct {
 }
 
 type ServerNetworkConfig struct {
-	Enabled                     bool            `json:"enabled"`
-	Network                     *IPNetWrapper   `json:"network"`
-	PseudoBridgeMasterInterface *string         `json:"pseudoBridgeMasterInterface"`
-	Snat                        *SnatConfig     `json:"snat"`
-	RoutedNetworks              []*IPNetWrapper `json:"routedNetworks"`
-	RoutedNetworksFirewall      bool            `json:"routedNetworksFirewall"`
-	CommentString               string          `json:"commentString"`
+	Enabled                     bool           `json:"enabled"`
+	Network                     *IPNetWrapper  `json:"network"`
+	PseudoBridgeMasterInterface *string        `json:"pseudoBridgeMasterInterface"`
+	Snat                        *SnatConfig    `json:"snat"`
+	RoutedNetworks              []IPNetWrapper `json:"routedNetworks"`
+	RoutedNetworksFirewall      bool           `json:"routedNetworksFirewall"`
+	CommentString               string         `json:"commentString"`
+}
+
+func (src *ServerNetworkConfig) Copy() (dst *ServerNetworkConfig) {
+	dst = &ServerNetworkConfig{}
+	*dst = *src
+	*dst.Network = *src.Network
+	*dst.PseudoBridgeMasterInterface = *src.PseudoBridgeMasterInterface
+	*dst.Snat = *src.Snat
+	copy(dst.RoutedNetworks, src.RoutedNetworks)
+	return
 }
 
 type WGState struct {
@@ -192,5 +202,22 @@ func (c *Client) SetIP(af int, serverNet *IPNetWrapper, ip net.IP, otherclients 
 		c.IPv6Offset = offset
 	}
 
+	return nil
+}
+
+func (s *Server) GetNetwork(af int) *IPNetWrapper {
+	if s == nil {
+		return nil
+	}
+	switch af {
+	case 4:
+		if s.IPv4 != nil {
+			return s.IPv4.Network
+		}
+	case 6:
+		if s.IPv6 != nil {
+			return s.IPv6.Network
+		}
+	}
 	return nil
 }

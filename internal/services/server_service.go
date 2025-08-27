@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"wg-panel/internal/config"
+	"wg-panel/internal/internalservice"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
 
@@ -13,10 +14,10 @@ import (
 type ServerService struct {
 	cfg *config.Config
 	wg  *WireGuardService
-	fw  *FirewallService
+	fw  *internalservice.FirewallService
 }
 
-func NewServerService(cfg *config.Config, wgService *WireGuardService, firewallService *FirewallService) *ServerService {
+func NewServerService(cfg *config.Config, wgService *WireGuardService, firewallService *internalservice.FirewallService) *ServerService {
 	return &ServerService{
 		cfg: cfg,
 		wg:  wgService,
@@ -277,14 +278,14 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 			ipv6.RoutedNetworks = append(ipv6.RoutedNetworks, r)
 		}
 	}
-
+	var exid *string
+	if oldServer != nil {
+		exid = &oldServer.ID
+	}
 	// 2. Validate IPv4 configuration if filled
 	if ipv4.Network != "" {
-		exids := []string{}
-		if oldServer != nil {
-			exids = []string{oldServer.ID}
-		}
-		if err := s.validateSingleServerNetworkConfig(iface, ipv4, 4, exids); err != nil {
+
+		if err := s.validateSingleServerNetworkConfig(4, iface, ipv4, exid); err != nil {
 			return nil, fmt.Errorf("IPv4 validation failed: %v", err)
 		}
 	} else if ipv4.Enabled {
@@ -293,11 +294,7 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 
 	// 3. Validate IPv6 configuration if filled
 	if ipv6.Network != "" {
-		exids := []string{}
-		if oldServer != nil {
-			exids = []string{oldServer.ID}
-		}
-		if err := s.validateSingleServerNetworkConfig(iface, ipv6, 6, exids); err != nil {
+		if err := s.validateSingleServerNetworkConfig(6, iface, ipv6, exid); err != nil {
 			return nil, fmt.Errorf("IPv6 validation failed: %v", err)
 		}
 	} else if ipv6.Enabled {
@@ -306,8 +303,9 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 
 	var server *models.Server
 	prefix := s.cfg.ServerId + "-"
-	ipv4CommentString, _ := utils.GenerateRandomString(prefix, 16)
-	ipv6CommentString, _ := utils.GenerateRandomString(prefix, 16)
+	CommentString, _ := utils.GenerateRandomString(prefix, 12)
+	ipv4CommentString := prefix + "-v4-" + CommentString
+	ipv6CommentString := prefix + "-v6-" + CommentString
 
 	if oldServer == nil {
 		// Generate comment strings for firewall rules with server ID prefix
@@ -334,22 +332,22 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 		*server = *oldServer
 
 		if req.IPv4 != nil && req.IPv4.Network != "" {
-			newV4, err := models.ParseCIDRAf(req.IPv4.Network, 4)
+			newV4, err := models.ParseCIDRAf(4, req.IPv4.Network)
 			if err != nil {
 				return nil, err
 			}
-			err = s.validateClientIPsInNewNetwork(server.Clients, newV4, 4)
+			err = s.validateClientIPsInNewNetwork(4, server.Clients, newV4)
 			if err != nil {
 				return nil, err
 			}
 		}
 		if req.IPv6 != nil && req.IPv6.Network != "" {
-			newV6, err := models.ParseCIDRAf(req.IPv6.Network, 6)
+			newV6, err := models.ParseCIDRAf(6, req.IPv6.Network)
 			if err != nil {
 				return nil, err
 			}
 
-			err = s.validateClientIPsInNewNetwork(server.Clients, newV6, 6)
+			err = s.validateClientIPsInNewNetwork(6, server.Clients, newV6)
 			if err != nil {
 				return nil, err
 			}
@@ -373,7 +371,7 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 			newserverbasenet := server.IPv4.Network.Network()
 			if len(server.IPv4.RoutedNetworks) == 1 && len(oldServer.IPv4.RoutedNetworks) == 1 {
 				if server.IPv4.RoutedNetworks[0].Equal(&oldserverbasenet) {
-					server.IPv4.RoutedNetworks = []*models.IPNetWrapper{&newserverbasenet}
+					server.IPv4.RoutedNetworks = []models.IPNetWrapper{newserverbasenet}
 				}
 			}
 			if server.IPv4.Snat != nil && server.IPv4.Snat.SnatExcludedNetwork != nil {
@@ -389,7 +387,7 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 			if len(server.IPv6.RoutedNetworks) == 1 && len(oldServer.IPv6.RoutedNetworks) == 1 {
 
 				if server.IPv6.RoutedNetworks[0].Equal(&oldserverbasenet) {
-					server.IPv6.RoutedNetworks = []*models.IPNetWrapper{&newserverbasenet}
+					server.IPv6.RoutedNetworks = []models.IPNetWrapper{newserverbasenet}
 				}
 			}
 			if server.IPv6.Snat != nil && server.IPv6.Snat.SnatExcludedNetwork != nil {
@@ -403,7 +401,7 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 	return server, nil
 }
 
-func (s *ServerService) validateSingleServerNetworkConfig(iface *models.Interface, cfg *ServerNetworkConfigRequest, version int, excludeServerID []string) error {
+func (s *ServerService) validateSingleServerNetworkConfig(version int, iface *models.Interface, cfg *ServerNetworkConfigRequest, excludeServerID *string) error {
 	if cfg.Network == "" {
 		return fmt.Errorf("network must be specified")
 	}
@@ -412,28 +410,30 @@ func (s *ServerService) validateSingleServerNetworkConfig(iface *models.Interfac
 	var network *models.IPNetWrapper
 	var err error
 	if version == 4 {
-		network, err = models.ParseCIDRAf(cfg.Network, 4)
+		network, err = models.ParseCIDRAf(4, cfg.Network)
 	} else {
-		network, err = models.ParseCIDRAf(cfg.Network, 6)
+		network, err = models.ParseCIDRAf(6, cfg.Network)
 	}
 	if err != nil {
 		return fmt.Errorf("invalid network CIDR: %v", err)
 	}
 
 	// 2. Check for network overlaps with other servers in the same VRF
-	if err := s.validateNetworkOverlaps(iface, network, version, excludeServerID...); err != nil {
-		return err
-	}
 
-	// 3. Validate pseudo-bridge and SNAT mutual exclusion
-	if cfg.PseudoBridgeMasterInterface != nil && *cfg.PseudoBridgeMasterInterface != "" &&
-		cfg.Snat != nil && cfg.Snat.Enabled {
-		return fmt.Errorf("SNAT and pseudo-bridge are mutually exclusive")
+	if err := s.cfg.CheckNetworkOverlapsInVRF(iface.VRFName, nil, excludeServerID, network); err != nil {
+		return err
 	}
 
 	// 4. Validate routed networks don't overlap with each other
-	if err := s.validateRoutedNetworksOverlap(cfg.RoutedNetworks); err != nil {
+	if err := s.validateRoutedNetworksOverlap(version, cfg.RoutedNetworks); err != nil {
 		return err
+	}
+
+	if cfg.PseudoBridgeMasterInterface != nil && len(*cfg.PseudoBridgeMasterInterface) > 0 {
+		err := utils.IsValidPhyIfName(*cfg.PseudoBridgeMasterInterface)
+		if err != nil {
+			return err
+		}
 	}
 
 	// 5. Validate SNAT configuration
@@ -446,7 +446,7 @@ func (s *ServerService) validateSingleServerNetworkConfig(iface *models.Interfac
 	return nil
 }
 
-func (s *ServerService) validateClientIPsInNewNetwork(clients []*models.Client, newNetwork *models.IPNetWrapper, version int) error {
+func (s *ServerService) validateClientIPsInNewNetwork(version int, clients []*models.Client, newNetwork *models.IPNetWrapper) error {
 	for _, client := range clients {
 		var clientIP *models.IPNetWrapper
 		var err error
@@ -464,45 +464,14 @@ func (s *ServerService) validateClientIPsInNewNetwork(clients []*models.Client, 
 	return nil
 }
 
-func (s *ServerService) validateNetworkOverlaps(iface *models.Interface, network *models.IPNetWrapper, version int, excludeServerID ...string) error {
-	excludeMap := make(map[string]bool)
-	for _, id := range excludeServerID {
-		excludeMap[id] = true
-	}
-
-	for _, otherIface := range s.cfg.GetAllInterfaces() {
-		if !s.interfacesInSameVRF(iface, otherIface) {
-			continue
-		}
-
-		for _, server := range otherIface.Servers {
-			if excludeMap[server.ID] {
-				continue
-			}
-
-			var otherNetwork *models.IPNetWrapper
-			if version == 4 && server.IPv4 != nil && server.IPv4.Network != nil {
-				otherNetwork = server.IPv4.Network
-			} else if version == 6 && server.IPv6 != nil && server.IPv6.Network != nil {
-				otherNetwork = server.IPv6.Network
-			}
-
-			if otherNetwork != nil && network.IsOverlap(otherNetwork) {
-				return fmt.Errorf("network overlaps with existing server network in same VRF")
-			}
-		}
-	}
-	return nil
-}
-
-func (s *ServerService) validateRoutedNetworksOverlap(routedNetworks []string) error {
+func (s *ServerService) validateRoutedNetworksOverlap(af int, routedNetworks []string) error {
 	if len(routedNetworks) <= 1 {
 		return nil
 	}
 
 	networks := make([]*models.IPNetWrapper, 0, len(routedNetworks))
 	for _, routedNet := range routedNetworks {
-		network, err := models.ParseCIDR(routedNet)
+		network, err := models.ParseCIDRAf(af, routedNet)
 		if err != nil {
 			return fmt.Errorf("invalid routed network CIDR %s: %v", routedNet, err)
 		}
@@ -525,9 +494,9 @@ func (s *ServerService) validateSnatConfiguration(serverNetwork *models.IPNetWra
 		var snatNet *models.IPNetWrapper
 		var err error
 		if version == 4 {
-			snatNet, err = models.ParseCIDRFromIPAf(snat.SnatIPNet, 4)
+			snatNet, err = models.ParseCIDRFromIPAf(4, snat.SnatIPNet)
 		} else {
-			snatNet, err = models.ParseCIDRFromIPAf(snat.SnatIPNet, 6)
+			snatNet, err = models.ParseCIDRFromIPAf(6, snat.SnatIPNet)
 		}
 		if err != nil {
 			return fmt.Errorf("invalid SNAT IP/Net: %v", err)
@@ -540,17 +509,13 @@ func (s *ServerService) validateSnatConfiguration(serverNetwork *models.IPNetWra
 			return fmt.Errorf("IPv6 SNAT IP must be /128 (SNAT mode) or equal with ServerNet /%d (NETMAP mode)", serverNetwork.Masklen())
 		}
 	}
+	if snat.RoamingMasterInterface != nil && len(*snat.RoamingMasterInterface) > 0 {
+		err := utils.IsValidPhyIfName(*snat.RoamingMasterInterface)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
-}
-
-func (s *ServerService) interfacesInSameVRF(iface1, iface2 *models.Interface) bool {
-	if iface1.VRFName == nil && iface2.VRFName == nil {
-		return true
-	}
-	if iface1.VRFName != nil && iface2.VRFName != nil {
-		return *iface1.VRFName == *iface2.VRFName
-	}
-	return false
 }
 
 func (s *ServerService) prepareNetworkConfig(af int, req *ServerNetworkConfigRequest, commentString string) (*models.ServerNetworkConfig, error) {
@@ -561,7 +526,7 @@ func (s *ServerService) prepareNetworkConfig(af int, req *ServerNetworkConfigReq
 	config := &models.ServerNetworkConfig{
 		Enabled:                     req.Enabled,
 		PseudoBridgeMasterInterface: req.PseudoBridgeMasterInterface,
-		RoutedNetworks:              make([]*models.IPNetWrapper, 0),
+		RoutedNetworks:              make([]models.IPNetWrapper, 0),
 		RoutedNetworksFirewall:      req.RoutedNetworksFirewall,
 		CommentString:               commentString,
 	}
@@ -590,13 +555,13 @@ func (s *ServerService) prepareNetworkConfig(af int, req *ServerNetworkConfigReq
 				return nil, fmt.Errorf("%v is not a ipv%v address in %v", routedNet, af, req.RoutedNetworks)
 			}
 			normalizedNetwork := network.Network()
-			config.RoutedNetworks = append(config.RoutedNetworks, &normalizedNetwork)
+			config.RoutedNetworks = append(config.RoutedNetworks, normalizedNetwork)
 
 		}
 	} else if config.Network != nil {
 		// Default to server's own network, normalized
 		normalizedNetwork := config.Network.Network()
-		config.RoutedNetworks = []*models.IPNetWrapper{&normalizedNetwork}
+		config.RoutedNetworks = []models.IPNetWrapper{normalizedNetwork}
 	}
 
 	// Parse SNAT configuration

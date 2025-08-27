@@ -28,7 +28,7 @@ func (s *WireGuardService) GenerateAndSyncInterface(iface *models.Interface) err
 	config := s.generateInterfaceConfig(iface)
 
 	// Write configuration file to wireguardConfigPath
-	configFile := filepath.Join(s.configPath, fmt.Sprintf("wg-%s.conf", iface.Ifname))
+	configFile := filepath.Join(s.configPath, fmt.Sprintf("%s.conf", iface.Ifname))
 	if err := utils.WriteFileAtomic(configFile, []byte(config), 0600); err != nil {
 		return fmt.Errorf("failed to write config file: %v", err)
 	}
@@ -137,7 +137,7 @@ func (s *WireGuardService) calculateAllowedIPs(client *models.Client, server *mo
 }
 
 func (s *WireGuardService) syncInterface(ifname string, configFile string) error {
-	interfaceName := fmt.Sprintf("wg-%s", ifname)
+	interfaceName := fmt.Sprintf("%s", ifname)
 
 	// Check if interface exists
 	if err := utils.RunCommand("ip", "link", "show", interfaceName); err != nil {
@@ -157,11 +157,10 @@ func (s *WireGuardService) syncInterface(ifname string, configFile string) error
 }
 
 func (s *WireGuardService) RemoveInterface(ifname string) error {
-	configFile := filepath.Join(s.configPath, fmt.Sprintf("wg-%s.conf", ifname))
-	interfaceName := fmt.Sprintf("wg-%s", ifname)
+	configFile := filepath.Join(s.configPath, fmt.Sprintf("%s.conf", ifname))
 
 	// Check if interface exists before trying to remove it
-	if err := utils.RunCommand("ip", "link", "show", interfaceName); err != nil {
+	if err := utils.RunCommand("ip", "link", "show", ifname); err != nil {
 		// Interface doesn't exist, skip removal but continue with config file cleanup
 		// This is not an error - interface might have been removed already
 	} else {
@@ -169,7 +168,7 @@ func (s *WireGuardService) RemoveInterface(ifname string) error {
 		// Use wg-quick down to remove interface
 		if err := utils.RunCommand("wg-quick", "down", configFile); err != nil {
 			// Try to remove manually if wg-quick fails
-			if err := utils.RunCommand("ip", "link", "delete", interfaceName); err != nil {
+			if err := utils.RunCommand("ip", "link", "delete", ifname); err != nil {
 				return fmt.Errorf("failed to remove interface: %v", err)
 			}
 		}
@@ -184,21 +183,20 @@ func (s *WireGuardService) RemoveInterface(ifname string) error {
 }
 
 func (s *WireGuardService) SetInterfaceMTU(ifname string, mtu int) error {
-	interfaceName := fmt.Sprintf("wg-%s", ifname)
 
 	// Check if interface exists before trying to set MTU
-	if err := utils.RunCommand("ip", "link", "show", interfaceName); err != nil {
-		return fmt.Errorf("interface %s does not exist: %v", interfaceName, err)
+	if err := utils.RunCommand("ip", "link", "show", ifname); err != nil {
+		return fmt.Errorf("interface %s does not exist: %v", ifname, err)
 	}
 
-	if err := utils.RunCommand("ip", "link", "set", "dev", interfaceName, "mtu", fmt.Sprintf("%d", mtu)); err != nil {
+	if err := utils.RunCommand("ip", "link", "set", "dev", ifname, "mtu", fmt.Sprintf("%d", mtu)); err != nil {
 		return fmt.Errorf("failed to set MTU: %v", err)
 	}
 	return nil
 }
 
 func (s *WireGuardService) GetPeerStats(interfaceName string) (map[string]*models.WGState, error) {
-	output, err := utils.RunCommandWithOutput("wg", "show", fmt.Sprintf("wg-%s", interfaceName), "dump")
+	output, err := utils.RunCommandWithOutput("wg", "show", fmt.Sprintf("%s", interfaceName), "dump")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get peer stats: %v", err)
 	}
@@ -276,7 +274,7 @@ func (s *WireGuardService) generatePostUpCommands(iface *models.Interface) (comm
 
 	// Add VRF configuration if specified
 	if iface.VRFName != nil && *iface.VRFName != "" {
-		commands = append(commands, fmt.Sprintf("ip link set dev wg-%s master %s", iface.Ifname, *iface.VRFName))
+		commands = append(commands, fmt.Sprintf("ip link set dev %s master %s", iface.Ifname, *iface.VRFName))
 	}
 
 	// Add firewall rules for each enabled server
@@ -321,7 +319,7 @@ func (s *WireGuardService) generatePreDownCommands(iface *models.Interface) (com
 
 	// Remove VRF configuration if specified
 	if iface.VRFName != nil && *iface.VRFName != "" {
-		commands = append(commands, fmt.Sprintf("ip link set dev wg-%s nomaster", iface.Ifname))
+		commands = append(commands, fmt.Sprintf("ip link set dev %s nomaster", iface.Ifname))
 	}
 	// Create a script that executes all commands (ignore errors on cleanup)
 	return

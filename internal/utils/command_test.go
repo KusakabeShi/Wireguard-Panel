@@ -18,7 +18,7 @@ func TestRunCommandWithOutput_Success(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
-	
+
 	if !strings.Contains(output, "hello world") {
 		t.Errorf("Expected output to contain 'hello world', got: %s", output)
 	}
@@ -29,12 +29,12 @@ func TestRunCommand_Failure(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error, got nil")
 	}
-	
+
 	cmdErr, ok := err.(*CommandError)
 	if !ok {
 		t.Errorf("Expected CommandError, got: %T", err)
 	}
-	
+
 	if cmdErr.ExitCode != 1 {
 		t.Errorf("Expected exit code 1, got: %d", cmdErr.ExitCode)
 	}
@@ -45,12 +45,12 @@ func TestRunCommand_NonExistentCommand(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for non-existent command, got nil")
 	}
-	
+
 	cmdErr, ok := err.(*CommandError)
 	if !ok {
 		t.Errorf("Expected CommandError, got: %T", err)
 	}
-	
+
 	// Should contain information about the failed command
 	errorStr := cmdErr.Error()
 	if !strings.Contains(errorStr, "nonexistent-command-12345") {
@@ -63,7 +63,7 @@ func TestRunCommandWithTimeout_Success(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
 	}
-	
+
 	if !strings.Contains(output, "hello") {
 		t.Errorf("Expected output to contain 'hello', got: %s", output)
 	}
@@ -75,12 +75,12 @@ func TestRunCommandWithTimeout_Timeout(t *testing.T) {
 	if err == nil {
 		t.Error("Expected timeout error, got nil")
 	}
-	
+
 	cmdErr, ok := err.(*CommandError)
 	if !ok {
 		t.Errorf("Expected CommandError, got: %T", err)
 	}
-	
+
 	errorStr := cmdErr.Error()
 	if !strings.Contains(errorStr, "timed out") {
 		t.Errorf("Expected timeout error message, got: %s", errorStr)
@@ -93,12 +93,12 @@ func TestCommandError_FormattedOutput(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error, got nil")
 	}
-	
+
 	cmdErr, ok := err.(*CommandError)
 	if !ok {
 		t.Errorf("Expected CommandError, got: %T", err)
 	}
-	
+
 	errorStr := cmdErr.Error()
 	if !strings.Contains(errorStr, "stderr: error message") {
 		t.Errorf("Expected stderr in error message, got: %s", errorStr)

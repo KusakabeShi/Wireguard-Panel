@@ -25,7 +25,7 @@
             "name": "Debug React Frontend (Remote)",
             "type": "chrome",
             "request": "launch",
-            "url": "http://192.168.68.154:3000",
+            "url": "http://192.168.68.121:3000",
             "webRoot": "${workspaceFolder}/frontend/src",
             "sourceMapPathOverrides": {
                 "webpack:///src/*": "${webRoot}/*",

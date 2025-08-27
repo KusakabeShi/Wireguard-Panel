@@ -13,7 +13,6 @@ func GenerateServerFirewallRules(interfaceName string, config *models.ServerNetw
 	}
 
 	var rules []string
-	interfaceDevice := fmt.Sprintf("wg-%s", interfaceName)
 	comment := config.CommentString
 	iptablesCmd := "iptables"
 	if version == 6 {
@@ -22,12 +21,12 @@ func GenerateServerFirewallRules(interfaceName string, config *models.ServerNetw
 
 	// Add SNAT rules
 	if config.Snat != nil && config.Snat.Enabled {
-		rules = append(rules, GenerateSNATRules(iptablesCmd, interfaceDevice, config, comment)...)
+		rules = append(rules, GenerateSNATRules(iptablesCmd, interfaceName, config, comment)...)
 	}
 
 	// Add routed networks firewall rules
 	if config.RoutedNetworksFirewall && len(config.RoutedNetworks) > 0 {
-		rules = append(rules, GenerateRoutedNetworksRules(iptablesCmd, config, comment)...)
+		rules = append(rules, GenerateRoutedNetworksRules(iptablesCmd, interfaceName, config, comment)...)
 	}
 
 	return rules
@@ -78,7 +77,7 @@ func GenerateSNATRules(iptablesCmd, interfaceDevice string, config *models.Serve
 	return rules
 }
 
-func GenerateRoutedNetworksRules(iptablesCmd string, config *models.ServerNetworkConfig, comment string) []string {
+func GenerateRoutedNetworksRules(iptablesCmd string, ifname string, config *models.ServerNetworkConfig, comment string) []string {
 	if config.Network == nil || len(config.RoutedNetworks) == 0 {
 		return []string{}
 	}
@@ -99,13 +98,13 @@ func GenerateRoutedNetworksRules(iptablesCmd string, config *models.ServerNetwor
 	if !hasAllowAll {
 		// Add specific allow rules for each routed network
 		for _, routedNet := range config.RoutedNetworks {
-			rules = append(rules, fmt.Sprintf("%s -A FORWARD -s %s -d %s -j ACCEPT -m comment --comment %s",
-				iptablesCmd, sourceNet, routedNet.NetworkStr(), comment))
+			rules = append(rules, fmt.Sprintf("%s -A FORWARD -i %s -s %s -d %s -j ACCEPT -m comment --comment %s",
+				iptablesCmd, ifname, sourceNet, routedNet.NetworkStr(), comment))
 		}
 
 		// Add deny rule for other destinations
-		rules = append(rules, fmt.Sprintf("%s -A FORWARD -s %s -j REJECT -m comment --comment %s",
-			iptablesCmd, sourceNet, comment))
+		rules = append(rules, fmt.Sprintf("%s -A FORWARD -i %s -s %s -j REJECT -m comment --comment %s",
+			iptablesCmd, ifname, sourceNet, comment))
 	}
 
 	return rules

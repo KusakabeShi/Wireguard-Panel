@@ -10,6 +10,7 @@ import (
 
 	"wg-panel/internal/config"
 	"wg-panel/internal/handlers"
+	"wg-panel/internal/internalservice"
 	"wg-panel/internal/middleware"
 	"wg-panel/internal/services"
 	"wg-panel/internal/utils"
@@ -20,11 +21,11 @@ import (
 type Server struct {
 	cfg                 *config.Config
 	engine              *gin.Engine
-	pseudoBridgeService *services.PseudoBridgeService
-	snatRoamingService  *services.SNATRoamingService
+	pseudoBridgeService *internalservice.PseudoBridgeService
+	snatRoamingService  *internalservice.SNATRoamingService
 }
 
-func NewServer(cfg *config.Config, pseudoBridge *services.PseudoBridgeService, snatRoaming *services.SNATRoamingService) *Server {
+func NewServer(cfg *config.Config, pseudoBridge *internalservice.PseudoBridgeService, snatRoaming *internalservice.SNATRoamingService) *Server {
 	return &Server{
 		cfg:                 cfg,
 		pseudoBridgeService: pseudoBridge,
@@ -32,7 +33,7 @@ func NewServer(cfg *config.Config, pseudoBridge *services.PseudoBridgeService, s
 	}
 }
 
-func (s *Server) Start() error {
+func (s *Server) Start(fw *internalservice.FirewallService) error {
 	// Set Gin mode
 	gin.SetMode(gin.ReleaseMode)
 	s.engine = gin.New()
@@ -40,7 +41,7 @@ func (s *Server) Start() error {
 
 	// Setup services
 	wgService := services.NewWireGuardService(s.cfg.WireGuardConfigPath)
-	firewallService := services.NewFirewallService()
+	firewallService := fw
 	startupService := services.NewStartupService(s.cfg, wgService, firewallService)
 
 	interfaceService := services.NewInterfaceService(s.cfg, wgService)
@@ -184,14 +185,6 @@ func (s *Server) updateServicesConfiguration() {
 	for {
 		select {
 		case <-ticker.C:
-			interfaces := s.cfg.GetAllInterfaces()
-
-			// Update pseudo-bridge service
-			s.pseudoBridgeService.UpdateConfiguration(interfaces)
-
-			// Update SNAT roaming service
-			s.snatRoamingService.UpdateConfiguration(interfaces)
-
 			// Clean up expired sessions
 			s.cfg.CleanExpiredSessions()
 		}

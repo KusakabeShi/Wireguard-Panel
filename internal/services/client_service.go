@@ -123,9 +123,7 @@ func (s *ClientService) GetClients(interfaceID, serverID string) ([]*models.Clie
 	}
 
 	clients := make([]*models.Client, len(server.Clients))
-	for i, client := range server.Clients {
-		clients[i] = client
-	}
+	copy(clients, server.Clients)
 
 	return clients, nil
 }

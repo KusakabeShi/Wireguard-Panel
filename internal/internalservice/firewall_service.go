@@ -1,4 +1,4 @@
-package services
+package internalservice
 
 import (
 	"fmt"
@@ -20,26 +20,25 @@ func (f *FirewallService) AddServerRules(interfaceName string, config *models.Se
 		return nil
 	}
 
-	interfaceDevice := fmt.Sprintf("wg-%s", interfaceName)
 	comment := config.CommentString
 
 	// Add IP address to interface (only if not already present)
 	if config.Network != nil {
-		if err := f.addIPAddressIfNotExists(interfaceDevice, config.Network.String()); err != nil {
+		if err := f.addIPAddressIfNotExists(interfaceName, config.Network.String()); err != nil {
 			return fmt.Errorf("failed to add IP address: %v", err)
 		}
 	}
 
 	// Add SNAT rules
 	if config.Snat != nil && config.Snat.Enabled {
-		if err := f.addSnatRules(interfaceDevice, config, comment); err != nil {
+		if err := f.addSnatRules(interfaceName, config, comment); err != nil {
 			return fmt.Errorf("failed to add SNAT rules: %v", err)
 		}
 	}
 
 	// Add routed networks firewall rules
 	if config.RoutedNetworksFirewall && len(config.RoutedNetworks) > 0 {
-		if err := f.addRoutedNetworksRules(interfaceDevice, config, comment); err != nil {
+		if err := f.addRoutedNetworksRules(interfaceName, config, comment); err != nil {
 			return fmt.Errorf("failed to add routed networks rules: %v", err)
 		}
 	}
@@ -52,7 +51,7 @@ func (f *FirewallService) RemoveServerRules(interfaceName string, config *models
 		return
 	}
 
-	interfaceDevice := fmt.Sprintf("wg-%s", interfaceName)
+	interfaceDevice := fmt.Sprintf("%s", interfaceName)
 	comment := config.CommentString
 
 	// Remove IP address from interface (only if it exists)
@@ -108,7 +107,7 @@ func (f *FirewallService) addRoutedNetworksRules(interfaceDevice string, config 
 	}
 
 	// Generate routed networks rules using shared function
-	rules := utils.GenerateRoutedNetworksRules(iptablesCmd, config, comment)
+	rules := utils.GenerateRoutedNetworksRules(iptablesCmd, interfaceDevice, config, comment)
 
 	// Apply each rule
 	for _, rule := range rules {

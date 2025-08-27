@@ -54,68 +54,64 @@ const ClientItem = ({
 
   return (
     <Box sx={{ mb: 1 }}>
-      {/* Client Row */}
-      <Box 
-        sx={{ 
-          display: 'flex',
-          alignItems: 'center',
-          p: 2,
-          backgroundColor: 'rgb(51, 109, 43)',
-          color: 'white',
-          borderRadius: '4px 4px 0 0'
-        }}
-      >
-
-        
-        <Box sx={{ flexGrow: 1 }}>
-          <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', fontWeight: 'bold' }}>
-            <span>{client.name}</span>
-            <span style={{ fontSize: '0.875rem', color: 'rgb(255, 255, 255)' }}>
-              {
-                getTrafficText()
-              }
-            </span>
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
-          <StatusIcon 
-            sx={{ 
-              color: isActive ? ' #4caf50' : ' #f44336', 
-              fontSize: 12 
-            }} 
-          />
-        </Box>
-        <Switch
-          checked={client.enabled}
-          onChange={(e) => onToggle(client, e.target.checked)}
-          sx={{
-            '& .MuiSwitch-switchBase.Mui-checked': {
-              color: 'white',
-            },
-            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-              backgroundColor: 'rgba(255,255,255,0.3)',
-            },
+      /* Client Row */
+        <Box 
+          sx={{ 
+            display: 'flex',
+            alignItems: 'center',
+            p: 2,
+            backgroundColor: 'rgb(51, 109, 43)',
+            color: 'white',
+            borderRadius: '4px 4px 0 0'
           }}
-        />
-        
-        <IconButton 
-          onClick={() => onEdit(client)}
-          sx={{ color: 'white', ml: 1 }}
-          size="small"
         >
-          <EditIcon fontSize="small" />
-        </IconButton>
-        
-        <IconButton 
-          onClick={() => onToggleExpanded(client.id)}
-          sx={{ color: 'white', ml: 1 }}
-          size="small"
-        >
-          {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-        </IconButton>
-      </Box>
+          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+          {client.name}
+            </Typography>
+          </Box>
+          <Box sx={{ mr: 2, display: 'flex', alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ color: 'rgb(255, 255, 255)', mr: 1 }}>
+          {getTrafficText()}
+            </Typography>
+            <StatusIcon 
+          sx={{ 
+            color: isActive ? ' #4caf50' : ' #f44336', 
+            fontSize: 12 
+          }} 
+            />
+          </Box>
+          <Switch
+            checked={client.enabled}
+            onChange={(e) => onToggle(client, e.target.checked)}
+            sx={{
+          '& .MuiSwitch-switchBase.Mui-checked': {
+            color: 'white',
+          },
+          '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+            backgroundColor: 'rgba(255,255,255,0.3)',
+          },
+            }}
+          />
+          
+          <IconButton 
+            onClick={() => onEdit(client)}
+            sx={{ color: 'white', ml: 1 }}
+            size="small"
+          >
+            <EditIcon fontSize="small" />
+          </IconButton>
+          
+          <IconButton 
+            onClick={() => onToggleExpanded(client.id)}
+            sx={{ color: 'white', ml: 1 }}
+            size="small"
+          >
+            {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          </IconButton>
+        </Box>
 
-      {/* Client Details */}
+        {/* Client Details */}
       <Collapse in={expanded}>
         <Box sx={{ backgroundColor: '#f9f9f9', p: 2, borderLeft: '4px solid #4caf50' }}>
           <ClientDetails 
