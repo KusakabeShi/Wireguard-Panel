@@ -5,6 +5,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"wg-panel/internal/config"
 	"wg-panel/internal/models"
@@ -59,6 +61,11 @@ func (s *InterfaceService) CreateInterface(req InterfaceCreateRequest) (*models.
 		return nil, fmt.Errorf("failed to generate public key: %v", err)
 	}
 
+	// Validate endpoint
+	if err := s.ValidateEndpoint(req.Endpoint); err != nil {
+		return nil, err
+	}
+
 	// Check if UDP port is available
 	if err := s.CheckUDPPortAvailable(req.Port); err != nil {
 		return nil, err
@@ -72,6 +79,7 @@ func (s *InterfaceService) CreateInterface(req InterfaceCreateRequest) (*models.
 	iface := &models.Interface{
 		ID:         uuid.New().String(),
 		Ifname:     req.Ifname,
+		Enabled:    false,
 		VRFName:    req.VRFName,
 		FwMark:     req.FwMark,
 		Endpoint:   req.Endpoint,
@@ -88,11 +96,35 @@ func (s *InterfaceService) CreateInterface(req InterfaceCreateRequest) (*models.
 	}
 
 	// Generate and apply WireGuard configuration
-	if err := s.wg.GenerateAndSyncInterface(iface); err != nil {
-		return nil, fmt.Errorf("failed to apply WireGuard configuration: %v", err)
+	if err := s.wg.SyncToConf(iface); err != nil {
+		return nil, fmt.Errorf("failed to save WireGuard configuration: %v", err)
 	}
 
 	return s.sanitizeInterface(iface), nil
+}
+
+func (s *InterfaceService) SetInterfaceEnabled(id string, enabled bool) error {
+	iface := s.cfg.GetInterface(id)
+	if iface == nil {
+		return fmt.Errorf("interface not found")
+	}
+
+	// Regenerate WireGuard configuration
+	if err := s.wg.SyncToConf(iface); err != nil {
+		return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
+	}
+	if err := s.wg.SyncToInterface(iface.Ifname, enabled, iface.PrivateKey); err != nil {
+		return fmt.Errorf("failed to apply WireGuard configuration: %v", err)
+	}
+
+	iface.Enabled = enabled
+
+	s.cfg.SetInterface(iface.ID, iface)
+	if err := s.cfg.Save(); err != nil {
+		return fmt.Errorf("failed to save configuration: %v", err)
+	}
+
+	return nil
 }
 
 func (s *InterfaceService) GetInterface(id string) (*models.Interface, error) {
@@ -116,7 +148,7 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 	if iface == nil {
 		return nil, fmt.Errorf("interface not found")
 	}
-
+	needsWGReCreateOldName := ""
 	needsWGRegeneration := false
 	needsMTUUpdate := false
 
@@ -135,7 +167,9 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 		if err := s.CheckIfNameAvailable(req.Ifname); err != nil {
 			return nil, err
 		}
+		needsWGReCreateOldName = iface.Ifname
 		iface.Ifname = req.Ifname
+		needsWGRegeneration = true
 	}
 
 	if req.VRFName != iface.VRFName {
@@ -159,6 +193,10 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 	}
 
 	if req.Endpoint != "" && req.Endpoint != iface.Endpoint {
+		// Validate endpoint
+		if err := s.ValidateEndpoint(req.Endpoint); err != nil {
+			return nil, err
+		}
 		iface.Endpoint = req.Endpoint
 	}
 
@@ -173,6 +211,7 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 
 	if req.MTU > 0 && req.MTU != iface.MTU {
 		iface.MTU = req.MTU
+		needsWGRegeneration = true
 		needsMTUUpdate = true
 	}
 
@@ -186,21 +225,40 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 		needsWGRegeneration = true
 	}
 
+	if needsWGReCreateOldName == "" {
+		// Apply system changes
+		if needsWGRegeneration {
+			if err := s.wg.SyncToConf(iface); err != nil {
+				return nil, fmt.Errorf("failed to regenerate WireGuard configuration: %v", err)
+			}
+		}
+
+		if needsMTUUpdate {
+			if err := s.wg.SetInterfaceMTU(iface.Ifname, iface.MTU); err != nil {
+				return nil, fmt.Errorf("failed to update MTU: %v", err)
+			}
+		}
+	} else {
+		// Remove old interface
+		if err := s.wg.RemoveConfig(needsWGReCreateOldName); err != nil {
+			return nil, fmt.Errorf("failed to remove old WireGuard interface: %v", err)
+		}
+		if err := s.wg.SyncToInterface(needsWGReCreateOldName, false, iface.PrivateKey); err != nil {
+			return nil, fmt.Errorf("failed to bring down old WireGuard interface: %v", err)
+		}
+		// Create new interface
+		if err := s.wg.SyncToConf(iface); err != nil {
+			return nil, fmt.Errorf("failed to create new WireGuard interface: %v", err)
+		}
+	}
+	if iface.Enabled {
+		if err := s.wg.SyncToInterface(iface.Ifname, true, iface.PrivateKey); err != nil {
+			return nil, fmt.Errorf("failed to bring up new WireGuard interface: %v", err)
+		}
+	}
+
 	if err := s.cfg.Save(); err != nil {
 		return nil, fmt.Errorf("failed to save configuration: %v", err)
-	}
-
-	// Apply system changes
-	if needsWGRegeneration {
-		if err := s.wg.GenerateAndSyncInterface(iface); err != nil {
-			return nil, fmt.Errorf("failed to regenerate WireGuard configuration: %v", err)
-		}
-	}
-
-	if needsMTUUpdate {
-		if err := s.wg.SetInterfaceMTU(iface.Ifname, iface.MTU); err != nil {
-			return nil, fmt.Errorf("failed to update MTU: %v", err)
-		}
 	}
 
 	return s.sanitizeInterface(iface), nil
@@ -213,8 +271,11 @@ func (s *InterfaceService) DeleteInterface(id string) error {
 	}
 
 	// Remove WireGuard interface
-	if err := s.wg.RemoveInterface(iface.Ifname); err != nil {
-		return fmt.Errorf("failed to remove WireGuard interface: %v", err)
+	if err := s.wg.RemoveConfig(iface.Ifname); err != nil {
+		return fmt.Errorf("failed to remove WireGuard config: %v", err)
+	}
+	if err := s.wg.SyncToInterface(iface.Ifname, false, iface.PrivateKey); err != nil {
+		return fmt.Errorf("failed to delete WireGuard interface: %v", err)
 	}
 
 	s.cfg.DeleteInterface(id)
@@ -257,6 +318,58 @@ func (s *InterfaceService) CheckUDPPortAvailable(port int) error {
 	defer conn.Close()
 
 	return nil
+}
+
+func (s *InterfaceService) ValidateEndpoint(endpoint string) error {
+	if endpoint == "" {
+		return fmt.Errorf("endpoint cannot be empty")
+	}
+
+	// Check if it's a valid IPv4 address
+	if ip := net.ParseIP(endpoint); ip != nil {
+		if ip.To4() != nil {
+			return nil // Valid IPv4
+		}
+		if ip.To16() != nil {
+			return nil // Valid IPv6
+		}
+	}
+
+	// Check if it's a valid domain name
+	if s.isValidDomain(endpoint) {
+		return nil
+	}
+
+	return fmt.Errorf("endpoint must be a valid IPv4 address, IPv6 address, or domain name")
+}
+
+func (s *InterfaceService) isValidDomain(domain string) bool {
+	// Basic domain validation
+	if len(domain) == 0 || len(domain) > 253 {
+		return false
+	}
+
+	// Domain regex pattern
+	domainRegex := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$`)
+
+	// Check basic format
+	if !domainRegex.MatchString(domain) {
+		return false
+	}
+
+	// Additional checks
+	labels := strings.Split(domain, ".")
+	for _, label := range labels {
+		if len(label) == 0 || len(label) > 63 {
+			return false
+		}
+		// Label cannot start or end with hyphen
+		if strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
+			return false
+		}
+	}
+
+	return true
 }
 
 type InterfaceCreateRequest struct {

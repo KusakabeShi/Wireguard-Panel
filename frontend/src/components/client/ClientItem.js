@@ -10,7 +10,7 @@ import {
   Edit as EditIcon, 
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  Circle as StatusIcon
+  Circle as CircleIcon
 } from '@mui/icons-material';
 import ClientDetails from './ClientDetails';
 import { formatBytes, formatLastHandshake, isClientActive } from '../../utils/formatUtils';
@@ -54,7 +54,7 @@ const ClientItem = ({
 
   return (
     <Box sx={{ mb: 1 }}>
-      /* Client Row */
+      {/* Client Row */}
         <Box 
           sx={{ 
             display: 'flex',
@@ -74,10 +74,11 @@ const ClientItem = ({
             <Typography variant="body2" sx={{ color: 'rgb(255, 255, 255)', mr: 1 }}>
           {getTrafficText()}
             </Typography>
-            <StatusIcon 
+            <CircleIcon 
           sx={{ 
-            color: isActive ? ' #4caf50' : ' #f44336', 
-            fontSize: 12 
+            color: isActive ? '#4caf50' : '#f44336', 
+            fontSize: 12,
+            filter: 'drop-shadow(0 0 1px rgba(128,128,128,0.8))'
           }} 
             />
           </Box>

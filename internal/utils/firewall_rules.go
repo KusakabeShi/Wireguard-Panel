@@ -21,7 +21,11 @@ func GenerateServerFirewallRules(interfaceName string, config *models.ServerNetw
 
 	// Add SNAT rules
 	if config.Snat != nil && config.Snat.Enabled {
-		rules = append(rules, GenerateSNATRules(iptablesCmd, interfaceName, config, comment)...)
+		if config.Snat.RoamingMasterInterface != nil && *config.Snat.RoamingMasterInterface != "" {
+			// If roaming is enabled, SNAT rules must managed by the roaming service
+		} else {
+			rules = append(rules, GenerateSNATRules(iptablesCmd, interfaceName, config, comment)...)
+		}
 	}
 
 	// Add routed networks firewall rules
@@ -41,9 +45,7 @@ func GenerateSNATRules(iptablesCmd, interfaceDevice string, config *models.Serve
 	sourceNet := config.Network.NetworkStr()
 	excludedNet := sourceNet
 	if config.Snat.SnatExcludedNetwork != nil {
-		zerov4, _ := models.ParseCIDR("0.0.0.0/32")
-		zerov6, _ := models.ParseCIDR("::/128")
-		if config.Snat.SnatExcludedNetwork.Equal(zerov4) || config.Snat.SnatExcludedNetwork.Equal(zerov6) {
+		if config.Snat.SnatExcludedNetwork.EqualZero(4) || config.Snat.SnatExcludedNetwork.EqualZero(6) {
 			excludedNet = ""
 		} else {
 			excludedNet = config.Snat.SnatExcludedNetwork.NetworkStr()
@@ -55,11 +57,30 @@ func GenerateSNATRules(iptablesCmd, interfaceDevice string, config *models.Serve
 		destExclusion = fmt.Sprintf("! -d %s ", excludedNet)
 	}
 
+	if config.Snat.RoamingMasterInterface != nil && *config.Snat.RoamingMasterInterface != "" {
+		// If roaming is enabled, SNAT rules must managed by the roaming service
+		return []string{}
+	}
+
 	if config.Snat.SnatIPNet == nil {
 		// MASQUERADE mode
 		rules = append(rules, fmt.Sprintf("%s -t nat -A POSTROUTING -s %s %s -j MASQUERADE -m comment --comment %s",
 			iptablesCmd, sourceNet, destExclusion, comment))
-	} else if config.Network.Version == 4 || config.Snat.SnatIPNet.Masklen() == 128 {
+	} else if config.Network.Version == 4 {
+		if config.Snat.SnatIPNet.Masklen() != 32 {
+			// Error, invalid IPv4 SNAT configuration, masklen must be /32
+			return []string{}
+		} else if config.Snat.SnatIPNet.EqualZero(4) {
+			// Error, invalid IPv4 SNAT configuration, can't be 0.0.0.0/32
+			return []string{}
+		}
+		rules = append(rules, fmt.Sprintf("%s -t nat -A POSTROUTING -s %s %s -j SNAT --to-source %s -m comment --comment %s",
+			iptablesCmd, sourceNet, destExclusion, config.Snat.SnatIPNet.IP.String(), comment))
+	} else if config.Network.Version == 6 && config.Snat.SnatIPNet.Masklen() == 128 {
+		if config.Snat.SnatIPNet.EqualZero(6) {
+			// Error, invalid IPv6 SNAT configuration, can't be ::/128
+			return []string{}
+		}
 		// SNAT mode (IPv4 /32 or IPv6 /128)
 		rules = append(rules, fmt.Sprintf("%s -t nat -A POSTROUTING -s %s %s -j SNAT --to-source %s -m comment --comment %s",
 			iptablesCmd, sourceNet, destExclusion, config.Snat.SnatIPNet.IP.String(), comment))
@@ -124,13 +145,13 @@ func GenerateCleanupRules(comment string, version int) []string {
 	}
 }
 
-func CleanupRules(comment string, version int, matchPrefix bool) error {
+func CleanupRules(comment string, version int, targetTable *[]string, matchPrefix bool) error {
 	if comment == "" {
 		return fmt.Errorf("cleanFirewallRuleByComment: comment can't be empty")
 	}
 	if version == 46 {
-		err4 := CleanupRules(comment, 4, matchPrefix)
-		err6 := CleanupRules(comment, 6, matchPrefix)
+		err4 := CleanupRules(comment, 4, targetTable, matchPrefix)
+		err6 := CleanupRules(comment, 6, targetTable, matchPrefix)
 		if err4 != nil && err6 != nil {
 			return fmt.Errorf("err4: %v, err6: %v", err4, err6)
 		} else if err4 != nil {
@@ -154,6 +175,11 @@ func CleanupRules(comment string, version int, matchPrefix bool) error {
 		if len(rule) > 1 && rule[0] == '*' {
 			currentTable = rule[1:]
 			continue
+		}
+		if targetTable != nil && len(*targetTable) > 0 {
+			if !stringInSlice(currentTable, *targetTable) {
+				continue
+			}
 		}
 		match := false
 		if matchPrefix {
@@ -180,4 +206,13 @@ func CleanupRules(comment string, version int, matchPrefix bool) error {
 	}
 
 	return err
+}
+
+func stringInSlice(target string, slice []string) bool {
+	for _, element := range slice {
+		if element == target {
+			return true // Found the string in the slice
+		}
+	}
+	return false // String not found in the slice
 }

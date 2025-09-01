@@ -134,6 +134,18 @@ func (c *Config) GetServer(ifaceID, serverID string) (*models.Server, error) {
 	return nil, fmt.Errorf("server not found")
 }
 
+func (c *Config) GetAllServers(ifaceID string) ([]*models.Server, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	iface, exists := c.Interfaces[ifaceID]
+	if !exists {
+		return nil, fmt.Errorf("interface not found")
+	}
+
+	return iface.Servers, nil
+}
+
 func (c *Config) GetClient(ifaceID, serverID, clientID string) (*models.Client, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -236,6 +248,9 @@ func (c *Config) SyncToInternalService() {
 	pbsConfig := make(map[string]internalservice.ResponderNetworks)
 	for _, iface := range c.GetAllInterfaces() {
 		// Check for network overlaps among child servers
+		if !iface.Enabled {
+			continue
+		}
 		for _, server := range iface.Servers {
 			if server.IPv4 != nil && server.IPv4.Enabled {
 				if server.IPv4.Network != nil &&
@@ -252,8 +267,7 @@ func (c *Config) SyncToInternalService() {
 					*server.IPv4.Snat.RoamingMasterInterface != "" {
 					ifname := *server.IPv4.Snat.RoamingMasterInterface
 					network := server.IPv4.Snat.SnatIPNet
-					zerov4, _ := models.ParseCIDR("0.0.0.0/32")
-					if network.Equal(zerov4) {
+					if network.EqualZero(4) {
 						//addPbsConf(pbsConfig, "v4o", ifname, network)
 						addSrsConf(srsConfig, ifname, server.IPv4)
 					} else {
@@ -276,8 +290,7 @@ func (c *Config) SyncToInternalService() {
 					*server.IPv6.Snat.RoamingMasterInterface != "" {
 					ifname := *server.IPv6.Snat.RoamingMasterInterface
 					network := server.IPv6.Snat.SnatIPNet
-					zerov6, _ := models.ParseCIDR("::/128")
-					if network.Equal(zerov6) {
+					if network.EqualZero(6) {
 						//addPbsConf(pbsConfig, "v6o", ifname, network)
 						addSrsConf(srsConfig, ifname, server.IPv6)
 					} else {

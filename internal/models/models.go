@@ -44,6 +44,7 @@ type WGState struct {
 type Interface struct {
 	ID         string    `json:"id"`
 	Ifname     string    `json:"ifname"`
+	Enabled    bool      `json:"enabled"`
 	VRFName    *string   `json:"vrfName"`
 	FwMark     *string   `json:"fwMark"`
 	Endpoint   string    `json:"endpoint"`

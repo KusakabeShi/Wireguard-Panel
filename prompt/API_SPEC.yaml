@@ -204,6 +204,28 @@ paths:
           description: Interface not found.
       security:
         - cookieAuth: []
+  /interfaces/{ifId}/set-enable:
+    parameters:
+      - $ref: '#/components/parameters/ifId'
+    post:
+      tags:
+        - Interfaces
+      summary: Enable or Disable an Interface
+      description: Enables or disables the WireGuard interface.
+      operationId: setInterfaceEnable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetEnableRequest'
+      responses:
+        '204':
+          description: Interface state updated successfully.
+        '404':
+          description: Interface not found.
+      security:
+        - cookieAuth: []
   /interfaces/{ifId}/servers:
     parameters:
       - $ref: '#/components/parameters/ifId'
@@ -647,6 +669,10 @@ components:
           description: A short name for the interface. The actual device name will be `wg-[ifname]`. Must be unique.
           pattern: '^[A-Za-z0-9_-]{1,12}$'
           example: 'prod'
+        enabled:
+          type: boolean
+          description: Reflects the current operational state of the interface. Use the set-enable endpoint to change.
+          readOnly: true
         vrfName:
           type: string
           description: The VRF (Virtual Routing and Forwarding) to which this interface belongs. If null, not in a VRF.
@@ -682,6 +708,7 @@ components:
       required:
         - id
         - ifname
+        - enabled
         - endpoint
         - port
         - publicKey

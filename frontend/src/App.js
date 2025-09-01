@@ -113,6 +113,16 @@ function AppContent() {
     }
   };
 
+  const handleToggleInterface = async (interfaceId, enabled) => {
+    try {
+      await apiService.setInterfaceEnabled(interfaceId, enabled);
+      await loadInterfaces();
+    } catch (error) {
+      console.error('Failed to toggle interface:', error);
+      showError(error, 'Failed to Toggle Interface');
+    }
+  };
+
   // Server handlers
   const handleAddServer = (interface_) => {
     setServerDialog({ open: true, server: null, interface: interface_ });
@@ -279,6 +289,7 @@ function AppContent() {
         onClose={() => setInterfaceDialog({ open: false, interface: null })}
         onSave={handleSaveInterface}
         onDelete={handleDeleteInterface}
+        onToggleEnable={handleToggleInterface}
         interface_={interfaceDialog.interface}
       />
 

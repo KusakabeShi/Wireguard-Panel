@@ -46,6 +46,21 @@ func ParseCIDR(cidr string) (*IPNetWrapper, error) {
 	}, nil
 }
 
+func (w *IPNetWrapper) EqualZero(af int) bool {
+	if w == nil {
+		return false
+	}
+	if af == 4 {
+		zerov4, _ := ParseCIDR("0.0.0.0/32")
+		return w.Equal(zerov4)
+	}
+	if af == 6 {
+		zerov6, _ := ParseCIDR("::/128")
+		return w.Equal(zerov6)
+	}
+	return false
+}
+
 func ParseCIDRAf(af int, cidr string) (ipnet *IPNetWrapper, err error) {
 	ipnet, err = ParseCIDRFromIP(cidr)
 	if err != nil {

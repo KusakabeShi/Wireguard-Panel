@@ -249,7 +249,7 @@ func (s *ClientService) UpdateClient(interfaceID, serverID, clientID string, req
 
 	// Sync WireGuard if needed
 	if needsWGSync && server.Enabled {
-		if err := s.wg.GenerateAndSyncInterface(iface); err != nil {
+		if err := s.wg.SyncToConfAndInterface(iface); err != nil {
 			return nil, fmt.Errorf("failed to sync WireGuard configuration: %v", err)
 		}
 	}
@@ -285,7 +285,7 @@ func (s *ClientService) SetClientEnabled(interfaceID, serverID, clientID string,
 
 	// Sync WireGuard configuration
 	if server.Enabled {
-		if err := s.wg.GenerateAndSyncInterface(iface); err != nil {
+		if err := s.wg.SyncToConfAndInterface(iface); err != nil {
 			return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
 		}
 	}

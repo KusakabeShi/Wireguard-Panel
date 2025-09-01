@@ -88,6 +88,13 @@ class ApiService {
     });
   }
 
+  async setInterfaceEnabled(ifId, enabled) {
+    return this.request(`/interfaces/${ifId}/set-enable`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    });
+  }
+
   // Server endpoints
   async getServers(ifId) {
     return this.request(`/interfaces/${ifId}/servers`);

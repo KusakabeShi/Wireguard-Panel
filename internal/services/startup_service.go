@@ -7,7 +7,6 @@ import (
 	"wg-panel/internal/config"
 	"wg-panel/internal/internalservice"
 	"wg-panel/internal/models"
-	"wg-panel/internal/utils"
 )
 
 type StartupService struct {
@@ -48,6 +47,9 @@ func (s *StartupService) InitializeInterfaces() error {
 
 func (s *StartupService) initializeInterface(iface *models.Interface) error {
 	// Check if interface has any enabled servers
+	if !iface.Enabled {
+		return nil
+	}
 	hasEnabledServers := false
 	for _, server := range iface.Servers {
 		if server.Enabled {
@@ -62,7 +64,7 @@ func (s *StartupService) initializeInterface(iface *models.Interface) error {
 	}
 
 	// Generate and apply WireGuard configuration
-	if err := s.wg.GenerateAndSyncInterface(iface); err != nil {
+	if err := s.wg.SyncToConfAndInterface(iface); err != nil {
 		return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
 	}
 
@@ -85,27 +87,17 @@ func (s *StartupService) initializeInterface(iface *models.Interface) error {
 func (s *StartupService) initializeServerFirewallRules(ifname string, server *models.Server) error {
 	// Apply IPv4 firewall rules
 	if server.IPv4 != nil && server.IPv4.Enabled {
-		if err := s.fw.AddServerRules(ifname, server.IPv4); err != nil {
+		if err := s.fw.AddIpAndFwRules(ifname, server.IPv4); err != nil {
 			return fmt.Errorf("failed to add IPv4 firewall rules: %v", err)
 		}
 	}
 
 	// Apply IPv6 firewall rules
 	if server.IPv6 != nil && server.IPv6.Enabled {
-		if err := s.fw.AddServerRules(ifname, server.IPv6); err != nil {
+		if err := s.fw.AddIpAndFwRules(ifname, server.IPv6); err != nil {
 			return fmt.Errorf("failed to add IPv6 firewall rules: %v", err)
 		}
 	}
 
-	return nil
-}
-
-// CleanupOrphanedRules removes any orphaned firewall rules from previous sessions
-func (s *StartupService) CleanupOrphanedRules() error {
-	log.Printf("Cleaning up orphaned firewall rules...")
-
-	// Get all current comment strings from active servers
-	_ = utils.CleanupRules(s.cfg.ServerId, 4, true)
-	_ = utils.CleanupRules(s.cfg.ServerId, 6, true)
 	return nil
 }

@@ -159,16 +159,6 @@ const ServerDialog = ({
       newWarnings.push('At least one of IPv4 or IPv6 must be enabled');
     }
 
-    // Check IPv4 SNAT vs Pseudo-bridge conflict
-    if (formData.ipv4.enabled && formData.ipv4.snat.enabled && formData.ipv4.pseudoBridgeMasterInterfaceEnabled) {
-      newWarnings.push('IPv4 SNAT and Pseudo-bridge are mutually exclusive');
-    }
-
-    // Check IPv6 SNAT vs Pseudo-bridge conflict
-    if (formData.ipv6.enabled && formData.ipv6.snat.enabled && formData.ipv6.pseudoBridgeMasterInterfaceEnabled) {
-      newWarnings.push('IPv6 SNAT and Pseudo-bridge are mutually exclusive');
-    }
-
     setWarnings(newWarnings);
   };
 

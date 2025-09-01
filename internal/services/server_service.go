@@ -83,11 +83,11 @@ func (s *ServerService) UpdateServer(interfaceID, serverID string, req ServerCre
 		return nil, err
 	}
 	if newserver.IPv4 != nil {
-		_ = utils.CleanupRules(newserver.IPv4.CommentString, 4, false)
+		_ = utils.CleanupRules(newserver.IPv4.CommentString, 4, nil, false)
 
 	}
 	if newserver.IPv6 != nil {
-		_ = utils.CleanupRules(newserver.IPv6.CommentString, 6, false)
+		_ = utils.CleanupRules(newserver.IPv6.CommentString, 6, nil, false)
 	}
 
 	s.SetServerEnabled(interfaceID, serverID, false)
@@ -112,6 +112,9 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 		return fmt.Errorf("interface not found")
 	}
 
+	if iface.Enabled == false && enabled == true {
+	}
+
 	server, err := s.cfg.GetServer(interfaceID, serverID)
 	if err != nil {
 		return err
@@ -124,22 +127,22 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 	if enabled {
 		// Enable: add IP addresses, firewall rules, and sync config
 		if server.IPv4 != nil && server.IPv4.Enabled {
-			if err := s.fw.AddServerRules(iface.Ifname, server.IPv4); err != nil {
+			if err := s.fw.AddIpAndFwRules(iface.Ifname, server.IPv4); err != nil {
 				return fmt.Errorf("failed to add IPv4 firewall rules: %v", err)
 			}
 		}
 		if server.IPv6 != nil && server.IPv6.Enabled {
-			if err := s.fw.AddServerRules(iface.Ifname, server.IPv6); err != nil {
+			if err := s.fw.AddIpAndFwRules(iface.Ifname, server.IPv6); err != nil {
 				return fmt.Errorf("failed to add IPv6 firewall rules: %v", err)
 			}
 		}
 	} else {
 		// Disable: remove IP addresses, firewall rules, and sync config
 		if server.IPv4 != nil && server.IPv4.Enabled {
-			s.fw.RemoveServerRules(iface.Ifname, server.IPv4)
+			s.fw.RemoveIpAndFwRules(iface.Ifname, server.IPv4)
 		}
 		if server.IPv6 != nil && server.IPv6.Enabled {
-			s.fw.RemoveServerRules(iface.Ifname, server.IPv6)
+			s.fw.RemoveIpAndFwRules(iface.Ifname, server.IPv6)
 		}
 	}
 
@@ -150,7 +153,7 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 	}
 
 	// Regenerate WireGuard configuration
-	if err := s.wg.GenerateAndSyncInterface(iface); err != nil {
+	if err := s.wg.SyncToConfAndInterface(iface); err != nil {
 		return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
 	}
 
@@ -239,10 +242,10 @@ func (s *ServerService) MoveServer(interfaceID, serverID, newInterfaceID string)
 	}
 
 	// Sync both interfaces
-	if err := s.wg.GenerateAndSyncInterface(srcIface); err != nil {
+	if err := s.wg.SyncToConfAndInterface(srcIface); err != nil {
 		return fmt.Errorf("failed to sync source interface: %v", err)
 	}
-	if err := s.wg.GenerateAndSyncInterface(destIface); err != nil {
+	if err := s.wg.SyncToConfAndInterface(destIface); err != nil {
 		return fmt.Errorf("failed to sync destination interface: %v", err)
 	}
 

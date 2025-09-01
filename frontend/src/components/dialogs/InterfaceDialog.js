@@ -15,6 +15,7 @@ const InterfaceDialog = ({
   onClose, 
   onSave, 
   onDelete,
+  onToggleEnable,
   interface_,
   title 
 }) => {
@@ -102,6 +103,22 @@ const InterfaceDialog = ({
       onClose();
     } catch (err) {
       setError(err.message || 'Failed to delete interface');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleEnable = async () => {
+    if (!interface_) return;
+    
+    setError('');
+    setLoading(true);
+
+    try {
+      await onToggleEnable(interface_.id, !interface_.enabled);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to update interface status');
     } finally {
       setLoading(false);
     }
@@ -199,6 +216,16 @@ const InterfaceDialog = ({
             disabled={loading}
           >
             DELETE
+          </Button>
+        )}
+        {isEdit && (
+          <Button 
+            onClick={handleToggleEnable}
+            color={interface_.enabled ? "warning" : "success"}
+            disabled={loading}
+            sx={{ ml: 1 }}
+          >
+            {interface_.enabled ? "DISABLE" : "ENABLE"}
           </Button>
         )}
         <Box sx={{ flexGrow: 1 }} />

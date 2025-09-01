@@ -9,7 +9,7 @@ import {
   IconButton,
   Divider
 } from '@mui/material';
-import { Menu as MenuIcon, Add as AddIcon } from '@mui/icons-material';
+import { Menu as MenuIcon, Add as AddIcon, Circle as CircleIcon } from '@mui/icons-material';
 
 const Sidebar = ({ 
   interfaces, 
@@ -67,6 +67,14 @@ const Sidebar = ({
                   '& .MuiTypography-root': { 
                     fontWeight: selectedInterface?.id === interface_.id ? 'bold' : 'normal' 
                   }
+                }}
+              />
+              <CircleIcon
+                sx={{
+                  fontSize: 12,
+                  color: interface_.enabled ? '#4caf50' : '#f44336',
+                  ml: 1,
+                  filter: 'drop-shadow(0 0 1px rgba(128,128,128,0.8))'
                 }}
               />
             </ListItemButton>

@@ -244,7 +244,7 @@ func (l *InterfaceIPNetListener) UpdateConfigs(configs map[string]*models.Server
 		if err != nil {
 			log.Printf("failed to calculate target_network: %v", err)
 		}
-		if err := l.fw.AddServerRules(l.interfaceName, simulatedConfig); err != nil {
+		if err := l.fw.AddIpAndFwRules(l.interfaceName, simulatedConfig); err != nil {
 			log.Printf("failed to add firewall rules: %v", err)
 		}
 	}
@@ -253,11 +253,8 @@ func (l *InterfaceIPNetListener) UpdateConfigs(configs map[string]*models.Server
 		if err != nil {
 			log.Printf("failed to calculate target_network: %v", err)
 		}
-		if err := l.fw.AddServerRules(l.interfaceName, simulatedConfig); err != nil {
-			log.Printf("failed to add firewall rules: %v", err)
-		}
-		l.fw.RemoveServerRules(l.interfaceName, simulatedConfig)
-		if err := l.fw.AddServerRules(l.interfaceName, simulatedConfig); err != nil {
+		l.fw.RemoveSnatRules(l.interfaceName, simulatedConfig, simulatedConfig.CommentString)
+		if err := l.fw.AddSnatRules(l.interfaceName, simulatedConfig, simulatedConfig.CommentString); err != nil {
 			log.Printf("failed to add firewall rules: %v", err)
 		}
 	}
@@ -266,10 +263,7 @@ func (l *InterfaceIPNetListener) UpdateConfigs(configs map[string]*models.Server
 		if err != nil {
 			log.Printf("failed to calculate target_network: %v", err)
 		}
-		if err := l.fw.AddServerRules(l.interfaceName, simulatedConfig); err != nil {
-			log.Printf("failed to add firewall rules: %v", err)
-		}
-		l.fw.RemoveServerRules(l.interfaceName, simulatedConfig)
+		l.fw.RemoveSnatRules(l.interfaceName, simulatedConfig, simulatedConfig.CommentString)
 	}
 }
 
@@ -288,7 +282,7 @@ func (l *InterfaceIPNetListener) getSimulatedConfig(config *models.ServerNetwork
 			SnatIPNet:              target_network,
 			SnatExcludedNetwork:    config.Snat.SnatExcludedNetwork,
 			RoamingMasterInterface: nil,
-			RoamingPseudoBridge:    true,
+			RoamingPseudoBridge:    false,
 		},
 		RoutedNetworks:         config.RoutedNetworks,
 		RoutedNetworksFirewall: config.RoutedNetworksFirewall,

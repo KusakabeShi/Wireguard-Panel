@@ -26,6 +26,7 @@ I'm going to implement a WireGuard server panel:
 ### Interface:
 *   **ifname:** The interface's short name, matching `^[A-Za-z0-9_-]{1,12}$`. Must be unique. The actual system interface name will be `wg-[ifname]`.
 *   **ID:** The unique ID of the interface, allocated when added. It is not changeable.
+*   **Enabled:** A boolean indicating if this interface is enabled. This value cannot be edited via the standard 'edit' API; it can only be modified using the dedicated 'SetEnable' API. When created, it will always be disabled.
 *   **VRF name:** The VRF (Virtual Routing and Forwarding) of the device. If null, no VRF is applied. Otherwise, `ip link set dev $IFNAME master $VRF_NAME` is added to the WireGuard configuration. Default value: null.
 *   **FwMark:** The `FwMark` attribute for the wg interface. Default value: null. Can be decimal or hexadecimal. If not null, `FwMark` is added to the server configuration.
 *   **Endpoint:** The public endpoint (domain or IP) of the WireGuard interface.
@@ -41,6 +42,9 @@ I'm going to implement a WireGuard server panel:
     *   When **VRF** is edited, check for network overlaps for all child servers before applying the change. If a collision is detected (a child server's network overlaps with another server's network in the target VRF), the operation fails.
     *   When **VRF, FwMark, Port, or PrivateKey** are changed, regenerate the WireGuard config and sync it to the `wg` interface (`wg syncconf [ifname] <(wg-quick strip [confpath])`).
     *   When **MTU** is changed, use `ip link set dev $IFNAME mtu $NEW_MTU` to apply the change to the interface.
+*   **SetEnable:**
+    *   **true:** Set `Enabled` to `true`, enable the WireGuard interface.
+    *   **false:** Set `Enabled` to `false`, disable the WireGuard interface.
 *   **Delete:** Delete the WireGuard interface and all of its associated servers.
 
 ### IPNetWrapper

@@ -40,7 +40,7 @@ func (h *InterfaceHandler) CreateInterface(c *gin.Context) {
 
 func (h *InterfaceHandler) GetInterface(c *gin.Context) {
 	ifId := c.Param("ifId")
-	
+
 	iface, err := h.service.GetInterface(ifId)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Interface not found"})
@@ -57,7 +57,7 @@ func (h *InterfaceHandler) ListInterfaces(c *gin.Context) {
 
 func (h *InterfaceHandler) UpdateInterface(c *gin.Context) {
 	ifId := c.Param("ifId")
-	
+
 	var req services.InterfaceUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -81,9 +81,33 @@ func (h *InterfaceHandler) UpdateInterface(c *gin.Context) {
 	c.JSON(http.StatusOK, iface)
 }
 
+func (h *InterfaceHandler) SetInterfaceEnabled(c *gin.Context) {
+	ifId := c.Param("ifId")
+
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.service.SetInterfaceEnabled(ifId, req.Enabled)
+	if err != nil {
+		if err.Error() == "interface not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Server or Interface not found"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
 func (h *InterfaceHandler) DeleteInterface(c *gin.Context) {
 	ifId := c.Param("ifId")
-	
+
 	err := h.service.DeleteInterface(ifId)
 	if err != nil {
 		if err.Error() == "interface not found" {
@@ -102,5 +126,6 @@ func (h *InterfaceHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.POST("", h.CreateInterface)
 	router.GET("/:ifId", h.GetInterface)
 	router.PUT("/:ifId", h.UpdateInterface)
+	router.POST("/:ifId/set-enable", h.SetInterfaceEnabled)
 	router.DELETE("/:ifId", h.DeleteInterface)
 }
