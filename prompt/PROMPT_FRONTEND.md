@@ -81,7 +81,6 @@ Simple form layout with the following fields:
 - ☑️ **SNAT** (checkbox) - **Controls SNAT sub-hierarchy**
   - When **unchecked**: SNAT sub-fields become disabled
   - When **checked**: SNAT sub-fields become available
-  - **Mutually exclusive with Pseudo-bridge** - show warning if both enabled
 
 **SNAT Sub-fields (enabled only when SNAT checkbox is checked):**
 - **SNAT IP** (text input)
@@ -101,7 +100,6 @@ Simple form layout with the following fields:
 - ☑️ **SNAT** (checkbox) - **Controls IPv6 SNAT sub-hierarchy**
   - When **unchecked**: IPv6 SNAT sub-fields become disabled
   - When **checked**: IPv6 SNAT sub-fields become available
-  - **Mutually exclusive with IPv6 Pseudo-bridge** - show warning if both enabled
 
 **IPv6 SNAT Sub-fields (enabled only when IPv6 SNAT checkbox is checked):**
 - **SNAT IP/Network** (text input)
@@ -111,7 +109,6 @@ Simple form layout with the following fields:
 
 **Validation Rules:**
 - At least one of IPv4 or IPv6 must be enabled
-- SNAT and Pseudo-bridge are mutually exclusive within each IP version
 - Display warning messages when conflicting options are selected
 
 ### 3. New/Edit Client Dialog

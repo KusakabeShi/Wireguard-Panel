@@ -30,6 +30,7 @@ const InterfaceDialog = ({
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(false);
 
   const isEdit = Boolean(interface_);
 
@@ -44,6 +45,7 @@ const InterfaceDialog = ({
         vrfName: interface_.vrfName || '',
         fwMark: interface_.fwMark || ''
       });
+      setIsEnabled(interface_.enabled || false);
     } else {
       setFormData({
         ifname: '',
@@ -54,6 +56,7 @@ const InterfaceDialog = ({
         vrfName: '',
         fwMark: ''
       });
+      setIsEnabled(false);
     }
     setError('');
   }, [interface_, open]);
@@ -115,8 +118,8 @@ const InterfaceDialog = ({
     setLoading(true);
 
     try {
-      await onToggleEnable(interface_.id, !interface_.enabled);
-      onClose();
+      await onToggleEnable(interface_.id, !isEnabled);
+      setIsEnabled(!isEnabled);
     } catch (err) {
       setError(err.message || 'Failed to update interface status');
     } finally {
@@ -221,11 +224,11 @@ const InterfaceDialog = ({
         {isEdit && (
           <Button 
             onClick={handleToggleEnable}
-            color={interface_.enabled ? "warning" : "success"}
+            color={isEnabled ? "warning" : "success"}
             disabled={loading}
             sx={{ ml: 1 }}
           >
-            {interface_.enabled ? "DISABLE" : "ENABLE"}
+            {isEnabled ? "DISABLE" : "ENABLE"}
           </Button>
         )}
         <Box sx={{ flexGrow: 1 }} />

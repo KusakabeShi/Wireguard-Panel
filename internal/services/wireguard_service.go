@@ -78,7 +78,7 @@ func (s *WireGuardService) GenerateConf(iface *models.Interface) string {
 	}
 
 	// Generate PostUp and PreDown commands
-	postUpCommands := s.generatePostUpCommands(iface)
+	postUpCommands := s.generatePostUpCommands(iface, true)
 	preDownCommands := s.generatePreDownCommands(iface)
 
 	// Add each PostUp command as a separate line
@@ -200,9 +200,9 @@ func (s *WireGuardService) SyncToInterface(ifname string, enabled bool, checkWgK
 				}
 			}
 
-			// Use ip link del to delete the interface
-			if err := utils.RunCommand("ip", "link", "delete", interfaceName); err != nil {
-				return fmt.Errorf("failed to delete interface: %v", err)
+			// Use wg-quick down to properly disable the interface
+			if err := utils.RunCommand("wg-quick", "down", configFile); err != nil {
+				return fmt.Errorf("failed to disable interface: %v", err)
 			}
 		}
 	}
@@ -333,11 +333,16 @@ func (s *WireGuardService) isTargetWgInterface(ifname string, key string) bool {
 	return currentPubKey == key
 }
 
-func (s *WireGuardService) generatePostUpCommands(iface *models.Interface) (commands []string) {
+func (s *WireGuardService) generatePostUpCommands(iface *models.Interface, ifnameUsePI bool) (commands []string) {
 
 	// Add VRF configuration if specified
 	if iface.VRFName != nil && *iface.VRFName != "" {
 		commands = append(commands, fmt.Sprintf("ip link set dev %s master %s", iface.Ifname, *iface.VRFName))
+	}
+
+	ifacename := iface.Ifname
+	if ifnameUsePI {
+		ifacename = "%i"
 	}
 
 	// Add firewall rules for each enabled server
@@ -348,12 +353,12 @@ func (s *WireGuardService) generatePostUpCommands(iface *models.Interface) (comm
 
 		// IPv4 firewall rules
 		if server.IPv4 != nil && server.IPv4.Enabled {
-			commands = append(commands, utils.GenerateServerFirewallRules(iface.Ifname, server.IPv4, 4)...)
+			commands = append(commands, utils.GenerateServerFirewallRules(ifacename, server.IPv4, 4)...)
 		}
 
 		// IPv6 firewall rules
 		if server.IPv6 != nil && server.IPv6.Enabled {
-			commands = append(commands, utils.GenerateServerFirewallRules(iface.Ifname, server.IPv6, 6)...)
+			commands = append(commands, utils.GenerateServerFirewallRules(ifacename, server.IPv6, 6)...)
 		}
 	}
 
@@ -362,7 +367,6 @@ func (s *WireGuardService) generatePostUpCommands(iface *models.Interface) (comm
 }
 
 func (s *WireGuardService) generatePreDownCommands(iface *models.Interface) (commands []string) {
-
 	// Remove firewall rules for each enabled server
 	for _, server := range iface.Servers {
 		if !server.Enabled {

@@ -240,11 +240,11 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 		}
 	} else {
 		// Remove old interface
-		if err := s.wg.RemoveConfig(needsWGReCreateOldName); err != nil {
-			return nil, fmt.Errorf("failed to remove old WireGuard interface: %v", err)
-		}
 		if err := s.wg.SyncToInterface(needsWGReCreateOldName, false, iface.PrivateKey); err != nil {
 			return nil, fmt.Errorf("failed to bring down old WireGuard interface: %v", err)
+		}
+		if err := s.wg.RemoveConfig(needsWGReCreateOldName); err != nil {
+			return nil, fmt.Errorf("failed to remove old WireGuard interface: %v", err)
 		}
 		// Create new interface
 		if err := s.wg.SyncToConf(iface); err != nil {

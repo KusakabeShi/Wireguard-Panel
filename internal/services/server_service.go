@@ -112,9 +112,6 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 		return fmt.Errorf("interface not found")
 	}
 
-	if iface.Enabled == false && enabled == true {
-	}
-
 	server, err := s.cfg.GetServer(interfaceID, serverID)
 	if err != nil {
 		return err
@@ -126,37 +123,35 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 
 	if enabled {
 		// Enable: add IP addresses, firewall rules, and sync config
-		if server.IPv4 != nil && server.IPv4.Enabled {
+		if iface.Enabled && server.IPv4 != nil && server.IPv4.Enabled {
 			if err := s.fw.AddIpAndFwRules(iface.Ifname, server.IPv4); err != nil {
 				return fmt.Errorf("failed to add IPv4 firewall rules: %v", err)
 			}
 		}
-		if server.IPv6 != nil && server.IPv6.Enabled {
+		if iface.Enabled && server.IPv6 != nil && server.IPv6.Enabled {
 			if err := s.fw.AddIpAndFwRules(iface.Ifname, server.IPv6); err != nil {
 				return fmt.Errorf("failed to add IPv6 firewall rules: %v", err)
 			}
 		}
 	} else {
 		// Disable: remove IP addresses, firewall rules, and sync config
-		if server.IPv4 != nil && server.IPv4.Enabled {
+		if iface.Enabled && server.IPv4 != nil && server.IPv4.Enabled {
 			s.fw.RemoveIpAndFwRules(iface.Ifname, server.IPv4)
 		}
-		if server.IPv6 != nil && server.IPv6.Enabled {
+		if iface.Enabled && server.IPv6 != nil && server.IPv6.Enabled {
 			s.fw.RemoveIpAndFwRules(iface.Ifname, server.IPv6)
 		}
-	}
-
-	server.Enabled = enabled
-	s.cfg.SetInterface(interfaceID, iface)
-	if err := s.cfg.Save(); err != nil {
-		return fmt.Errorf("failed to save configuration: %v", err)
 	}
 
 	// Regenerate WireGuard configuration
 	if err := s.wg.SyncToConfAndInterface(iface); err != nil {
 		return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
 	}
-
+	server.Enabled = enabled
+	s.cfg.SetInterface(interfaceID, iface)
+	if err := s.cfg.Save(); err != nil {
+		return fmt.Errorf("failed to save configuration: %v", err)
+	}
 	return nil
 }
 
