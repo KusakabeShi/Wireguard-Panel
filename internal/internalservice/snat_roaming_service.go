@@ -3,6 +3,7 @@ package internalservice
 import (
 	"fmt"
 	"log"
+	"net"
 	"sync"
 	"time"
 
@@ -43,7 +44,6 @@ func NewSNATRoamingService(pseudoBridgeService *PseudoBridgeService, firewallSer
 		pseudoBridgeService: pseudoBridgeService,
 		fw:                  firewallService,
 	}
-	log.Println("Starting SNAT Roaming Service")
 	go s.mainLoop()
 	return s
 }
@@ -76,14 +76,18 @@ func (s *SNATRoamingService) UpdateConfiguration(waitnigInterface map[string]map
 		}
 	}
 
-	for ifname := range addIF {
+	for ifname, configs := range addIF {
 		s.runningInterface[ifname] = &SNATRoamingSynced{
 			ExistsInNewConfig: false,
 		}
 		s.listeners[ifname] = NewInterfaceIPNetListener(ifname, s.pseudoBridgeService, s.fw)
+		s.listeners[ifname].SyncIpFromIface()
+		s.listeners[ifname].UpdateConfigsAndSyncFw(configs, false)
+
 	}
 	for ifname, configs := range updateIF {
-		s.listeners[ifname].UpdateConfigs(configs)
+		s.listeners[ifname].SyncIpFromIface()
+		s.listeners[ifname].UpdateConfigsAndSyncFw(configs, false)
 	}
 	for ifname := range delIF {
 		s.listeners[ifname].Stop()
@@ -98,10 +102,10 @@ func (s *SNATRoamingService) mainLoop() {
 	linkUpdates := make(chan netlink.LinkUpdate, 10)
 	addrUpdates := make(chan netlink.AddrUpdate, 10)
 	defer func() {
-		fmt.Printf("SNATRoamingService stopped")
+		log.Println("SNAT Roaming Service stopped")
 		close(s.stopCh)
 	}()
-	log.Println("Starting SNATRoamingService")
+	log.Println("Starting SNAT Roaming Service")
 	for {
 		// Try to open pcap handle for the interface
 		if !linkUpdatesSubscribed {
@@ -140,7 +144,8 @@ func (s *SNATRoamingService) mainLoop() {
 				listener, ok := s.listeners[ifname]
 				s.mu.RUnlock()
 				if ok {
-					listener.IPaddrUpdate()
+					listener.SyncIpFromIface()
+					listener.UpdateConfigsAndSyncFw(listener.configs, true)
 				}
 
 			case addrUpdate, ok := <-addrUpdates:
@@ -157,7 +162,8 @@ func (s *SNATRoamingService) mainLoop() {
 				listener, ok := s.listeners[ifname]
 				s.mu.RUnlock()
 				if ok {
-					listener.IPaddrUpdate()
+					listener.SyncIpFromIface()
+					listener.UpdateConfigsAndSyncFw(listener.configs, true)
 				}
 			}
 		}
@@ -202,13 +208,16 @@ func NewInterfaceIPNetListener(interfaceName string, pseudoBridgeService *Pseudo
 	r.ifIPs[4] = nil
 	r.ifIPs[6] = nil
 
-	r.mainLoop()
+	go r.mainLoop()
 	return r
 }
 
-func (l *InterfaceIPNetListener) UpdateConfigs(configs map[string]*models.ServerNetworkConfig) {
+func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*models.ServerNetworkConfig, forceUpdateAll bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if configs == nil {
+		return
+	}
 	oldsynced := make(map[string]bool)
 	for k := range l.configs {
 		oldsynced[k] = false
@@ -227,7 +236,7 @@ func (l *InterfaceIPNetListener) UpdateConfigs(configs map[string]*models.Server
 		oldconf, ok := l.configs[key]
 		if ok {
 			oldsynced[key] = true
-			if !oldconf.Network.Equal(newconf.Network) || !oldconf.Snat.SnatExcludedNetwork.Equal(newconf.Snat.SnatExcludedNetwork) || !models.NetworksEqual(oldconf.RoutedNetworks, newconf.RoutedNetworks) {
+			if forceUpdateAll || !oldconf.Network.Equal(newconf.Network) || !oldconf.Snat.SnatExcludedNetwork.Equal(newconf.Snat.SnatExcludedNetwork) || !models.NetworksEqualNP(oldconf.RoutedNetworks, newconf.RoutedNetworks) {
 				toUpdate[key] = newconf
 			}
 		} else {
@@ -268,8 +277,21 @@ func (l *InterfaceIPNetListener) UpdateConfigs(configs map[string]*models.Server
 }
 
 func (l *InterfaceIPNetListener) getSimulatedConfig(config *models.ServerNetworkConfig) (*models.ServerNetworkConfig, error) {
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
 
-	target_network, err := config.Network.GetNetByOffset(config.Snat.SnatIPNet)
+	if config.Network == nil || config.Snat == nil || config.Snat.SnatIPNet == nil {
+		return nil, fmt.Errorf("config.Network or config.Snat or config.Snat.SnatIPNet is nil")
+	}
+
+	_, ok := l.ifIPs[config.Network.Version]
+	if !ok || l.ifIPs[config.Network.Version] == nil {
+		return nil, fmt.Errorf("interface %v has no IP for version %v", l.interfaceName, config.Network.Version)
+	}
+
+	target_network, err := l.ifIPs[config.Network.Version].GetNetByOffset(config.Snat.SnatIPNet)
+
 	if err != nil {
 		return nil, fmt.Errorf("error get target_network, err: %v", err)
 	}
@@ -292,14 +314,44 @@ func (l *InterfaceIPNetListener) getSimulatedConfig(config *models.ServerNetwork
 	return simulatedIfConfig, nil
 }
 
-func (l *InterfaceIPNetListener) IPaddrUpdate() {
+func (l *InterfaceIPNetListener) SyncIpFromIface() {
 	ipv4, ipv6, err := utils.GetInterfaceIP(l.interfaceName)
 	if err != nil {
 		log.Printf("Read IP from %v failed, err: %v", l.interfaceName, err)
 	}
 	l.ifIPs[4] = ipv4
 	l.ifIPs[6] = ipv6
-	l.pseudoBridgeService.UpdateBaseNets(l.interfaceName, ipv4, ipv6)
+	ipv4s, ipv6s, err := l.getAllBoundIPs()
+	if err != nil {
+		log.Printf("Failed to get all bound IPs for %v: %v", l.interfaceName, err)
+	}
+	l.pseudoBridgeService.UpdateIfaceBindInfo(l.interfaceName, ipv4, ipv6, ipv4s, ipv6s)
+}
+
+func (l *InterfaceIPNetListener) getAllBoundIPs() ([]net.IP, []net.IP, error) {
+	link, err := netlink.LinkByName(l.interfaceName)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get link by name %v: %w", l.interfaceName, err)
+	}
+
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to list addresses: %w", err)
+	}
+
+	var ipv4s, ipv6s []net.IP
+	for _, addr := range addrs {
+		if addr.IP == nil {
+			continue
+		}
+		if addr.IP.To4() != nil {
+			ipv4s = append(ipv4s, addr.IP)
+		} else if addr.IP.To16() != nil {
+			ipv6s = append(ipv6s, addr.IP)
+		}
+	}
+
+	return ipv4s, ipv6s, nil
 }
 
 func (l *InterfaceIPNetListener) Stop() {

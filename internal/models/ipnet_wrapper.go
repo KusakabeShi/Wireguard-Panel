@@ -392,24 +392,43 @@ func (w *IPNetWrapper) Equal(w2 *IPNetWrapper) bool {
 	return true
 }
 
-func NetworksEqual(s1, s2 []IPNetWrapper) bool {
+func NetworksEqual(s1, s2 []*IPNetWrapper) bool {
+	if s1 == nil && s2 == nil {
+		return true
+	}
+	if s1 == nil || s2 == nil {
+		return false
+	}
 	if len(s1) != len(s2) {
 		return false
 	}
 	// Sort both slices
 	sort.Slice(s1, func(i, j int) bool {
-		return IPNetLess(&s1[i], &s1[j])
+		return IPNetLess(s1[i], s1[j])
 	})
 	sort.Slice(s2, func(i, j int) bool {
-		return IPNetLess(&s2[i], &s2[j])
+		return IPNetLess(s2[i], s2[j])
 	})
 
 	// Compare each element
 	for i := 0; i < len(s1); i++ {
-		if !s1[i].Equal(&s2[i]) {
+		if !s1[i].Equal(s2[i]) {
 			return false
 		}
 	}
 
 	return true
+}
+
+func NetworksEqualNP(s1, s2 []IPNetWrapper) bool {
+	var s1p []*IPNetWrapper
+	var s2p []*IPNetWrapper
+	for i := range s1 {
+		s1p = append(s1p, &s1[i])
+	}
+	for i := range s2 {
+		s2p = append(s2p, &s2[i])
+	}
+	return NetworksEqual(s1p, s2p)
+
 }

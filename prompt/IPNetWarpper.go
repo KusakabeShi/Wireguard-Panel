@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/big"
 	"net"
 	"strconv"
@@ -138,7 +139,7 @@ func (w *IPNetWrapper) GetOffset() (net.IP, error) {
 	networkIP := tip.Mask(mask)
 
 	offset := make(net.IP, len(tip))
-	fmt.Printf("%v\n", len(tip))
+	log.Printf("%v\n", len(tip))
 	for i := 0; i < len(tip); i++ {
 		offset[i] = tip[i] ^ networkIP[i]
 	}

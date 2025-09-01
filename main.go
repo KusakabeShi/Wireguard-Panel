@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"embed"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -17,6 +18,9 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+//go:embed all:frontend/build
+var frontendFS embed.FS
 
 func main() {
 	var configPath = flag.String("c", "./config.json", "Path to configuration file")
@@ -50,9 +54,9 @@ func main() {
 	firewallService := internalservice.NewFirewallService()
 	pseudoBridgeService := internalservice.NewPseudoBridgeService()
 	snatRoamingService := internalservice.NewSNATRoamingService(pseudoBridgeService, firewallService)
-
+	cfg.LoadInternalServices(pseudoBridgeService, snatRoamingService)
 	// Start HTTP server
-	srv := server.NewServer(cfg, pseudoBridgeService, snatRoamingService)
+	srv := server.NewServer(cfg, frontendFS)
 	log.Printf("Starting WireGuard Panel on %s:%d", cfg.ListenIP, cfg.ListenPort)
 	log.Fatal(srv.Start(firewallService))
 }
@@ -83,7 +87,7 @@ func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, e
 			Password:            string(hashedPassword),
 			ListenIP:            "0.0.0.0",
 			ListenPort:          5000,
-			SiteURLPrefix:       "/",
+			BasePath:            "/",
 			SiteFrontendPath:    "./frontend/build",
 			APIPrefix:           "/api",
 			ServerId:            serverId,

@@ -37,10 +37,12 @@ func (s *StartupService) InitializeInterfaces() error {
 		if err := s.initializeInterface(iface); err != nil {
 			log.Printf("Failed to initialize interface %s: %v", iface.Ifname, err)
 			// Continue with other interfaces even if one fails
+			iface.Enabled = false
 			continue
 		}
 		log.Printf("Successfully initialized interface %s", iface.Ifname)
 	}
+	s.cfg.SyncToInternalService()
 
 	return nil
 }

@@ -26,7 +26,7 @@ type Config struct {
 	Password            string                       `json:"password"`
 	ListenIP            string                       `json:"listenIP"`
 	ListenPort          int                          `json:"listenPort"`
-	SiteURLPrefix       string                       `json:"siteUrlPrefix"`
+	BasePath            string                       `json:"basePath"`
 	SiteFrontendPath    string                       `json:"siteFrontendPath"`
 	APIPrefix           string                       `json:"apiPrefix"`
 	ServerId            string                       `json:"serverId"`
@@ -34,9 +34,9 @@ type Config struct {
 	Sessions            map[string]*Session          `json:"sessions"`
 
 	// For thread safety
-	mu  sync.RWMutex                        `json:"-"`
-	pbs internalservice.PseudoBridgeService `json:"-"`
-	srs internalservice.SNATRoamingService  `json:"-"`
+	mu  sync.RWMutex                         `json:"-"`
+	pbs *internalservice.PseudoBridgeService `json:"-"`
+	srs *internalservice.SNATRoamingService  `json:"-"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -74,6 +74,11 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func (c *Config) LoadInternalServices(pbs *internalservice.PseudoBridgeService, srs *internalservice.SNATRoamingService) {
+	c.pbs = pbs
+	c.srs = srs
 }
 
 func (c *Config) Save() error {
@@ -258,7 +263,12 @@ func (c *Config) SyncToInternalService() {
 					*server.IPv4.PseudoBridgeMasterInterface != "" {
 					ifname := *server.IPv4.PseudoBridgeMasterInterface
 					network := server.IPv4.Network
-					addPbsConf(pbsConfig, "v4", ifname, network)
+					var base_net models.IPNetWrapper
+					if network != nil {
+						base_net = network.Network()
+					}
+					addPbsConf(pbsConfig, "v4", ifname, &base_net)
+					addSrsConf(srsConfig, ifname, nil)
 				}
 				if server.IPv4.Snat != nil && server.IPv4.Snat.Enabled &&
 					server.IPv4.Snat.SnatIPNet != nil &&
@@ -282,7 +292,12 @@ func (c *Config) SyncToInternalService() {
 					*server.IPv6.PseudoBridgeMasterInterface != "" {
 					ifname := *server.IPv6.PseudoBridgeMasterInterface
 					network := server.IPv6.Network
-					addPbsConf(pbsConfig, "v6", ifname, network)
+					var base_net models.IPNetWrapper
+					if network != nil {
+						base_net = network.Network()
+					}
+					addPbsConf(pbsConfig, "v6", ifname, &base_net)
+					addSrsConf(srsConfig, ifname, nil)
 				}
 				if server.IPv6.Snat != nil && server.IPv6.Snat.Enabled && server.IPv6.Snat.SnatIPNet != nil &&
 					server.IPv6.Snat.RoamingPseudoBridge &&
@@ -315,6 +330,7 @@ func (c *Config) SyncToInternalService() {
 
 func addSrsConf(srsConfig map[string]map[string]*models.ServerNetworkConfig, ifname string, network *models.ServerNetworkConfig) {
 	if network == nil {
+		srsConfig[ifname] = nil
 		return
 	}
 	key := network.CommentString
@@ -323,7 +339,7 @@ func addSrsConf(srsConfig map[string]map[string]*models.ServerNetworkConfig, ifn
 		return
 	}
 	oldrn, ok := srsConfig[ifname]
-	if !ok {
+	if !ok || oldrn == nil {
 		oldrn = make(map[string]*models.ServerNetworkConfig)
 		srsConfig[ifname] = oldrn
 	}
@@ -345,13 +361,13 @@ func addPbsConf(pbsConfig map[string]internalservice.ResponderNetworks, target s
 	*network_copy = *network
 	switch target {
 	case "v4":
-		oldrn.V4Networks = append(oldrn.V4Networks, *network_copy)
+		oldrn.V4Networks = append(oldrn.V4Networks, network_copy)
 	case "v6":
-		oldrn.V6Networks = append(oldrn.V6Networks, *network_copy)
+		oldrn.V6Networks = append(oldrn.V6Networks, network_copy)
 	case "v4o":
-		oldrn.V4Offsets = append(oldrn.V4Offsets, *network_copy)
+		oldrn.V4Offsets = append(oldrn.V4Offsets, network_copy)
 	case "v6o":
-		oldrn.V6Offsets = append(oldrn.V6Offsets, *network_copy)
+		oldrn.V6Offsets = append(oldrn.V6Offsets, network_copy)
 	}
 
 	pbsConfig[ifname] = oldrn

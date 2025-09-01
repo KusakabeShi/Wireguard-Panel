@@ -90,6 +90,7 @@ func (a *AuthMiddleware) Login(c *gin.Context) {
 	}
 
 	a.cfg.AddSession(token, session)
+	a.cfg.CleanExpiredSessions()
 
 	// Set cookie
 	c.SetCookie("session_token", token, 24*3600, "/", "", false, true)

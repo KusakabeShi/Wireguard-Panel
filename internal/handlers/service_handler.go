@@ -24,16 +24,15 @@ func NewServiceHandler(cfg *config.Config, auth *middleware.AuthMiddleware) *Ser
 func (h *ServiceHandler) GetServiceConfig(c *gin.Context) {
 	response := map[string]interface{}{
 		"wireguardConfigPath": h.cfg.WireGuardConfigPath,
-		"user":               h.cfg.User,
-		"listenIP":           h.cfg.ListenIP,
-		"listenPort":         h.cfg.ListenPort,
-		"siteUrlPrefix":      h.cfg.SiteURLPrefix,
-		"apiPrefix":          h.cfg.APIPrefix,
+		"user":                h.cfg.User,
+		"listenIP":            h.cfg.ListenIP,
+		"listenPort":          h.cfg.ListenPort,
+		"siteUrlPrefix":       h.cfg.BasePath,
+		"apiPrefix":           h.cfg.APIPrefix,
 	}
-	
+
 	c.JSON(http.StatusOK, response)
 }
-
 
 func (h *ServiceHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.POST("/login", h.auth.Login)

@@ -25,16 +25,18 @@ type InterfaceResponder struct {
 	workingNetworks ResponderNetworks
 	ipv4Base        *models.IPNetWrapper
 	ipv6Base        *models.IPNetWrapper
+	bindedIPv4s     []net.IP
+	bindedIPv6s     []net.IP
 	handle          *pcap.Handle
 	stopCh          chan struct{}
 	mu              sync.RWMutex
 }
 
 type ResponderNetworks struct {
-	V4Networks []models.IPNetWrapper
-	V6Networks []models.IPNetWrapper
-	V4Offsets  []models.IPNetWrapper
-	V6Offsets  []models.IPNetWrapper
+	V4Networks []*models.IPNetWrapper
+	V6Networks []*models.IPNetWrapper
+	V4Offsets  []*models.IPNetWrapper
+	V6Offsets  []*models.IPNetWrapper
 }
 
 type IPNetSynced struct {
@@ -97,14 +99,14 @@ func (s *PseudoBridgeService) UpdateConfiguration(waitInterface map[string]Respo
 	}
 }
 
-func (s *PseudoBridgeService) UpdateBaseNets(ifname string, ipv4net, ipv6net *models.IPNetWrapper) error {
+func (s *PseudoBridgeService) UpdateIfaceBindInfo(ifname string, ipv4net, ipv6net *models.IPNetWrapper, ipv4s, ipv6s []net.IP) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	responder, ok := s.responders[ifname]
 	if !ok {
 		return fmt.Errorf("responder for interface %v not found", ifname)
 	}
-	responder.UpdateBaseNets(ipv4net, ipv6net)
+	responder.UpdateIfaceBinds(ipv4net, ipv6net, ipv4s, ipv6s)
 	return nil
 }
 
@@ -127,9 +129,10 @@ func (s *PseudoBridgeService) Stop() {
 
 func NewInterfaceResponder(interfaceName string, networks ResponderNetworks) *InterfaceResponder {
 	ifr := &InterfaceResponder{
-		interfaceName: interfaceName,
-		networks:      networks,
-		stopCh:        make(chan struct{}),
+		interfaceName:   interfaceName,
+		networks:        networks,
+		workingNetworks: networks,
+		stopCh:          make(chan struct{}),
 	}
 	go ifr.mainLoop()
 	return ifr
@@ -137,34 +140,38 @@ func NewInterfaceResponder(interfaceName string, networks ResponderNetworks) *In
 
 func (r *InterfaceResponder) mainLoop() {
 	var handle *pcap.Handle
+	var packetSource *gopacket.PacketSource
+	var err error
 	defer func() {
 		if handle != nil {
 			handle.Close()
 		}
 		close(r.stopCh)
-		fmt.Printf("Responder for %v stopped", r.interfaceName)
+		log.Printf("Responder for %v stopped\n", r.interfaceName)
 	}()
-	log.Println("Starting Pseudo-bridge Service")
+	log.Println("Starting Pseudo-bridge Responder for", r.interfaceName)
 	for {
 		// Try to open pcap handle for the interface
 		if handle == nil {
-			handle, err := pcap.OpenLive(r.interfaceName, 1600, true, pcap.BlockForever)
-			if err != nil {
+			if handle, err = pcap.OpenLive(r.interfaceName, 9200, false, pcap.BlockForever); err != nil {
 				log.Printf("Failed to open pcap handle for %s, retrying in 5 seconds: %v", r.interfaceName, err)
 				time.Sleep(5 * time.Second)
-
 				continue
 			}
 			// Set BPF filter for ARP and ICMPv6
 			filter := "arp or (icmp6 and ip6[40] == 135)" // ARP or Neighbor Solicitation
-			if err := handle.SetBPFFilter(filter); err != nil {
+			if err = handle.SetBPFFilter(filter); err != nil {
 				handle.Close()
 				log.Printf("Failed to set BPF filter for %s, retrying in 5 seconds: %v", r.interfaceName, err)
 				time.Sleep(5 * time.Second)
 				continue
 			}
+			packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
+			log.Println("Started listening ARP and NS on", r.interfaceName)
+		} else if packetSource == nil {
+			packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
 		} else {
-			packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+			r.handle = handle
 			select {
 			case <-r.stopCh:
 				return
@@ -174,12 +181,14 @@ func (r *InterfaceResponder) mainLoop() {
 					log.Printf("Packet source returned nil for %s, retry listening after 5 second", r.interfaceName)
 					handle.Close()
 					handle = nil
+					packetSource = nil
+					r.handle = nil
 					time.Sleep(5 * time.Second)
+					continue
 				}
 				r.handlePacket(packet)
 			}
 		}
-		return
 	}
 }
 
@@ -191,11 +200,17 @@ func (r *InterfaceResponder) UpdateNetworks(networks ResponderNetworks) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.networks = networks
+	r.networks.V4Networks = networks.V4Networks
+	r.networks.V6Networks = networks.V6Networks
 	r.offset2workingNet()
 }
-func (r *InterfaceResponder) UpdateBaseNets(ipv4net, ipv6net *models.IPNetWrapper) {
+func (r *InterfaceResponder) UpdateIfaceBinds(ipv4net, ipv6net *models.IPNetWrapper, ipv4s, ipv6s []net.IP) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.bindedIPv4s = make([]net.IP, len(ipv4s))
+	copy(r.bindedIPv4s, ipv4s)
+	r.bindedIPv6s = make([]net.IP, len(ipv6s))
+	copy(r.bindedIPv6s, ipv6s)
 	r.ipv4Base = ipv4net
 	r.ipv6Base = ipv6net
 	r.offset2workingNet()
@@ -206,22 +221,22 @@ func (r *InterfaceResponder) offset2workingNet() {
 	r.workingNetworks.V6Networks = r.networks.V6Networks
 	if r.ipv4Base != nil {
 		for _, v4offset := range r.networks.V4Offsets {
-			newnet, err := r.ipv4Base.GetNetByOffset(&v4offset)
+			newnet, err := r.ipv4Base.GetNetByOffset(v4offset)
 			if err != nil {
 				log.Printf("Failed to get net by offset: %v from base: %v, err: %v", v4offset, r.ipv4Base, err)
 				continue
 			}
-			r.workingNetworks.V4Networks = append(r.workingNetworks.V4Networks, *newnet)
+			r.workingNetworks.V4Networks = append(r.workingNetworks.V4Networks, newnet)
 		}
 	}
 	if r.ipv6Base != nil {
 		for _, v6offset := range r.networks.V6Offsets {
-			newnet, err := r.ipv6Base.GetNetByOffset(&v6offset)
+			newnet, err := r.ipv6Base.GetNetByOffset(v6offset)
 			if err != nil {
 				log.Printf("Failed to get net by offset: %v from base: %v, err: %v", v6offset, r.ipv6Base, err)
 				continue
 			}
-			r.workingNetworks.V6Networks = append(r.workingNetworks.V6Networks, *newnet)
+			r.workingNetworks.V6Networks = append(r.workingNetworks.V6Networks, newnet)
 		}
 	}
 }
@@ -249,7 +264,15 @@ func (r *InterfaceResponder) handleARPRequest(packet gopacket.Packet, arp *layer
 
 	r.mu.RLock()
 	networks := r.workingNetworks.V4Networks
+	bindedIPv4s := r.bindedIPv4s
 	r.mu.RUnlock()
+
+	// Check if target IP is bound to interface - if so, don't respond
+	for _, boundIP := range bindedIPv4s {
+		if targetIP.Equal(boundIP) {
+			return
+		}
+	}
 
 	// Check if target IP is in any of our managed networks
 	for _, network := range networks {
@@ -270,7 +293,15 @@ func (r *InterfaceResponder) handleNeighborSolicitation(packet gopacket.Packet, 
 
 	r.mu.RLock()
 	networks := r.workingNetworks.V6Networks
+	bindedIPv6s := r.bindedIPv6s
 	r.mu.RUnlock()
+
+	// Check if target IP is bound to interface - if so, don't respond
+	for _, boundIP := range bindedIPv6s {
+		if targetIP.Equal(boundIP) {
+			return
+		}
+	}
 
 	// Check if target IP is in any of our managed networks
 	for _, network := range networks {
@@ -319,7 +350,9 @@ func (r *InterfaceResponder) sendARPReply(requestPacket gopacket.Packet, request
 	opts := gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}
 	gopacket.SerializeLayers(buffer, opts, eth, arp)
 
-	r.handle.WritePacketData(buffer.Bytes())
+	if r.handle != nil {
+		r.handle.WritePacketData(buffer.Bytes())
+	}
 }
 
 func (r *InterfaceResponder) sendNeighborAdvertisement(requestPacket gopacket.Packet, targetIP net.IP) {
@@ -380,5 +413,7 @@ func (r *InterfaceResponder) sendNeighborAdvertisement(requestPacket gopacket.Pa
 	opts := gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}
 	gopacket.SerializeLayers(buffer, opts, eth, ipv6, icmp6)
 
-	r.handle.WritePacketData(buffer.Bytes())
+	if r.handle != nil {
+		r.handle.WritePacketData(buffer.Bytes())
+	}
 }

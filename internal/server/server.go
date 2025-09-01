@@ -1,12 +1,12 @@
 package server
 
 import (
+	"embed"
 	"fmt"
 	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"wg-panel/internal/config"
 	"wg-panel/internal/handlers"
@@ -19,17 +19,15 @@ import (
 )
 
 type Server struct {
-	cfg                 *config.Config
-	engine              *gin.Engine
-	pseudoBridgeService *internalservice.PseudoBridgeService
-	snatRoamingService  *internalservice.SNATRoamingService
+	cfg        *config.Config
+	engine     *gin.Engine
+	frontendFS embed.FS
 }
 
-func NewServer(cfg *config.Config, pseudoBridge *internalservice.PseudoBridgeService, snatRoaming *internalservice.SNATRoamingService) *Server {
+func NewServer(cfg *config.Config, frontendFS embed.FS) *Server {
 	return &Server{
-		cfg:                 cfg,
-		pseudoBridgeService: pseudoBridge,
-		snatRoamingService:  snatRoaming,
+		cfg:        cfg,
+		frontendFS: frontendFS,
 	}
 }
 
@@ -68,9 +66,6 @@ func (s *Server) Start(fw *internalservice.FirewallService) error {
 	// Setup routes
 	s.setupRoutes(serviceHandler, interfaceHandler, serverHandler, clientHandler, authMiddleware)
 
-	// Start background services configuration update
-	go s.updateServicesConfiguration()
-
 	// Start server
 	var listenAddr string
 	if strings.Contains(s.cfg.ListenIP, ":") {
@@ -89,7 +84,7 @@ func (s *Server) setupRoutes(
 	authMiddleware *middleware.AuthMiddleware,
 ) {
 	// API routes first to avoid conflicts
-	apiPath := s.cfg.SiteURLPrefix + s.cfg.APIPrefix
+	apiPath := s.cfg.BasePath + s.cfg.APIPrefix
 	if apiPath[len(apiPath)-1] != '/' {
 		apiPath += "/"
 	}
@@ -119,21 +114,25 @@ func (s *Server) setupRoutes(
 	serversWithClientGroup := interfacesGroup.Group("/:ifId/servers/:serverId")
 	clientHandler.RegisterRoutes(serversWithClientGroup)
 
-	// Static file serving (after API routes)
-	frontendPath := s.cfg.SiteFrontendPath
-	if !filepath.IsAbs(frontendPath) {
-		frontendPath = filepath.Join(".", frontendPath)
-	}
-
-	// Serve index.html at SiteURLPrefix
-	sitePrefix := s.cfg.SiteURLPrefix
+	// Static file serving (after API routes) using embedded filesystem
+	sitePrefix := s.cfg.BasePath
 	if sitePrefix == "/" {
 		s.engine.GET("/", func(c *gin.Context) {
-			c.File(filepath.Join(frontendPath, "index.html"))
+			data, err := s.frontendFS.ReadFile("frontend/build/index.html")
+			if err != nil {
+				c.String(http.StatusNotFound, "File not found")
+				return
+			}
+			c.Data(http.StatusOK, "text/html; charset=utf-8", data)
 		})
 	} else {
 		s.engine.GET(sitePrefix, func(c *gin.Context) {
-			c.File(filepath.Join(frontendPath, "index.html"))
+			data, err := s.frontendFS.ReadFile("frontend/build/index.html")
+			if err != nil {
+				c.String(http.StatusNotFound, "File not found")
+				return
+			}
+			c.Data(http.StatusOK, "text/html; charset=utf-8", data)
 		})
 	}
 
@@ -156,37 +155,46 @@ func (s *Server) setupRoutes(
 				relativePath = "/"
 			}
 
-			// Try to serve static file from frontend directory
-			filePath := filepath.Join(frontendPath, relativePath)
-
-			// Check if file exists and is not a directory
-			if info, err := http.Dir(frontendPath).Open(relativePath); err == nil {
-				defer info.Close()
-				if stat, err := info.Stat(); err == nil && !stat.IsDir() {
-					c.File(filePath)
-					return
+			// Try to serve static file from embedded filesystem
+			embedPath := "frontend/build/" + relativePath
+			if data, err := s.frontendFS.ReadFile(embedPath); err == nil {
+				// Determine content type based on file extension
+				contentType := "text/plain"
+				if ext := filepath.Ext(relativePath); ext != "" {
+					switch ext {
+					case ".html":
+						contentType = "text/html; charset=utf-8"
+					case ".css":
+						contentType = "text/css; charset=utf-8"
+					case ".js":
+						contentType = "application/javascript; charset=utf-8"
+					case ".json":
+						contentType = "application/json"
+					case ".png":
+						contentType = "image/png"
+					case ".jpg", ".jpeg":
+						contentType = "image/jpeg"
+					case ".gif":
+						contentType = "image/gif"
+					case ".svg":
+						contentType = "image/svg+xml"
+					case ".ico":
+						contentType = "image/x-icon"
+					}
 				}
+				c.Data(http.StatusOK, contentType, data)
+				return
 			}
 
 			// Fallback to index.html for SPA routing
-			c.File(filepath.Join(frontendPath, "index.html"))
-			return
+			// if data, err := s.frontendFS.ReadFile("frontend/build/index.html"); err == nil {
+			// 	c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+			// } else {
+			// 	c.String(http.StatusNotFound, "File not found")
+			// }
+			// return
 		}
-
 		// Not a frontend or API request
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 	})
-}
-
-func (s *Server) updateServicesConfiguration() {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			// Clean up expired sessions
-			s.cfg.CleanExpiredSessions()
-		}
-	}
 }

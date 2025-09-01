@@ -148,6 +148,7 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 		return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
 	}
 	server.Enabled = enabled
+	s.cfg.SyncToInternalService()
 	s.cfg.SetInterface(interfaceID, iface)
 	if err := s.cfg.Save(); err != nil {
 		return fmt.Errorf("failed to save configuration: %v", err)
@@ -243,6 +244,7 @@ func (s *ServerService) MoveServer(interfaceID, serverID, newInterfaceID string)
 	if err := s.wg.SyncToConfAndInterface(destIface); err != nil {
 		return fmt.Errorf("failed to sync destination interface: %v", err)
 	}
+	s.cfg.SyncToInternalService()
 
 	return nil
 }

@@ -88,14 +88,34 @@ function AppContent() {
   };
 
   const handleSaveInterface = async (interfaceData) => {
+    let interfaceId;
+    
     if (interfaceDialog.interface) {
       // Edit existing
-      await apiService.updateInterface(interfaceDialog.interface.id, interfaceData);
+      interfaceId = interfaceDialog.interface.id;
+      await apiService.updateInterface(interfaceId, interfaceData);
     } else {
       // Create new
-      await apiService.createInterface(interfaceData);
+      const newInterface = await apiService.createInterface(interfaceData);
+      interfaceId = newInterface.id;
     }
-    await loadInterfaces();
+    
+    // Load updated interfaces
+    const updatedInterfaces = await apiService.getInterfaces();
+    setInterfaces(updatedInterfaces);
+    
+    // Update selected interface to reflect changes if it was the one edited
+    if (selectedInterface && selectedInterface.id === interfaceId) {
+      const updatedInterface = updatedInterfaces.find(i => i.id === interfaceId);
+      if (updatedInterface) {
+        setSelectedInterface(updatedInterface);
+      }
+    }
+    
+    // Select first interface if none selected and interfaces exist
+    if (!selectedInterface && updatedInterfaces.length > 0) {
+      setSelectedInterface(updatedInterfaces[0]);
+    }
   };
 
   const handleDeleteInterface = async (interfaceId) => {
