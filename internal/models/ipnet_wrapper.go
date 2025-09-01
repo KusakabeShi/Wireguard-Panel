@@ -420,6 +420,34 @@ func NetworksEqual(s1, s2 []*IPNetWrapper) bool {
 	return true
 }
 
+func IPsEqual(s1, s2 []net.IP) bool {
+	if s1 == nil && s2 == nil {
+		return true
+	}
+	if s1 == nil || s2 == nil {
+		return false
+	}
+	if len(s1) != len(s2) {
+		return false
+	}
+	// Sort both slices
+	sort.Slice(s1, func(i, j int) bool {
+		return IPLess(&s1[i], &s1[j])
+	})
+	sort.Slice(s2, func(i, j int) bool {
+		return IPLess(&s2[i], &s2[j])
+	})
+
+	// Compare each element
+	for i := 0; i < len(s1); i++ {
+		if !s1[i].Equal(s2[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func NetworksEqualNP(s1, s2 []IPNetWrapper) bool {
 	var s1p []*IPNetWrapper
 	var s2p []*IPNetWrapper

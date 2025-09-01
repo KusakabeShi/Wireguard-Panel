@@ -37,6 +37,8 @@ type ResponderNetworks struct {
 	V6Networks []*models.IPNetWrapper
 	V4Offsets  []*models.IPNetWrapper
 	V6Offsets  []*models.IPNetWrapper
+	V4Skipped  []net.IP
+	V6Skipped  []net.IP
 }
 
 type IPNetSynced struct {
@@ -70,7 +72,11 @@ func (s *PseudoBridgeService) UpdateConfiguration(waitInterface map[string]Respo
 			if !(models.NetworksEqual(runningIF.IPNet.V4Networks, newNets.V4Networks) &&
 				models.NetworksEqual(runningIF.IPNet.V6Networks, newNets.V6Networks) &&
 				models.NetworksEqual(runningIF.IPNet.V4Offsets, newNets.V4Offsets) &&
-				models.NetworksEqual(runningIF.IPNet.V6Offsets, newNets.V6Offsets)) {
+				models.NetworksEqual(runningIF.IPNet.V6Offsets, newNets.V6Offsets)) &&
+				models.IPsEqual(runningIF.IPNet.V4Skipped, newNets.V4Skipped) &&
+				models.IPsEqual(runningIF.IPNet.V6Skipped, newNets.V6Skipped) {
+				// Need update
+				runningIF.IPNet = newNets
 				updateIF[newIF] = newNets
 			}
 		} else {
@@ -274,6 +280,12 @@ func (r *InterfaceResponder) handleARPRequest(packet gopacket.Packet, arp *layer
 		}
 	}
 
+	for _, skipIP := range r.networks.V4Skipped {
+		if targetIP.Equal(skipIP) {
+			return
+		}
+	}
+
 	// Check if target IP is in any of our managed networks
 	for _, network := range networks {
 		if network.Contains(targetIP) {
@@ -299,6 +311,12 @@ func (r *InterfaceResponder) handleNeighborSolicitation(packet gopacket.Packet, 
 	// Check if target IP is bound to interface - if so, don't respond
 	for _, boundIP := range bindedIPv6s {
 		if targetIP.Equal(boundIP) {
+			return
+		}
+	}
+
+	for _, skipIP := range r.networks.V6Skipped {
+		if targetIP.Equal(skipIP) {
 			return
 		}
 	}

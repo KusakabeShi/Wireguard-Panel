@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -268,6 +269,7 @@ func (c *Config) SyncToInternalService() {
 						base_net = network.Network()
 					}
 					addPbsConf(pbsConfig, "v4", ifname, &base_net)
+					addPbsSkipIP(pbsConfig, "v4", ifname, &server.IPv4.Network.IP)
 					addSrsConf(srsConfig, ifname, nil)
 				}
 				if server.IPv4.Snat != nil && server.IPv4.Snat.Enabled &&
@@ -297,6 +299,7 @@ func (c *Config) SyncToInternalService() {
 						base_net = network.Network()
 					}
 					addPbsConf(pbsConfig, "v6", ifname, &base_net)
+					addPbsSkipIP(pbsConfig, "v6", ifname, &server.IPv6.Network.IP)
 					addSrsConf(srsConfig, ifname, nil)
 				}
 				if server.IPv6.Snat != nil && server.IPv6.Snat.Enabled && server.IPv6.Snat.SnatIPNet != nil &&
@@ -368,6 +371,40 @@ func addPbsConf(pbsConfig map[string]internalservice.ResponderNetworks, target s
 		oldrn.V4Offsets = append(oldrn.V4Offsets, network_copy)
 	case "v6o":
 		oldrn.V6Offsets = append(oldrn.V6Offsets, network_copy)
+	}
+
+	pbsConfig[ifname] = oldrn
+}
+
+func addPbsSkipIP(pbsConfig map[string]internalservice.ResponderNetworks, target string, ifname string, skipIP *net.IP) {
+	if skipIP == nil {
+		return
+	}
+	oldrn, ok := pbsConfig[ifname]
+	if !ok {
+		oldrn = internalservice.ResponderNetworks{}
+	}
+
+	var waitAdd []net.IP
+
+	switch target {
+	case "v4":
+		waitAdd = oldrn.V4Skipped
+	case "v6":
+		waitAdd = oldrn.V6Skipped
+	}
+	for _, ip := range waitAdd {
+		if ip.Equal(*skipIP) {
+			// already exists
+			return
+		}
+	}
+	waitAdd = append(waitAdd, *skipIP)
+	switch target {
+	case "v4":
+		oldrn.V4Skipped = waitAdd
+	case "v6":
+		oldrn.V6Skipped = waitAdd
 	}
 
 	pbsConfig[ifname] = oldrn
