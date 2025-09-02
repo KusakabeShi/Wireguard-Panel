@@ -60,6 +60,32 @@ func GetInterfaceIP(ifname string) (*models.IPNetWrapper, *models.IPNetWrapper, 
 	return bestV4, bestV6, nil
 }
 
+func GetInterfaceIPs(ifname string) ([]net.IP, []net.IP, error) {
+	link, err := netlink.LinkByName(ifname)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get link by name %v: %w", ifname, err)
+	}
+
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to list addresses: %w", err)
+	}
+
+	var ipv4s, ipv6s []net.IP
+	for _, addr := range addrs {
+		if addr.IP == nil {
+			continue
+		}
+		if addr.IP.To4() != nil {
+			ipv4s = append(ipv4s, addr.IP)
+		} else if addr.IP.To16() != nil {
+			ipv6s = append(ipv6s, addr.IP)
+		}
+	}
+
+	return ipv4s, ipv6s, nil
+}
+
 // === Sorting helpers ===
 
 func better(a, b netlink.Addr) bool {
@@ -207,6 +233,31 @@ func IsValidPhyIfName(ifname string) error {
 
 	if !allowedIfNameChars.MatchString(ifname) {
 		return fmt.Errorf("interface name %q contains invalid characters: allowed are letters, digits, '.', '_', '-', '@'", ifname)
+	}
+
+	return nil
+}
+
+func IsIfExists(ifname string) error {
+	_, err := netlink.LinkByName(ifname)
+	if err != nil {
+		if _, ok := err.(netlink.LinkNotFoundError); ok {
+			return fmt.Errorf("interface %s does not exist", ifname)
+		}
+		return fmt.Errorf("error checking interface %s: %v", ifname, err)
+	}
+	return nil
+}
+
+func IsIfaceLayer2(ifname string) error {
+	iface, err := net.InterfaceByName(ifname)
+	if err != nil {
+		return fmt.Errorf("interface %q not found: %w", ifname, err)
+	}
+
+	// Check if it has a hardware (MAC) address
+	if len(iface.HardwareAddr) == 0 {
+		return fmt.Errorf("interface %q is not a Layer 2 device (no MAC address)", ifname)
 	}
 
 	return nil

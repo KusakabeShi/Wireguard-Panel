@@ -3,7 +3,6 @@ package internalservice
 import (
 	"fmt"
 	"log"
-	"net"
 	"sync"
 	"time"
 
@@ -321,37 +320,11 @@ func (l *InterfaceIPNetListener) SyncIpFromIface() {
 	}
 	l.ifIPs[4] = ipv4
 	l.ifIPs[6] = ipv6
-	ipv4s, ipv6s, err := l.getAllBoundIPs()
+	ipv4s, ipv6s, err := utils.GetInterfaceIPs(l.interfaceName)
 	if err != nil {
 		log.Printf("Failed to get all bound IPs for %v: %v", l.interfaceName, err)
 	}
 	l.pseudoBridgeService.UpdateIfaceBindInfo(l.interfaceName, ipv4, ipv6, ipv4s, ipv6s)
-}
-
-func (l *InterfaceIPNetListener) getAllBoundIPs() ([]net.IP, []net.IP, error) {
-	link, err := netlink.LinkByName(l.interfaceName)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get link by name %v: %w", l.interfaceName, err)
-	}
-
-	addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list addresses: %w", err)
-	}
-
-	var ipv4s, ipv6s []net.IP
-	for _, addr := range addrs {
-		if addr.IP == nil {
-			continue
-		}
-		if addr.IP.To4() != nil {
-			ipv4s = append(ipv4s, addr.IP)
-		} else if addr.IP.To16() != nil {
-			ipv6s = append(ipv6s, addr.IP)
-		}
-	}
-
-	return ipv4s, ipv6s, nil
 }
 
 func (l *InterfaceIPNetListener) Stop() {

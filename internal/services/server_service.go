@@ -284,7 +284,6 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 	}
 	// 2. Validate IPv4 configuration if filled
 	if ipv4.Network != "" {
-
 		if err := s.validateSingleServerNetworkConfig(4, iface, ipv4, exid); err != nil {
 			return nil, fmt.Errorf("IPv4 validation failed: %v", err)
 		}
@@ -367,16 +366,29 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 
 		server.IPv4 = newIPv4
 		if server.IPv4 != nil && server.IPv4.Network != nil && oldServer.IPv4 != nil && oldServer.IPv4.Network != nil {
-			oldserverbasenet := oldServer.IPv4.Network.Network()
-			newserverbasenet := server.IPv4.Network.Network()
-			if len(server.IPv4.RoutedNetworks) == 1 && len(oldServer.IPv4.RoutedNetworks) == 1 {
-				if server.IPv4.RoutedNetworks[0].Equal(&oldserverbasenet) {
-					server.IPv4.RoutedNetworks = []models.IPNetWrapper{newserverbasenet}
+			oldServerBaseNet := oldServer.IPv4.Network.Network()
+			newServerBaseNet := server.IPv4.Network.Network()
+			if !oldServerBaseNet.Equal(&newServerBaseNet) {
+				// if oldServerBaseNet exists in server.IPv4.RoutedNetworks, and newserverbasenet not exisis, replace it with newServerBaseNet
+				newnetexisisinrns := false
+				for _, rn := range server.IPv4.RoutedNetworks {
+					if rn.Contains(oldServerBaseNet.IP) || oldServerBaseNet.Contains(rn.IP) {
+						newnetexisisinrns = true
+						break
+					}
+				}
+				if !newnetexisisinrns {
+					// replace oldServerBaseNet with newServerBaseNet in server.IPv4.RoutedNetworks
+					for i, rn := range server.IPv4.RoutedNetworks {
+						if oldServerBaseNet.Equal(&rn) {
+							server.IPv4.RoutedNetworks[i] = newServerBaseNet
+						}
+					}
 				}
 			}
 			if server.IPv4.Snat != nil && server.IPv4.Snat.SnatExcludedNetwork != nil {
-				if server.IPv4.Snat.SnatExcludedNetwork.Equal(&oldserverbasenet) {
-					server.IPv4.Snat.SnatExcludedNetwork = &newserverbasenet
+				if server.IPv4.Snat.SnatExcludedNetwork.Equal(&oldServerBaseNet) {
+					server.IPv4.Snat.SnatExcludedNetwork = &newServerBaseNet
 				}
 			}
 		}
@@ -384,10 +396,21 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 		if server.IPv6 != nil && server.IPv6.Network != nil && oldServer.IPv6 != nil && oldServer.IPv6.Network != nil {
 			oldserverbasenet := oldServer.IPv6.Network.Network()
 			newserverbasenet := server.IPv6.Network.Network()
-			if len(server.IPv6.RoutedNetworks) == 1 && len(oldServer.IPv6.RoutedNetworks) == 1 {
-
-				if server.IPv6.RoutedNetworks[0].Equal(&oldserverbasenet) {
-					server.IPv6.RoutedNetworks = []models.IPNetWrapper{newserverbasenet}
+			if !oldserverbasenet.Equal(&newserverbasenet) {
+				// if oldserverbasenet exists in server.IPv6.RoutedNetworks, and newserverbasenet not exisis, replace it with newserverbasenet
+				newnetexisisinrns := false
+				for _, rn := range server.IPv6.RoutedNetworks {
+					if rn.Contains(oldserverbasenet.IP) || oldserverbasenet.Contains(rn.IP) {
+						newnetexisisinrns = true
+						break
+					}
+				}
+				if !newnetexisisinrns {
+					for i, rn := range server.IPv6.RoutedNetworks {
+						if oldserverbasenet.Equal(&rn) {
+							server.IPv6.RoutedNetworks[i] = newserverbasenet
+						}
+					}
 				}
 			}
 			if server.IPv6.Snat != nil && server.IPv6.Snat.SnatExcludedNetwork != nil {
@@ -401,7 +424,7 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 	return server, nil
 }
 
-func (s *ServerService) validateSingleServerNetworkConfig(version int, iface *models.Interface, cfg *ServerNetworkConfigRequest, excludeServerID *string) error {
+func (s *ServerService) validateSingleServerNetworkConfig(af int, iface *models.Interface, cfg *ServerNetworkConfigRequest, excludeServerID *string) error {
 	if cfg.Network == "" {
 		return fmt.Errorf("network must be specified")
 	}
@@ -409,7 +432,7 @@ func (s *ServerService) validateSingleServerNetworkConfig(version int, iface *mo
 	// Parse and validate network CIDR
 	var network *models.IPNetWrapper
 	var err error
-	if version == 4 {
+	if af == 4 {
 		network, err = models.ParseCIDRAf(4, cfg.Network)
 	} else {
 		network, err = models.ParseCIDRAf(6, cfg.Network)
@@ -425,12 +448,12 @@ func (s *ServerService) validateSingleServerNetworkConfig(version int, iface *mo
 	}
 
 	// 4. Validate routed networks don't overlap with each other
-	if err := s.validateRoutedNetworksOverlap(version, cfg.RoutedNetworks); err != nil {
+	if err := s.validateRoutedNetworksOverlap(af, cfg.RoutedNetworks); err != nil {
 		return err
 	}
 
 	if cfg.PseudoBridgeMasterInterface != nil && len(*cfg.PseudoBridgeMasterInterface) > 0 {
-		err := utils.IsValidPhyIfName(*cfg.PseudoBridgeMasterInterface)
+		err := utils.IsIfaceLayer2(*cfg.PseudoBridgeMasterInterface)
 		if err != nil {
 			return err
 		}
@@ -438,7 +461,7 @@ func (s *ServerService) validateSingleServerNetworkConfig(version int, iface *mo
 
 	// 5. Validate SNAT configuration
 	if cfg.Snat != nil && cfg.Snat.Enabled {
-		if err := s.validateSnatConfiguration(network, cfg.Snat, version); err != nil {
+		if err := s.validateSnatConfiguration(af, network, cfg.Snat); err != nil {
 			return fmt.Errorf("SNAT validation failed: %v", err)
 		}
 	}
@@ -446,14 +469,14 @@ func (s *ServerService) validateSingleServerNetworkConfig(version int, iface *mo
 	return nil
 }
 
-func (s *ServerService) validateClientIPsInNewNetwork(version int, clients []*models.Client, newNetwork *models.IPNetWrapper) error {
+func (s *ServerService) validateClientIPsInNewNetwork(af int, clients []*models.Client, newNetwork *models.IPNetWrapper) error {
 	for _, client := range clients {
 		var clientIP *models.IPNetWrapper
 		var err error
 
-		if version == 4 && client.IPv4Offset != nil {
+		if af == 4 && client.IPv4Offset != nil {
 			clientIP, err = client.GetIPv4(newNetwork)
-		} else if version == 6 && client.IPv6Offset != nil {
+		} else if af == 6 && client.IPv6Offset != nil {
 			clientIP, err = client.GetIPv6(newNetwork)
 		}
 
@@ -489,31 +512,60 @@ func (s *ServerService) validateRoutedNetworksOverlap(af int, routedNetworks []s
 	return nil
 }
 
-func (s *ServerService) validateSnatConfiguration(serverNetwork *models.IPNetWrapper, snat *SnatConfigRequest, version int) error {
+func (s *ServerService) validateSnatConfiguration(af int, serverNetwork *models.IPNetWrapper, snat *SnatConfigRequest) error {
+	isRoaming := false
+	if snat.RoamingMasterInterface != nil && len(*snat.RoamingMasterInterface) > 0 {
+		isRoaming = true
+
+	}
+	if snat.SnatIPNet == "" {
+		// MASQUERADE mode
+		if isRoaming {
+			return fmt.Errorf("masquerade mode doesn't support roaming, SnatIPNet must be set, or unset RoamingMasterInterface")
+		}
+	}
 	if snat.SnatIPNet != "" {
 		var snatNet *models.IPNetWrapper
 		var err error
-		if version == 4 {
+		switch af {
+		case 4:
 			snatNet, err = models.ParseCIDRFromIPAf(4, snat.SnatIPNet)
-		} else {
+		case 6:
 			snatNet, err = models.ParseCIDRFromIPAf(6, snat.SnatIPNet)
+		default:
+			return fmt.Errorf("invalid IP version for SNAT configuration")
 		}
 		if err != nil {
 			return fmt.Errorf("invalid SNAT IP/Net: %v", err)
 		}
 
-		if version == 4 && snatNet.Masklen() != 32 {
-			return fmt.Errorf("IPv4 SNAT IP must be /32")
-		}
-		if version == 6 && snatNet.Masklen() != 128 && snatNet.Masklen() != serverNetwork.Masklen() {
-			return fmt.Errorf("IPv6 SNAT IP must be /128 (SNAT mode) or equal with ServerNet /%d (NETMAP mode)", serverNetwork.Masklen())
+		switch af {
+		case 4:
+			if snatNet.Masklen() == 32 {
+				if isRoaming && !snatNet.EqualZero(af) {
+					return fmt.Errorf("in roaming mode, SNAT IP must be 0.0.0.0/32")
+				}
+			} else {
+				return fmt.Errorf("IPv4 SNAT doesn't support NETMAP mode, it supports SNAT mode only. Thus IPNet must be /32")
+			}
+		case 6:
+			if snatNet.Masklen() == 128 {
+				if isRoaming && !snatNet.EqualZero(af) {
+					return fmt.Errorf("in roaming mode, SNAT IP must be ::/128")
+				}
+			} else {
+				if snatNet.Masklen() != serverNetwork.Masklen() {
+					return fmt.Errorf("IPv6 SNAT IP must be /128 (SNAT mode) or equal with ServerNet /%d (NETMAP mode)", serverNetwork.Masklen())
+				}
+			}
 		}
 	}
-	if snat.RoamingMasterInterface != nil && len(*snat.RoamingMasterInterface) > 0 {
-		err := utils.IsValidPhyIfName(*snat.RoamingMasterInterface)
+	if isRoaming {
+		err := utils.IsIfaceLayer2(*snat.RoamingMasterInterface)
 		if err != nil {
 			return err
 		}
+
 	}
 	return nil
 }
@@ -573,7 +625,7 @@ func (s *ServerService) prepareNetworkConfig(af int, req *ServerNetworkConfigReq
 		}
 
 		if req.Snat.SnatIPNet != "" {
-			snatNet, err := models.ParseCIDR(req.Snat.SnatIPNet)
+			snatNet, err := models.ParseCIDRFromIPAf(af, req.Snat.SnatIPNet)
 			if err != nil {
 				return nil, fmt.Errorf("%v is not a ipv%v network", req.Snat.SnatIPNet, af)
 			}
@@ -585,7 +637,7 @@ func (s *ServerService) prepareNetworkConfig(af int, req *ServerNetworkConfigReq
 		}
 
 		if req.Snat.SnatExcludedNetwork != "" {
-			excludedNet, err := models.ParseCIDR(req.Snat.SnatExcludedNetwork)
+			excludedNet, err := models.ParseCIDRAf(af, req.Snat.SnatExcludedNetwork)
 			if err != nil {
 				return nil, fmt.Errorf("%v is not a ipv%v network", req.Snat.SnatExcludedNetwork, af)
 			}

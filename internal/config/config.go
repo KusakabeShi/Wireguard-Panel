@@ -274,12 +274,11 @@ func (c *Config) SyncToInternalService() {
 				}
 				if server.IPv4.Snat != nil && server.IPv4.Snat.Enabled &&
 					server.IPv4.Snat.SnatIPNet != nil &&
-					server.IPv4.Snat.RoamingPseudoBridge &&
 					server.IPv4.Snat.RoamingMasterInterface != nil &&
 					*server.IPv4.Snat.RoamingMasterInterface != "" {
 					ifname := *server.IPv4.Snat.RoamingMasterInterface
 					network := server.IPv4.Snat.SnatIPNet
-					if network.EqualZero(4) {
+					if network.EqualZero(4) && !server.IPv4.Snat.RoamingPseudoBridge {
 						//addPbsConf(pbsConfig, "v4o", ifname, network)
 						addSrsConf(srsConfig, ifname, server.IPv4)
 					} else {
@@ -302,16 +301,16 @@ func (c *Config) SyncToInternalService() {
 					addPbsSkipIP(pbsConfig, "v6", ifname, &server.IPv6.Network.IP)
 					addSrsConf(srsConfig, ifname, nil)
 				}
-				if server.IPv6.Snat != nil && server.IPv6.Snat.Enabled && server.IPv6.Snat.SnatIPNet != nil &&
-					server.IPv6.Snat.RoamingPseudoBridge &&
+				if server.IPv6.Snat != nil && server.IPv6.Snat.Enabled &&
+					server.IPv6.Snat.SnatIPNet != nil &&
 					server.IPv6.Snat.RoamingMasterInterface != nil &&
 					*server.IPv6.Snat.RoamingMasterInterface != "" {
 					ifname := *server.IPv6.Snat.RoamingMasterInterface
 					network := server.IPv6.Snat.SnatIPNet
-					if network.EqualZero(6) {
+					if network.EqualZero(6) && !server.IPv6.Snat.RoamingPseudoBridge {
 						//addPbsConf(pbsConfig, "v6o", ifname, network)
 						addSrsConf(srsConfig, ifname, server.IPv6)
-					} else {
+					} else if server.IPv6.Snat.RoamingPseudoBridge {
 						if server.IPv6.Network != nil {
 							if server.IPv6.Network.Masklen() == network.Masklen() {
 								addPbsConf(pbsConfig, "v6o", ifname, network)

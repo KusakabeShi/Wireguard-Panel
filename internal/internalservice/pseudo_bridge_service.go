@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 	"wg-panel/internal/models"
+	"wg-panel/internal/utils"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -23,6 +24,8 @@ type InterfaceResponder struct {
 	interfaceName   string
 	networks        ResponderNetworks // [v4/v6][networks...]
 	workingNetworks ResponderNetworks
+	workingSkipIPv4 []net.IP
+	workingSkipIPv6 []net.IP
 	ipv4Base        *models.IPNetWrapper
 	ipv6Base        *models.IPNetWrapper
 	bindedIPv4s     []net.IP
@@ -140,6 +143,18 @@ func NewInterfaceResponder(interfaceName string, networks ResponderNetworks) *In
 		workingNetworks: networks,
 		stopCh:          make(chan struct{}),
 	}
+	v4s, v6s, err := utils.GetInterfaceIPs(ifr.interfaceName)
+	if err != nil {
+		log.Printf("Failed to get interface IPs for %v: %v", ifr.interfaceName, err)
+	} else {
+		ifr.bindedIPv4s = make([]net.IP, len(v4s))
+		copy(ifr.bindedIPv4s, v4s)
+		ifr.bindedIPv6s = make([]net.IP, len(v6s))
+		copy(ifr.bindedIPv6s, v6s)
+	}
+
+	// Start the main loop in a separate
+
 	go ifr.mainLoop()
 	return ifr
 }
@@ -159,6 +174,11 @@ func (r *InterfaceResponder) mainLoop() {
 	for {
 		// Try to open pcap handle for the interface
 		if handle == nil {
+			if err = utils.IsIfaceLayer2(r.interfaceName); err != nil {
+				log.Printf("Error occurs, retrying in 5 seconds: %v", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
 			if handle, err = pcap.OpenLive(r.interfaceName, 9200, false, pcap.BlockForever); err != nil {
 				log.Printf("Failed to open pcap handle for %s, retrying in 5 seconds: %v", r.interfaceName, err)
 				time.Sleep(5 * time.Second)
@@ -208,7 +228,7 @@ func (r *InterfaceResponder) UpdateNetworks(networks ResponderNetworks) {
 	r.networks = networks
 	r.networks.V4Networks = networks.V4Networks
 	r.networks.V6Networks = networks.V6Networks
-	r.offset2workingNet()
+	r.setupWorkingNets()
 }
 func (r *InterfaceResponder) UpdateIfaceBinds(ipv4net, ipv6net *models.IPNetWrapper, ipv4s, ipv6s []net.IP) {
 	r.mu.Lock()
@@ -219,10 +239,10 @@ func (r *InterfaceResponder) UpdateIfaceBinds(ipv4net, ipv6net *models.IPNetWrap
 	copy(r.bindedIPv6s, ipv6s)
 	r.ipv4Base = ipv4net
 	r.ipv6Base = ipv6net
-	r.offset2workingNet()
+	r.setupWorkingNets()
 }
 
-func (r *InterfaceResponder) offset2workingNet() {
+func (r *InterfaceResponder) setupWorkingNets() {
 	r.workingNetworks.V4Networks = r.networks.V4Networks
 	r.workingNetworks.V6Networks = r.networks.V6Networks
 	if r.ipv4Base != nil {
@@ -245,6 +265,9 @@ func (r *InterfaceResponder) offset2workingNet() {
 			r.workingNetworks.V6Networks = append(r.workingNetworks.V6Networks, newnet)
 		}
 	}
+	r.workingSkipIPv4 = append(r.bindedIPv4s, r.networks.V4Skipped...)
+	r.workingSkipIPv6 = append(r.bindedIPv6s, r.networks.V6Skipped...)
+
 }
 
 func (r *InterfaceResponder) handlePacket(packet gopacket.Packet) {
@@ -270,18 +293,12 @@ func (r *InterfaceResponder) handleARPRequest(packet gopacket.Packet, arp *layer
 
 	r.mu.RLock()
 	networks := r.workingNetworks.V4Networks
-	bindedIPv4s := r.bindedIPv4s
+	skipIPs := r.workingSkipIPv4
 	r.mu.RUnlock()
 
 	// Check if target IP is bound to interface - if so, don't respond
-	for _, boundIP := range bindedIPv4s {
-		if targetIP.Equal(boundIP) {
-			return
-		}
-	}
-
-	for _, skipIP := range r.networks.V4Skipped {
-		if targetIP.Equal(skipIP) {
+	for _, SkipIP := range skipIPs {
+		if targetIP.Equal(SkipIP) {
 			return
 		}
 	}
@@ -305,18 +322,12 @@ func (r *InterfaceResponder) handleNeighborSolicitation(packet gopacket.Packet, 
 
 	r.mu.RLock()
 	networks := r.workingNetworks.V6Networks
-	bindedIPv6s := r.bindedIPv6s
+	skipIPs := r.workingSkipIPv6
 	r.mu.RUnlock()
 
 	// Check if target IP is bound to interface - if so, don't respond
-	for _, boundIP := range bindedIPv6s {
-		if targetIP.Equal(boundIP) {
-			return
-		}
-	}
-
-	for _, skipIP := range r.networks.V6Skipped {
-		if targetIP.Equal(skipIP) {
+	for _, SkipIP := range skipIPs {
+		if targetIP.Equal(SkipIP) {
 			return
 		}
 	}
