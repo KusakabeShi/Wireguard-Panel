@@ -104,7 +104,7 @@ func (s *SNATRoamingService) mainLoop() {
 		log.Println("SNAT Roaming Service stopped")
 		close(s.stopCh)
 	}()
-	log.Println("Starting SNAT Roaming Service")
+	log.Println("SNAT Roaming Service starting")
 	for {
 		// Try to open pcap handle for the interface
 		if !linkUpdatesSubscribed {
@@ -170,9 +170,10 @@ func (s *SNATRoamingService) mainLoop() {
 }
 
 func (l *InterfaceIPNetListener) mainLoop() {
-	log.Printf("Starting InterfaceIPNetListener for %v", l.interfaceName)
+	log.Printf("Interface IPNet Listener for %v started", l.interfaceName)
 	defer func() {
 		close(l.stopCh)
+		log.Printf("Interface IPNet Listener for %v stopped", l.interfaceName)
 	}()
 	for {
 		select {

@@ -129,7 +129,7 @@ func (h *ServerHandler) SetServerEnabled(c *gin.Context) {
 		return
 	}
 
-	err := h.service.SetServerEnabled(ifId, serverId, req.Enabled)
+	err := h.service.SetServerEnabled(ifId, serverId, req.Enabled, true)
 	if err != nil {
 		if err.Error() == "interface not found" || err.Error() == "server not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Server or Interface not found"})

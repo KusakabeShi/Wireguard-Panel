@@ -90,11 +90,11 @@ func (s *ServerService) UpdateServer(interfaceID, serverID string, req ServerCre
 		_ = utils.CleanupRules(newserver.IPv6.CommentString, 6, nil, false)
 	}
 
-	s.SetServerEnabled(interfaceID, serverID, false)
+	s.SetServerEnabled(interfaceID, serverID, false, !enabledState)
 	*server = *newserver
 	server.Enabled = false
 	if enabledState {
-		s.SetServerEnabled(interfaceID, serverID, true)
+		s.SetServerEnabled(interfaceID, serverID, true, true)
 	}
 
 	// Update network configurations and determine if firewall update is needed
@@ -106,7 +106,7 @@ func (s *ServerService) UpdateServer(interfaceID, serverID string, req ServerCre
 	return server, nil
 }
 
-func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled bool) error {
+func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled bool, syncServiceAndConfig bool) error {
 	iface := s.cfg.GetInterface(interfaceID)
 	if iface == nil {
 		return fmt.Errorf("interface not found")
@@ -148,10 +148,14 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 		return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
 	}
 	server.Enabled = enabled
-	s.cfg.SyncToInternalService()
+	if syncServiceAndConfig {
+		s.cfg.SyncToInternalService()
+	}
 	s.cfg.SetInterface(interfaceID, iface)
-	if err := s.cfg.Save(); err != nil {
-		return fmt.Errorf("failed to save configuration: %v", err)
+	if syncServiceAndConfig {
+		if err := s.cfg.Save(); err != nil {
+			return fmt.Errorf("failed to save configuration: %v", err)
+		}
 	}
 	return nil
 }
@@ -169,7 +173,7 @@ func (s *ServerService) DeleteServer(interfaceID, serverID string) error {
 
 	// Disable first (removes firewall rules and IPs)
 	if server.Enabled {
-		if err := s.SetServerEnabled(interfaceID, serverID, false); err != nil {
+		if err := s.SetServerEnabled(interfaceID, serverID, false, true); err != nil {
 			return fmt.Errorf("failed to disable server before deletion: %v", err)
 		}
 	}
@@ -207,7 +211,7 @@ func (s *ServerService) MoveServer(interfaceID, serverID, newInterfaceID string)
 	// Disable server first
 	wasEnabled := server.Enabled
 	if wasEnabled {
-		if err := s.SetServerEnabled(interfaceID, serverID, false); err != nil {
+		if err := s.SetServerEnabled(interfaceID, serverID, false, true); err != nil {
 			return fmt.Errorf("failed to disable server for move: %v", err)
 		}
 	}
@@ -232,7 +236,7 @@ func (s *ServerService) MoveServer(interfaceID, serverID, newInterfaceID string)
 
 	// Re-enable on destination if it was enabled
 	if wasEnabled {
-		if err := s.SetServerEnabled(newInterfaceID, serverID, true); err != nil {
+		if err := s.SetServerEnabled(newInterfaceID, serverID, true, true); err != nil {
 			return fmt.Errorf("failed to re-enable server after move: %v", err)
 		}
 	}

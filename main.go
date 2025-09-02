@@ -50,6 +50,10 @@ func main() {
 		return
 	}
 
+	// Initialize logger with configured log level
+	config.InitLogger(cfg.LogLevel)
+	config.LogInfo("Starting WireGuard Panel with log level: %s", cfg.LogLevel.String())
+
 	// Initialize services
 	firewallService := internalservice.NewFirewallService()
 	pseudoBridgeService := internalservice.NewPseudoBridgeService()
@@ -58,7 +62,7 @@ func main() {
 	// Start HTTP server
 	srv := server.NewServer(cfg, frontendFS)
 	log.Printf("Starting WireGuard Panel on %s:%d", cfg.ListenIP, cfg.ListenPort)
-	log.Fatal(srv.Start(firewallService))
+	log.Fatal(srv.Start(firewallService, cfg.LogLevel))
 }
 
 func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, error) {
@@ -83,6 +87,7 @@ func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, e
 
 		cfg := &config.Config{
 			WireGuardConfigPath: "/etc/wireguard",
+			LogLevel:            config.LogLevelInfo,
 			User:                "admin",
 			Password:            string(hashedPassword),
 			ListenIP:            "0.0.0.0",

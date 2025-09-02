@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"sync"
@@ -23,6 +22,7 @@ type Session struct {
 type Config struct {
 	ConfigPath          string                       `json:"-"`
 	WireGuardConfigPath string                       `json:"wireguardConfigPath"`
+	LogLevel            LogLevel                     `json:"logLevel"`
 	User                string                       `json:"user"`
 	Password            string                       `json:"password"`
 	ListenIP            string                       `json:"listenIP"`
@@ -41,13 +41,16 @@ type Config struct {
 }
 
 func LoadConfig(path string) (*Config, error) {
+	LogVerbose("Loading configuration from: %s", path)
 	data, err := os.ReadFile(path)
 	if err != nil {
+		LogError("Failed to read config file %s: %v", path, err)
 		return nil, fmt.Errorf("failed to read config file: %v", err)
 	}
 
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
+		LogError("Failed to parse config file %s: %v", path, err)
 		return nil, fmt.Errorf("failed to parse config file: %v", err)
 	}
 
@@ -63,15 +66,20 @@ func LoadConfig(path string) (*Config, error) {
 
 	// Generate ServerId if not present
 	if cfg.ServerId == "" {
+		LogInfo("Generating new server ID")
 		serverId, err := utils.GenerateRandomString("", 6)
 		if err != nil {
+			LogError("Failed to generate server ID: %v", err)
 			return nil, fmt.Errorf("failed to generate server ID: %v", err)
 		}
 		cfg.ServerId = serverId
+		LogInfo("Generated server ID: %s", serverId)
 		// Save the config with the new ServerId
 		if err := cfg.Save(); err != nil {
+			LogError("Failed to save config with new server ID: %v", err)
 			return nil, fmt.Errorf("failed to save config with new server ID: %v", err)
 		}
+		LogInfo("Saved configuration with new server ID")
 	}
 
 	return &cfg, nil
@@ -258,6 +266,9 @@ func (c *Config) SyncToInternalService() {
 			continue
 		}
 		for _, server := range iface.Servers {
+			if !server.Enabled {
+				continue
+			}
 			if server.IPv4 != nil && server.IPv4.Enabled {
 				if server.IPv4.Network != nil &&
 					server.IPv4.PseudoBridgeMasterInterface != nil &&

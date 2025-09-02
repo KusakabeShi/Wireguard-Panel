@@ -168,9 +168,9 @@ func (r *InterfaceResponder) mainLoop() {
 			handle.Close()
 		}
 		close(r.stopCh)
-		log.Printf("Responder for %v stopped\n", r.interfaceName)
+		log.Println("Pseudo-bridge Responder for", r.interfaceName, "stopped")
 	}()
-	log.Println("Starting Pseudo-bridge Responder for", r.interfaceName)
+	log.Println("Pseudo-bridge Responder for", r.interfaceName, "starting")
 	for {
 		// Try to open pcap handle for the interface
 		if handle == nil {
@@ -193,7 +193,7 @@ func (r *InterfaceResponder) mainLoop() {
 				continue
 			}
 			packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
-			log.Println("Started listening ARP and NS on", r.interfaceName)
+			log.Println("Pseudo-bridge Responder: start listening ARP and NS on ", r.interfaceName)
 		} else if packetSource == nil {
 			packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
 		} else {

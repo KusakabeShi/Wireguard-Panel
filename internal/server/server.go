@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"wg-panel/internal/config"
 	"wg-panel/internal/handlers"
@@ -31,11 +32,11 @@ func NewServer(cfg *config.Config, frontendFS embed.FS) *Server {
 	}
 }
 
-func (s *Server) Start(fw *internalservice.FirewallService) error {
+func (s *Server) Start(fw *internalservice.FirewallService, logLevel config.LogLevel) error {
 	// Set Gin mode
 	gin.SetMode(gin.ReleaseMode)
 	s.engine = gin.New()
-	s.engine.Use(gin.Logger(), gin.Recovery())
+	s.engine.Use(CustomLogger(logLevel), gin.Recovery())
 
 	// Setup services
 	wgService := services.NewWireGuardService(s.cfg.WireGuardConfigPath)
@@ -197,4 +198,45 @@ func (s *Server) setupRoutes(
 		// Not a frontend or API request
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 	})
+}
+
+func CustomLogger(level config.LogLevel) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+
+		latency := time.Since(start)
+		status := c.Writer.Status()
+		method := c.Request.Method
+		path := c.Request.URL.Path
+		clientIP := c.ClientIP()
+
+		// Determine prefix from status/method
+		var reqlevel config.LogLevel
+		switch {
+		case status >= 400:
+			reqlevel = config.LogLevelError
+		case method != "GET":
+			reqlevel = config.LogLevelInfo
+		default:
+			reqlevel = config.LogLevelVerbose
+		}
+
+		var prefix string
+		switch reqlevel {
+		case config.LogLevelError:
+			prefix = "[ERROR]"
+		case config.LogLevelInfo:
+			prefix = "[INFO]"
+		case config.LogLevelVerbose:
+			prefix = "[VERBOSE]"
+		}
+
+		if reqlevel > level {
+			return
+		}
+
+		log.Printf("%s %d | %13v | %15s | %-7s %s",
+			prefix, status, latency, clientIP, method, path)
+	}
 }
