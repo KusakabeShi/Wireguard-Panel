@@ -157,8 +157,7 @@ func NewInterfaceResponder(interfaceName string, networks ResponderNetworks) *In
 		copy(ifr.bindedIPv6s, v6s)
 	}
 
-	// Start the main loop in a separate
-
+	// Start the main loop in a separate goroutine
 	go ifr.mainLoop()
 	return ifr
 }
@@ -188,8 +187,9 @@ func (r *InterfaceResponder) mainLoop() {
 				time.Sleep(5 * time.Second)
 				continue
 			}
-			// Set BPF filter for ARP and ICMPv6
-			filter := "arp or (icmp6 and ip6[40] == 135)" // ARP or Neighbor Solicitation
+			// Set BPF filter for ARP and ICMPv6, excluding VLAN-tagged packets
+			// This filters at kernel level for better efficiency
+			filter := "(arp or (icmp6 and ip6[40] == 135)) and not vlan" // ARP or Neighbor Solicitation, but not VLAN-tagged
 			if err = handle.SetBPFFilter(filter); err != nil {
 				handle.Close()
 				logging.LogError("Failed to set BPF filter for %s, retrying in 5 seconds: %v", r.interfaceName, err)
@@ -197,7 +197,7 @@ func (r *InterfaceResponder) mainLoop() {
 				continue
 			}
 			packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
-			logging.LogInfo("Pseudo-bridge Responder for %s started, listening ARP and NS now", r.interfaceName)
+			logging.LogInfo("Pseudo-bridge Responder for %s started, listening ARP and NS on main network", r.interfaceName)
 		} else if packetSource == nil {
 			packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
 		} else {
