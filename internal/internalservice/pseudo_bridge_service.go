@@ -2,10 +2,10 @@ package internalservice
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"sync"
 	"time"
+	"wg-panel/internal/logging"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
 
@@ -57,6 +57,7 @@ func NewPseudoBridgeService() *PseudoBridgeService {
 }
 
 func (s *PseudoBridgeService) UpdateConfiguration(waitInterface map[string]ResponderNetworks) {
+	logging.LogVerbose("Updating pseudo-bridge configuration for %d interfaces", len(waitInterface))
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -92,6 +93,7 @@ func (s *PseudoBridgeService) UpdateConfiguration(waitInterface map[string]Respo
 		}
 	}
 	for ifname, af := range addIF {
+		logging.LogVerbose("Adding pseudo-bridge responder for interface: %s", ifname)
 		s.runningInterface[ifname] = &IPNetSynced{
 			ExistsInNewConfig: false,
 			IPNet:             af,
@@ -99,9 +101,11 @@ func (s *PseudoBridgeService) UpdateConfiguration(waitInterface map[string]Respo
 		s.responders[ifname] = NewInterfaceResponder(ifname, af)
 	}
 	for ifname, af := range updateIF {
+		logging.LogVerbose("Updating pseudo-bridge responder for interface: %s", ifname)
 		s.responders[ifname].UpdateNetworks(af)
 	}
 	for ifname := range delIF {
+		logging.LogVerbose("Removing pseudo-bridge responder for interface: %s", ifname)
 		s.responders[ifname].Stop()
 		delete(s.runningInterface, ifname)
 		delete(s.responders, ifname)
@@ -133,7 +137,7 @@ func (s *PseudoBridgeService) Stop() {
 	}
 	s.responders = make(map[string]*InterfaceResponder)
 
-	log.Println("Pseudo-bridge Service stopped")
+	logging.LogInfo("Pseudo-bridge Service stopped")
 }
 
 func NewInterfaceResponder(interfaceName string, networks ResponderNetworks) *InterfaceResponder {
@@ -145,7 +149,7 @@ func NewInterfaceResponder(interfaceName string, networks ResponderNetworks) *In
 	}
 	v4s, v6s, err := utils.GetInterfaceIPs(ifr.interfaceName)
 	if err != nil {
-		log.Printf("Failed to get interface IPs for %v: %v", ifr.interfaceName, err)
+		logging.LogError("Failed to get interface IPs for %v: %v", ifr.interfaceName, err)
 	} else {
 		ifr.bindedIPv4s = make([]net.IP, len(v4s))
 		copy(ifr.bindedIPv4s, v4s)
@@ -168,19 +172,19 @@ func (r *InterfaceResponder) mainLoop() {
 			handle.Close()
 		}
 		close(r.stopCh)
-		log.Println("Pseudo-bridge Responder for", r.interfaceName, "stopped")
+		logging.LogInfo("Pseudo-bridge Responder for %s stopped", r.interfaceName)
 	}()
-	log.Println("Pseudo-bridge Responder for", r.interfaceName, "starting")
+	logging.LogInfo("Pseudo-bridge Responder for %s starting", r.interfaceName)
 	for {
 		// Try to open pcap handle for the interface
 		if handle == nil {
 			if err = utils.IsIfaceLayer2(r.interfaceName); err != nil {
-				log.Printf("Error occurs, retrying in 5 seconds: %v", err)
+				logging.LogError("Interface %s layer2 check failed, retrying in 5 seconds: %v", r.interfaceName, err)
 				time.Sleep(5 * time.Second)
 				continue
 			}
 			if handle, err = pcap.OpenLive(r.interfaceName, 9200, false, pcap.BlockForever); err != nil {
-				log.Printf("Failed to open pcap handle for %s, retrying in 5 seconds: %v", r.interfaceName, err)
+				logging.LogError("Failed to open pcap handle for %s, retrying in 5 seconds: %v", r.interfaceName, err)
 				time.Sleep(5 * time.Second)
 				continue
 			}
@@ -188,12 +192,12 @@ func (r *InterfaceResponder) mainLoop() {
 			filter := "arp or (icmp6 and ip6[40] == 135)" // ARP or Neighbor Solicitation
 			if err = handle.SetBPFFilter(filter); err != nil {
 				handle.Close()
-				log.Printf("Failed to set BPF filter for %s, retrying in 5 seconds: %v", r.interfaceName, err)
+				logging.LogError("Failed to set BPF filter for %s, retrying in 5 seconds: %v", r.interfaceName, err)
 				time.Sleep(5 * time.Second)
 				continue
 			}
 			packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
-			log.Println("Pseudo-bridge Responder: start listening ARP and NS on ", r.interfaceName)
+			logging.LogInfo("Pseudo-bridge Responder for %s started, listening ARP and NS now", r.interfaceName)
 		} else if packetSource == nil {
 			packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
 		} else {
@@ -204,7 +208,7 @@ func (r *InterfaceResponder) mainLoop() {
 			case packet := <-packetSource.Packets():
 				if packet == nil {
 					// Interface might have disappeared, restart with retry logic
-					log.Printf("Packet source returned nil for %s, retry listening after 5 second", r.interfaceName)
+					logging.LogError("Packet source returned nil for %s, retry listening after 5 seconds", r.interfaceName)
 					handle.Close()
 					handle = nil
 					packetSource = nil
@@ -249,7 +253,7 @@ func (r *InterfaceResponder) setupWorkingNets() {
 		for _, v4offset := range r.networks.V4Offsets {
 			newnet, err := r.ipv4Base.GetNetByOffset(v4offset)
 			if err != nil {
-				log.Printf("Failed to get net by offset: %v from base: %v, err: %v", v4offset, r.ipv4Base, err)
+				logging.LogError("Failed to get IPv4 net by offset: %v from base: %v, err: %v", v4offset, r.ipv4Base, err)
 				continue
 			}
 			r.workingNetworks.V4Networks = append(r.workingNetworks.V4Networks, newnet)
@@ -259,7 +263,7 @@ func (r *InterfaceResponder) setupWorkingNets() {
 		for _, v6offset := range r.networks.V6Offsets {
 			newnet, err := r.ipv6Base.GetNetByOffset(v6offset)
 			if err != nil {
-				log.Printf("Failed to get net by offset: %v from base: %v, err: %v", v6offset, r.ipv6Base, err)
+				logging.LogError("Failed to get IPv6 net by offset: %v from base: %v, err: %v", v6offset, r.ipv6Base, err)
 				continue
 			}
 			r.workingNetworks.V6Networks = append(r.workingNetworks.V6Networks, newnet)
@@ -290,6 +294,7 @@ func (r *InterfaceResponder) handlePacket(packet gopacket.Packet) {
 
 func (r *InterfaceResponder) handleARPRequest(packet gopacket.Packet, arp *layers.ARP) {
 	targetIP := net.IP(arp.DstProtAddress)
+	logging.LogVerbose("ARP request detected on %s for target IP: %s", r.interfaceName, targetIP.String())
 
 	r.mu.RLock()
 	networks := r.workingNetworks.V4Networks
@@ -299,6 +304,7 @@ func (r *InterfaceResponder) handleARPRequest(packet gopacket.Packet, arp *layer
 	// Check if target IP is bound to interface - if so, don't respond
 	for _, SkipIP := range skipIPs {
 		if targetIP.Equal(SkipIP) {
+			logging.LogVerbose("ARP request for %s on %s - skipping (IP is bound to interface)", targetIP.String(), r.interfaceName)
 			return
 		}
 	}
@@ -306,19 +312,23 @@ func (r *InterfaceResponder) handleARPRequest(packet gopacket.Packet, arp *layer
 	// Check if target IP is in any of our managed networks
 	for _, network := range networks {
 		if network.Contains(targetIP) {
+			logging.LogVerbose("ARP request for %s on %s - matched network %s, sending reply", targetIP.String(), r.interfaceName, network.String())
 			r.sendARPReply(packet, arp)
 			return
 		}
 	}
+	logging.LogVerbose("ARP request for %s on %s - no matching networks, ignoring", targetIP.String(), r.interfaceName)
 }
 
 func (r *InterfaceResponder) handleNeighborSolicitation(packet gopacket.Packet, icmp6 *layers.ICMPv6) {
 	// Parse the target address from the NS packet
 	if len(icmp6.Payload) < 20 {
+		logging.LogVerbose("Neighbor solicitation on %s - invalid payload length", r.interfaceName)
 		return
 	}
 
 	targetIP := net.IP(icmp6.Payload[4:20])
+	logging.LogVerbose("Neighbor solicitation detected on %s for target IP: %s", r.interfaceName, targetIP.String())
 
 	r.mu.RLock()
 	networks := r.workingNetworks.V6Networks
@@ -328,6 +338,7 @@ func (r *InterfaceResponder) handleNeighborSolicitation(packet gopacket.Packet, 
 	// Check if target IP is bound to interface - if so, don't respond
 	for _, SkipIP := range skipIPs {
 		if targetIP.Equal(SkipIP) {
+			logging.LogVerbose("Neighbor solicitation for %s on %s - skipping (IP is bound to interface)", targetIP.String(), r.interfaceName)
 			return
 		}
 	}
@@ -335,16 +346,20 @@ func (r *InterfaceResponder) handleNeighborSolicitation(packet gopacket.Packet, 
 	// Check if target IP is in any of our managed networks
 	for _, network := range networks {
 		if network.Contains(targetIP) {
+			logging.LogVerbose("Neighbor solicitation for %s on %s - matched network %s, sending advertisement", targetIP.String(), r.interfaceName, network.String())
 			r.sendNeighborAdvertisement(packet, targetIP)
 			return
 		}
 	}
+	logging.LogVerbose("Neighbor solicitation for %s on %s - no matching networks, ignoring", targetIP.String(), r.interfaceName)
 }
 
 func (r *InterfaceResponder) sendARPReply(requestPacket gopacket.Packet, requestARP *layers.ARP) {
+	targetIP := net.IP(requestARP.DstProtAddress)
 	// Get the interface's MAC address
 	iface, err := net.InterfaceByName(r.interfaceName)
 	if err != nil {
+		logging.LogError("Failed to get interface %s for ARP reply: %v", r.interfaceName, err)
 		return
 	}
 
@@ -380,7 +395,12 @@ func (r *InterfaceResponder) sendARPReply(requestPacket gopacket.Packet, request
 	gopacket.SerializeLayers(buffer, opts, eth, arp)
 
 	if r.handle != nil {
-		r.handle.WritePacketData(buffer.Bytes())
+		err := r.handle.WritePacketData(buffer.Bytes())
+		if err != nil {
+			logging.LogError("Failed to send ARP reply for %s on %s: %v", targetIP.String(), r.interfaceName, err)
+		} else {
+			logging.LogVerbose("Sent ARP reply for %s on %s (MAC: %s)", targetIP.String(), r.interfaceName, iface.HardwareAddr.String())
+		}
 	}
 }
 
@@ -388,6 +408,7 @@ func (r *InterfaceResponder) sendNeighborAdvertisement(requestPacket gopacket.Pa
 	// Get the interface's MAC address
 	iface, err := net.InterfaceByName(r.interfaceName)
 	if err != nil {
+		logging.LogError("Failed to get interface %s for neighbor advertisement: %v", r.interfaceName, err)
 		return
 	}
 
@@ -443,6 +464,11 @@ func (r *InterfaceResponder) sendNeighborAdvertisement(requestPacket gopacket.Pa
 	gopacket.SerializeLayers(buffer, opts, eth, ipv6, icmp6)
 
 	if r.handle != nil {
-		r.handle.WritePacketData(buffer.Bytes())
+		err := r.handle.WritePacketData(buffer.Bytes())
+		if err != nil {
+			logging.LogError("Failed to send neighbor advertisement for %s on %s: %v", targetIP.String(), r.interfaceName, err)
+		} else {
+			logging.LogVerbose("Sent neighbor advertisement for %s on %s (MAC: %s)", targetIP.String(), r.interfaceName, iface.HardwareAddr.String())
+		}
 	}
 }

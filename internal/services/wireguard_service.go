@@ -3,7 +3,6 @@ package services
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"wg-panel/internal/logging"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
 )
@@ -44,7 +44,7 @@ func (s *WireGuardService) SyncToConf(iface *models.Interface) error {
 		return fmt.Errorf("failed to write config file: %v", err)
 	}
 
-	log.Printf("Generated standalone WireGuard configuration at %s", configFile)
+	logging.LogInfo("Generated standalone WireGuard configuration at %s", configFile)
 	return nil
 }
 

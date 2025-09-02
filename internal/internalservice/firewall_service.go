@@ -2,9 +2,9 @@ package internalservice
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
+	"wg-panel/internal/logging"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
 )
@@ -66,7 +66,7 @@ func (f *FirewallService) RemoveIpAndFwRules(interfaceName string, config *model
 	// Remove firewall rules by comment
 	err := utils.CleanupRules(comment, config.Network.Version, nil, false)
 	if err != nil {
-		log.Printf("Failed to remove firewall rules: %v", err)
+		logging.LogError("Failed to remove firewall rules: %v", err)
 	}
 }
 

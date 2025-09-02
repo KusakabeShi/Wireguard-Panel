@@ -2,10 +2,10 @@ package internalservice
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
+	"wg-panel/internal/logging"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
 
@@ -101,16 +101,16 @@ func (s *SNATRoamingService) mainLoop() {
 	linkUpdates := make(chan netlink.LinkUpdate, 10)
 	addrUpdates := make(chan netlink.AddrUpdate, 10)
 	defer func() {
-		log.Println("SNAT Roaming Service stopped")
+		logging.LogInfo("SNAT Roaming Service stopped")
 		close(s.stopCh)
 	}()
-	log.Println("SNAT Roaming Service starting")
+	logging.LogInfo("SNAT Roaming Service starting")
 	for {
 		// Try to open pcap handle for the interface
 		if !linkUpdatesSubscribed {
 			// Subscribe to link updates for interface up/down events
 			if err := netlink.LinkSubscribe(linkUpdates, s.stopCh); err != nil {
-				log.Printf("failed to subscribe to link updates: %v, retrying in 5 seconds:", err)
+				logging.LogError("Failed to subscribe to link updates: %v, retrying in 5 seconds", err)
 				time.Sleep(5 * time.Second)
 				continue
 			}
@@ -119,7 +119,7 @@ func (s *SNATRoamingService) mainLoop() {
 		if !addrUpdatesSubscribed {
 			// Subscribe to address updates for IP address changes
 			if err := netlink.AddrSubscribe(addrUpdates, s.stopCh); err != nil {
-				log.Printf("failed to subscribe to address updates: %v, retrying in 5 seconds:", err)
+				logging.LogError("Failed to subscribe to address updates: %v, retrying in 5 seconds", err)
 				time.Sleep(5 * time.Second)
 				continue
 			}
@@ -131,38 +131,46 @@ func (s *SNATRoamingService) mainLoop() {
 				return
 			case linkUpdate, ok := <-linkUpdates:
 				if !ok {
-					log.Printf("Link updates channel closed, attempting to resubscribe in 5 seconds")
+					logging.LogError("Link updates channel closed, attempting to resubscribe in 5 seconds")
 					linkUpdatesSubscribed = false
 					continue
 				}
 				ifname, err := getNetlinkIfName(linkUpdate)
 				if err != nil {
-					log.Printf("Failed to parse ifname from linkUpdate: %v", err)
+					logging.LogError("Failed to parse ifname from linkUpdate: %v", err)
 				}
+				logging.LogVerbose("Link update detected for interface: %s", ifname)
 				s.mu.RLock()
 				listener, ok := s.listeners[ifname]
 				s.mu.RUnlock()
 				if ok {
+					logging.LogVerbose("Syncing IP addresses for interface: %s", ifname)
 					listener.SyncIpFromIface()
 					listener.UpdateConfigsAndSyncFw(listener.configs, true)
+				} else {
+					logging.LogVerbose("No SNAT roaming listener found for interface: %s", ifname)
 				}
 
 			case addrUpdate, ok := <-addrUpdates:
 				if !ok {
-					log.Printf("Address updates channel closed, attempting to resubscribe in 5 seconds")
+					logging.LogError("Address updates channel closed, attempting to resubscribe in 5 seconds")
 					addrUpdatesSubscribed = false
 					continue
 				}
 				ifname, err := getAddrUpdateIfName(addrUpdate)
 				if err != nil {
-					log.Printf("Failed to parse ifname from linkUpdate: %v", err)
+					logging.LogError("Failed to parse ifname from addrUpdate: %v", err)
 				}
+				logging.LogVerbose("Address change detected for interface: %s", ifname)
 				s.mu.RLock()
 				listener, ok := s.listeners[ifname]
 				s.mu.RUnlock()
 				if ok {
+					logging.LogVerbose("Syncing IP addresses for interface: %s after address change", ifname)
 					listener.SyncIpFromIface()
 					listener.UpdateConfigsAndSyncFw(listener.configs, true)
+				} else {
+					logging.LogVerbose("No SNAT roaming listener found for interface: %s", ifname)
 				}
 			}
 		}
@@ -170,10 +178,10 @@ func (s *SNATRoamingService) mainLoop() {
 }
 
 func (l *InterfaceIPNetListener) mainLoop() {
-	log.Printf("Interface IPNet Listener for %v started", l.interfaceName)
+	logging.LogInfo("Interface IPNet Listener for %v started", l.interfaceName)
 	defer func() {
 		close(l.stopCh)
-		log.Printf("Interface IPNet Listener for %v stopped", l.interfaceName)
+		logging.LogInfo("Interface IPNet Listener for %v stopped", l.interfaceName)
 	}()
 	for {
 		select {
@@ -192,7 +200,7 @@ func (s *SNATRoamingService) Stop() {
 	}
 	s.listeners = make(map[string]*InterfaceIPNetListener)
 
-	log.Println("SNAT Roaming Service stopped")
+	logging.LogInfo("SNAT Roaming Service stopped")
 }
 
 func NewInterfaceIPNetListener(interfaceName string, pseudoBridgeService *PseudoBridgeService, fw *FirewallService) *InterfaceIPNetListener {
@@ -248,31 +256,39 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 			toDel[key] = l.configs[key]
 		}
 	}
-	for _, config := range toAdd {
+	for key, config := range toAdd {
+		logging.LogVerbose("Adding SNAT roaming rules for %s on interface %s", key, l.interfaceName)
 		simulatedConfig, err := l.getSimulatedConfig(config)
 		if err != nil {
-			log.Printf("failed to calculate target_network: %v", err)
+			logging.LogError("Failed to calculate target_network: %v", err)
 		}
 		if err := l.fw.AddIpAndFwRules(l.interfaceName, simulatedConfig); err != nil {
-			log.Printf("failed to add firewall rules: %v", err)
+			logging.LogError("Failed to add firewall rules: %v", err)
+		} else {
+			logging.LogVerbose("Successfully added SNAT roaming rules for %s on interface %s", key, l.interfaceName)
 		}
 	}
-	for _, config := range toUpdate {
+	for key, config := range toUpdate {
+		logging.LogVerbose("Updating SNAT roaming rules for %s on interface %s", key, l.interfaceName)
 		simulatedConfig, err := l.getSimulatedConfig(config)
 		if err != nil {
-			log.Printf("failed to calculate target_network: %v", err)
+			logging.LogError("Failed to calculate target_network: %v", err)
 		}
 		l.fw.RemoveSnatRules(l.interfaceName, simulatedConfig, simulatedConfig.CommentString)
 		if err := l.fw.AddSnatRules(l.interfaceName, simulatedConfig, simulatedConfig.CommentString); err != nil {
-			log.Printf("failed to add firewall rules: %v", err)
+			logging.LogError("Failed to add firewall rules: %v", err)
+		} else {
+			logging.LogVerbose("Successfully updated SNAT roaming rules for %s on interface %s", key, l.interfaceName)
 		}
 	}
-	for _, config := range toDel {
+	for key, config := range toDel {
+		logging.LogVerbose("Removing SNAT roaming rules for %s on interface %s", key, l.interfaceName)
 		simulatedConfig, err := l.getSimulatedConfig(config)
 		if err != nil {
-			log.Printf("failed to calculate target_network: %v", err)
+			logging.LogError("Failed to calculate target_network: %v", err)
 		}
 		l.fw.RemoveSnatRules(l.interfaceName, simulatedConfig, simulatedConfig.CommentString)
+		logging.LogVerbose("Successfully removed SNAT roaming rules for %s on interface %s", key, l.interfaceName)
 	}
 }
 
@@ -317,13 +333,17 @@ func (l *InterfaceIPNetListener) getSimulatedConfig(config *models.ServerNetwork
 func (l *InterfaceIPNetListener) SyncIpFromIface() {
 	ipv4, ipv6, err := utils.GetInterfaceIP(l.interfaceName)
 	if err != nil {
-		log.Printf("Read IP from %v failed, err: %v", l.interfaceName, err)
+		logging.LogError("Read IP from %v failed, err: %v", l.interfaceName, err)
+	} else {
+		logging.LogVerbose("Synced primary IPs for %s: IPv4=%v, IPv6=%v", l.interfaceName, ipv4, ipv6)
 	}
 	l.ifIPs[4] = ipv4
 	l.ifIPs[6] = ipv6
 	ipv4s, ipv6s, err := utils.GetInterfaceIPs(l.interfaceName)
 	if err != nil {
-		log.Printf("Failed to get all bound IPs for %v: %v", l.interfaceName, err)
+		logging.LogError("Failed to get all bound IPs for %v: %v", l.interfaceName, err)
+	} else {
+		logging.LogVerbose("Synced all IPs for %s: %d IPv4 addresses, %d IPv6 addresses", l.interfaceName, len(ipv4s), len(ipv6s))
 	}
 	l.pseudoBridgeService.UpdateIfaceBindInfo(l.interfaceName, ipv4, ipv6, ipv4s, ipv6s)
 }
@@ -347,7 +367,7 @@ func getAddrUpdateIfName(addrUpdate netlink.AddrUpdate) (string, error) {
 	// Safely get the link by index to check the name
 	link, err := netlink.LinkByIndex(addrUpdate.LinkIndex)
 	if err != nil {
-		log.Printf("Failed to get link by index %d: %v", addrUpdate.LinkIndex, err)
+		logging.LogError("Failed to get link by index %d: %v", addrUpdate.LinkIndex, err)
 		return "", err
 	}
 	if link == nil {

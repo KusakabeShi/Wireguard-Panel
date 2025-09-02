@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"wg-panel/internal/internalservice"
+	"wg-panel/internal/logging"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
 )
@@ -22,7 +23,7 @@ type Session struct {
 type Config struct {
 	ConfigPath          string                       `json:"-"`
 	WireGuardConfigPath string                       `json:"wireguardConfigPath"`
-	LogLevel            LogLevel                     `json:"logLevel"`
+	LogLevel            logging.LogLevel             `json:"logLevel"`
 	User                string                       `json:"user"`
 	Password            string                       `json:"password"`
 	ListenIP            string                       `json:"listenIP"`
@@ -41,16 +42,16 @@ type Config struct {
 }
 
 func LoadConfig(path string) (*Config, error) {
-	LogVerbose("Loading configuration from: %s", path)
+	logging.LogVerbose("Loading configuration from: %s", path)
 	data, err := os.ReadFile(path)
 	if err != nil {
-		LogError("Failed to read config file %s: %v", path, err)
+		logging.LogError("Failed to read config file %s: %v", path, err)
 		return nil, fmt.Errorf("failed to read config file: %v", err)
 	}
 
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		LogError("Failed to parse config file %s: %v", path, err)
+		logging.LogError("Failed to parse config file %s: %v", path, err)
 		return nil, fmt.Errorf("failed to parse config file: %v", err)
 	}
 
@@ -66,20 +67,20 @@ func LoadConfig(path string) (*Config, error) {
 
 	// Generate ServerId if not present
 	if cfg.ServerId == "" {
-		LogInfo("Generating new server ID")
+		logging.LogInfo("Generating new server ID")
 		serverId, err := utils.GenerateRandomString("", 6)
 		if err != nil {
-			LogError("Failed to generate server ID: %v", err)
+			logging.LogError("Failed to generate server ID: %v", err)
 			return nil, fmt.Errorf("failed to generate server ID: %v", err)
 		}
 		cfg.ServerId = serverId
-		LogInfo("Generated server ID: %s", serverId)
+		logging.LogInfo("Generated server ID: %s", serverId)
 		// Save the config with the new ServerId
 		if err := cfg.Save(); err != nil {
-			LogError("Failed to save config with new server ID: %v", err)
+			logging.LogError("Failed to save config with new server ID: %v", err)
 			return nil, fmt.Errorf("failed to save config with new server ID: %v", err)
 		}
-		LogInfo("Saved configuration with new server ID")
+		logging.LogInfo("Saved configuration with new server ID")
 	}
 
 	return &cfg, nil
@@ -293,7 +294,7 @@ func (c *Config) SyncToInternalService() {
 						//addPbsConf(pbsConfig, "v4o", ifname, network)
 						addSrsConf(srsConfig, ifname, server.IPv4)
 					} else {
-						log.Printf("non 0.0.0.0/32 address for snat roaming for if: %v server: %v at interface %v", iface.Ifname, server.Name, ifname)
+						logging.LogError("Non 0.0.0.0/32 address for snat roaming for interface: %v server: %v at interface %v", iface.Ifname, server.Name, ifname)
 					}
 
 				}
@@ -327,10 +328,10 @@ func (c *Config) SyncToInternalService() {
 								addPbsConf(pbsConfig, "v6o", ifname, network)
 								addSrsConf(srsConfig, ifname, server.IPv6)
 							} else {
-								log.Printf("error to set snat roaming for if: %v server: %v at interface %v, network.Masklen= %v which is not /128 for SNAT mode, nor same as server network: %v for NETMAP mode", iface.Ifname, server.Name, ifname, network.Masklen(), server.IPv6.Network.String())
+								logging.LogError("Error to set snat roaming for interface: %v server: %v at interface %v, network.Masklen= %v which is not /128 for SNAT mode, nor same as server network: %v for NETMAP mode", iface.Ifname, server.Name, ifname, network.Masklen(), server.IPv6.Network.String())
 							}
 						}
-						log.Printf("error to set snat roaming for if: %v server: %v at interface %v, network.Masklen= %v which is not /128 for SNAT mode, nor same as server network: %v for NETMAP mode", iface.Ifname, server.Name, ifname, network.Masklen(), "nil")
+						logging.LogError("Error to set snat roaming for interface: %v server: %v at interface %v, network.Masklen= %v which is not /128 for SNAT mode, nor same as server network: %v for NETMAP mode", iface.Ifname, server.Name, ifname, network.Masklen(), "nil")
 					}
 				}
 			}
@@ -348,7 +349,7 @@ func addSrsConf(srsConfig map[string]map[string]*models.ServerNetworkConfig, ifn
 	}
 	key := network.CommentString
 	if key == "" {
-		log.Printf("empty network.CommentString!")
+		logging.LogError("Empty network.CommentString!")
 		return
 	}
 	oldrn, ok := srsConfig[ifname]

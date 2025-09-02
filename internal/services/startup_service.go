@@ -2,10 +2,10 @@ package services
 
 import (
 	"fmt"
-	"log"
 
 	"wg-panel/internal/config"
 	"wg-panel/internal/internalservice"
+	"wg-panel/internal/logging"
 	"wg-panel/internal/models"
 )
 
@@ -25,22 +25,22 @@ func NewStartupService(cfg *config.Config, wgService *WireGuardService, firewall
 
 // InitializeInterfaces brings up all enabled interfaces and applies firewall rules during startup
 func (s *StartupService) InitializeInterfaces() error {
-	log.Printf("Initializing WireGuard interfaces and firewall rules...")
+	logging.LogInfo("Initializing WireGuard interfaces and firewall rules...")
 
 	interfaces := s.cfg.GetAllInterfaces()
 	if len(interfaces) == 0 {
-		log.Printf("No interfaces found, skipping initialization")
+		logging.LogInfo("No interfaces found, skipping initialization")
 		return nil
 	}
 
 	for _, iface := range interfaces {
 		if err := s.initializeInterface(iface); err != nil {
-			log.Printf("Failed to initialize interface %s: %v", iface.Ifname, err)
+			logging.LogError("Failed to initialize interface %s: %v", iface.Ifname, err)
 			// Continue with other interfaces even if one fails
 			iface.Enabled = false
 			continue
 		}
-		log.Printf("Successfully initialized interface %s", iface.Ifname)
+		logging.LogInfo("Successfully initialized interface %s", iface.Ifname)
 	}
 	s.cfg.SyncToInternalService()
 
@@ -61,7 +61,7 @@ func (s *StartupService) initializeInterface(iface *models.Interface) error {
 	}
 
 	if !hasEnabledServers {
-		log.Printf("Interface %s has no enabled servers, skipping", iface.Ifname)
+		logging.LogVerbose("Interface %s has no enabled servers, skipping", iface.Ifname)
 		return nil
 	}
 
@@ -77,7 +77,7 @@ func (s *StartupService) initializeInterface(iface *models.Interface) error {
 		}
 
 		if err := s.initializeServerFirewallRules(iface.Ifname, server); err != nil {
-			log.Printf("Failed to initialize firewall rules for server %s: %v", server.Name, err)
+			logging.LogError("Failed to initialize firewall rules for server %s: %v", server.Name, err)
 			// Continue with other servers
 			continue
 		}

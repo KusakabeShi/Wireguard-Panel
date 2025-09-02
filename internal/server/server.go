@@ -12,6 +12,7 @@ import (
 	"wg-panel/internal/config"
 	"wg-panel/internal/handlers"
 	"wg-panel/internal/internalservice"
+	"wg-panel/internal/logging"
 	"wg-panel/internal/middleware"
 	"wg-panel/internal/services"
 	"wg-panel/internal/utils"
@@ -32,7 +33,7 @@ func NewServer(cfg *config.Config, frontendFS embed.FS) *Server {
 	}
 }
 
-func (s *Server) Start(fw *internalservice.FirewallService, logLevel config.LogLevel) error {
+func (s *Server) Start(fw *internalservice.FirewallService, logLevel logging.LogLevel) error {
 	// Set Gin mode
 	gin.SetMode(gin.ReleaseMode)
 	s.engine = gin.New()
@@ -49,7 +50,7 @@ func (s *Server) Start(fw *internalservice.FirewallService, logLevel config.LogL
 
 	// Initialize interfaces and firewall rules during startup
 	if err := utils.CleanupRules(s.cfg.ServerId, 46, nil, true); err != nil {
-		log.Printf("Warning: failed to cleanup orphaned rules: %v", err)
+		logging.LogError("Warning: failed to cleanup orphaned rules: %v", err)
 	}
 	if err := startupService.InitializeInterfaces(); err != nil {
 		return fmt.Errorf("failed to initialize interfaces: %v", err)
@@ -200,7 +201,7 @@ func (s *Server) setupRoutes(
 	})
 }
 
-func CustomLogger(level config.LogLevel) gin.HandlerFunc {
+func CustomLogger(level logging.LogLevel) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
@@ -212,23 +213,23 @@ func CustomLogger(level config.LogLevel) gin.HandlerFunc {
 		clientIP := c.ClientIP()
 
 		// Determine prefix from status/method
-		var reqlevel config.LogLevel
+		var reqlevel logging.LogLevel
 		switch {
 		case status >= 400:
-			reqlevel = config.LogLevelError
+			reqlevel = logging.LogLevelError
 		case method != "GET":
-			reqlevel = config.LogLevelInfo
+			reqlevel = logging.LogLevelInfo
 		default:
-			reqlevel = config.LogLevelVerbose
+			reqlevel = logging.LogLevelVerbose
 		}
 
 		var prefix string
 		switch reqlevel {
-		case config.LogLevelError:
+		case logging.LogLevelError:
 			prefix = "[ERROR]"
-		case config.LogLevelInfo:
+		case logging.LogLevelInfo:
 			prefix = "[INFO]"
-		case config.LogLevelVerbose:
+		case logging.LogLevelVerbose:
 			prefix = "[VERBOSE]"
 		}
 

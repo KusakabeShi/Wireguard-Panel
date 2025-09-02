@@ -5,6 +5,7 @@ import (
 
 	"wg-panel/internal/config"
 	"wg-panel/internal/internalservice"
+	"wg-panel/internal/logging"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
 
@@ -26,14 +27,18 @@ func NewServerService(cfg *config.Config, wgService *WireGuardService, firewallS
 }
 
 func (s *ServerService) CreateServer(interfaceID string, req ServerCreateRequest) (*models.Server, error) {
+	logging.LogInfo("Creating server %s for interface %s", req.Name, interfaceID)
 	iface := s.cfg.GetInterface(interfaceID)
 	if iface == nil {
+		logging.LogError("Interface %s not found during server creation", interfaceID)
 		return nil, fmt.Errorf("interface not found")
 	}
 
 	// Validate server configuration
+	logging.LogVerbose("Validating server configuration for %s", req.Name)
 	server, err := s.validateAndGenerateServerConfig(iface, &req, nil)
 	if err != nil {
+		logging.LogError("Server validation failed for %s: %v", req.Name, err)
 		return nil, err
 	}
 
@@ -41,10 +46,13 @@ func (s *ServerService) CreateServer(interfaceID string, req ServerCreateRequest
 	iface.Servers = append(iface.Servers, server)
 	s.cfg.SetInterface(interfaceID, iface)
 
+	logging.LogVerbose("Saving configuration after server creation")
 	if err := s.cfg.Save(); err != nil {
+		logging.LogError("Failed to save configuration after creating server %s: %v", req.Name, err)
 		return nil, fmt.Errorf("failed to save configuration: %v", err)
 	}
 
+	logging.LogInfo("Successfully created server %s (ID: %s) for interface %s", server.Name, server.ID, interfaceID)
 	return server, nil
 }
 
@@ -107,34 +115,42 @@ func (s *ServerService) UpdateServer(interfaceID, serverID string, req ServerCre
 }
 
 func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled bool, syncServiceAndConfig bool) error {
+	logging.LogInfo("Setting server %s enabled=%t for interface %s", serverID, enabled, interfaceID)
 	iface := s.cfg.GetInterface(interfaceID)
 	if iface == nil {
+		logging.LogError("Interface %s not found when setting server enabled state", interfaceID)
 		return fmt.Errorf("interface not found")
 	}
 
 	server, err := s.cfg.GetServer(interfaceID, serverID)
 	if err != nil {
+		logging.LogError("Server %s not found when setting enabled state: %v", serverID, err)
 		return err
 	}
 
 	if server.Enabled == enabled {
+		logging.LogVerbose("Server %s already in desired enabled state (%t)", serverID, enabled)
 		return nil // Already in desired state
 	}
 
 	if enabled {
 		// Enable: add IP addresses, firewall rules, and sync config
+		logging.LogVerbose("Enabling server %s - adding firewall rules", serverID)
 		if iface.Enabled && server.IPv4 != nil && server.IPv4.Enabled {
 			if err := s.fw.AddIpAndFwRules(iface.Ifname, server.IPv4); err != nil {
+				logging.LogError("Failed to add IPv4 firewall rules for server %s: %v", serverID, err)
 				return fmt.Errorf("failed to add IPv4 firewall rules: %v", err)
 			}
 		}
 		if iface.Enabled && server.IPv6 != nil && server.IPv6.Enabled {
 			if err := s.fw.AddIpAndFwRules(iface.Ifname, server.IPv6); err != nil {
+				logging.LogError("Failed to add IPv6 firewall rules for server %s: %v", serverID, err)
 				return fmt.Errorf("failed to add IPv6 firewall rules: %v", err)
 			}
 		}
 	} else {
 		// Disable: remove IP addresses, firewall rules, and sync config
+		logging.LogVerbose("Disabling server %s - removing firewall rules", serverID)
 		if iface.Enabled && server.IPv4 != nil && server.IPv4.Enabled {
 			s.fw.RemoveIpAndFwRules(iface.Ifname, server.IPv4)
 		}
@@ -144,7 +160,9 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 	}
 
 	// Regenerate WireGuard configuration
+	logging.LogVerbose("Syncing WireGuard configuration after server enable/disable")
 	if err := s.wg.SyncToConfAndInterface(iface); err != nil {
+		logging.LogError("Failed to sync WireGuard configuration for server %s: %v", serverID, err)
 		return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
 	}
 	server.Enabled = enabled
@@ -154,26 +172,33 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 	s.cfg.SetInterface(interfaceID, iface)
 	if syncServiceAndConfig {
 		if err := s.cfg.Save(); err != nil {
+			logging.LogError("Failed to save configuration after setting server enabled: %v", err)
 			return fmt.Errorf("failed to save configuration: %v", err)
 		}
 	}
+	logging.LogInfo("Successfully set server %s enabled=%t for interface %s", serverID, enabled, interfaceID)
 	return nil
 }
 
 func (s *ServerService) DeleteServer(interfaceID, serverID string) error {
+	logging.LogInfo("Deleting server %s from interface %s", serverID, interfaceID)
 	iface := s.cfg.GetInterface(interfaceID)
 	if iface == nil {
+		logging.LogError("Interface %s not found during server deletion", interfaceID)
 		return fmt.Errorf("interface not found")
 	}
 
 	server, err := s.cfg.GetServer(interfaceID, serverID)
 	if err != nil {
+		logging.LogError("Server %s not found during deletion: %v", serverID, err)
 		return err
 	}
 
 	// Disable first (removes firewall rules and IPs)
 	if server.Enabled {
+		logging.LogVerbose("Disabling server %s before deletion", serverID)
 		if err := s.SetServerEnabled(interfaceID, serverID, false, true); err != nil {
+			logging.LogError("Failed to disable server %s before deletion: %v", serverID, err)
 			return fmt.Errorf("failed to disable server before deletion: %v", err)
 		}
 	}

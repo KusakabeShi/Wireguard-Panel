@@ -12,6 +12,7 @@ import (
 
 	"wg-panel/internal/config"
 	"wg-panel/internal/internalservice"
+	"wg-panel/internal/logging"
 	"wg-panel/internal/models"
 	"wg-panel/internal/server"
 	"wg-panel/internal/utils"
@@ -51,8 +52,8 @@ func main() {
 	}
 
 	// Initialize logger with configured log level
-	config.InitLogger(cfg.LogLevel)
-	config.LogInfo("Starting WireGuard Panel with log level: %s", cfg.LogLevel.String())
+	logging.InitLogger(cfg.LogLevel)
+	logging.LogInfo("Starting WireGuard Panel with log level: %s", cfg.LogLevel.String())
 
 	// Initialize services
 	firewallService := internalservice.NewFirewallService()
@@ -61,7 +62,7 @@ func main() {
 	cfg.LoadInternalServices(pseudoBridgeService, snatRoamingService)
 	// Start HTTP server
 	srv := server.NewServer(cfg, frontendFS)
-	log.Printf("Starting WireGuard Panel on %s:%d", cfg.ListenIP, cfg.ListenPort)
+	logging.LogInfo("Starting WireGuard Panel on %s:%d", cfg.ListenIP, cfg.ListenPort)
 	log.Fatal(srv.Start(firewallService, cfg.LogLevel))
 }
 
@@ -87,7 +88,7 @@ func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, e
 
 		cfg := &config.Config{
 			WireGuardConfigPath: "/etc/wireguard",
-			LogLevel:            config.LogLevelInfo,
+			LogLevel:            logging.LogLevelInfo,
 			User:                "admin",
 			Password:            string(hashedPassword),
 			ListenIP:            "0.0.0.0",
