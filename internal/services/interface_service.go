@@ -63,10 +63,11 @@ func (s *InterfaceService) CreateInterface(req InterfaceCreateRequest) (*models.
 	}
 
 	// Validate endpoint
-	if err := s.ValidateEndpoint(req.Endpoint); err != nil {
+	if newendpoint, err := s.ValidateEndpoint(req.Endpoint); err != nil {
 		return nil, err
+	} else {
+		req.Endpoint = newendpoint
 	}
-
 	// Check if UDP port is available
 	if err := s.CheckUDPPortAvailable(req.Port); err != nil {
 		return nil, err
@@ -196,8 +197,10 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 
 	if req.Endpoint != "" && req.Endpoint != iface.Endpoint {
 		// Validate endpoint
-		if err := s.ValidateEndpoint(req.Endpoint); err != nil {
+		if newendpoint, err := s.ValidateEndpoint(req.Endpoint); err != nil {
 			return nil, err
+		} else {
+			req.Endpoint = newendpoint
 		}
 		iface.Endpoint = req.Endpoint
 	}
@@ -323,27 +326,31 @@ func (s *InterfaceService) CheckUDPPortAvailable(port int) error {
 	return nil
 }
 
-func (s *InterfaceService) ValidateEndpoint(endpoint string) error {
+func (s *InterfaceService) ValidateEndpoint(endpoint string) (string, error) {
 	if endpoint == "" {
-		return fmt.Errorf("endpoint cannot be empty")
+		return "", fmt.Errorf("endpoint cannot be empty")
+	}
+
+	if len(endpoint) > 2 && endpoint[0] == '[' && endpoint[len(endpoint)-1] == ']' {
+		endpoint = endpoint[1 : len(endpoint)-1]
 	}
 
 	// Check if it's a valid IPv4 address
 	if ip := net.ParseIP(endpoint); ip != nil {
 		if ip.To4() != nil {
-			return nil // Valid IPv4
+			return endpoint, nil // Valid IPv4
 		}
 		if ip.To16() != nil {
-			return nil // Valid IPv6
+			return "[" + endpoint + "]", nil // Valid IPv6
 		}
 	}
 
 	// Check if it's a valid domain name
 	if s.isValidDomain(endpoint) {
-		return nil
+		return endpoint, nil
 	}
 
-	return fmt.Errorf("endpoint must be a valid IPv4 address, IPv6 address, or domain name")
+	return "", fmt.Errorf("endpoint must be a valid IPv4 address, IPv6 address, or domain name")
 }
 
 func (s *InterfaceService) isValidDomain(domain string) bool {

@@ -430,38 +430,45 @@ func (r *InterfaceResponder) sendNeighborAdvertisement(requestPacket gopacket.Pa
 	}
 
 	ipv6 := &layers.IPv6{
-		Version:    6,
-		NextHeader: layers.IPProtocolICMPv6,
-		HopLimit:   255,
-		SrcIP:      targetIP,
-		DstIP:      srcIPv6.SrcIP,
+		Version:      6,
+		TrafficClass: 0,
+		FlowLabel:    0,
+		Length:       32, // Fixed length for NA: 4 (ICMPv6 hdr) + 28 (NA payload)
+		NextHeader:   layers.IPProtocolICMPv6,
+		HopLimit:     255,
+		SrcIP:        targetIP,
+		DstIP:        srcIPv6.SrcIP,
 	}
 
-	// Build ICMPv6 Neighbor Advertisement
+	// Build ICMPv6 Neighbor Advertisement using gopacket's built-in layer
+	na := &layers.ICMPv6NeighborAdvertisement{
+		Flags:         0x60, // Solicited=1, Override=1 (top byte only)
+		TargetAddress: targetIP,
+		Options: layers.ICMPv6Options{
+			{
+				Type: layers.ICMPv6OptTargetAddress,
+				Data: iface.HardwareAddr[:6],
+			},
+		},
+	}
+
 	icmp6 := &layers.ICMPv6{
 		TypeCode: layers.CreateICMPv6TypeCode(layers.ICMPv6TypeNeighborAdvertisement, 0),
 	}
 
-	// NA payload: flags (4 bytes) + target address (16 bytes) + TLV options
-	naPayload := make([]byte, 24) // 4 + 16 + 8 (for TLV option)
+	icmp6.Payload = na.LayerPayload()
 
-	// Flags: Solicited flag set
-	naPayload[0] = 0x40
-
-	// Target address
-	copy(naPayload[4:20], targetIP)
-
-	// Target Link-layer Address option (Type=2, Length=1, MAC)
-	naPayload[20] = 2 // Type
-	naPayload[21] = 1 // Length (in units of 8 bytes)
-	copy(naPayload[22:28], iface.HardwareAddr)
-
-	icmp6.Payload = naPayload
+	// Set up checksum calculation for ICMPv6
+	icmp6.SetNetworkLayerForChecksum(ipv6)
 
 	// Serialize and send
 	buffer := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}
-	gopacket.SerializeLayers(buffer, opts, eth, ipv6, icmp6)
+	err = gopacket.SerializeLayers(buffer, opts, eth, ipv6, icmp6, na)
+	if err != nil {
+		logging.LogError("Failed to serialize neighbor advertisement packet for %s on %s: %v", targetIP.String(), r.interfaceName, err)
+		return
+	}
 
 	if r.handle != nil {
 		err := r.handle.WritePacketData(buffer.Bytes())

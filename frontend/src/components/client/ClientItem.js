@@ -31,6 +31,14 @@ const ClientItem = ({
   useEffect(() => {
     // Always load client state to show traffic stats and status
     loadClientState();
+    
+    // Set up interval to update client status every 5 seconds
+    const interval = setInterval(() => {
+      loadClientState();
+    }, 5000);
+    
+    // Cleanup interval on unmount or when client.id changes
+    return () => clearInterval(interval);
   }, [client.id]);
 
   const loadClientState = async () => {
@@ -74,12 +82,15 @@ const ClientItem = ({
             <Typography variant="body2" sx={{ color: 'rgb(255, 255, 255)', mr: 1 }}>
           {getTrafficText()}
             </Typography>
-            <CircleIcon 
-          sx={{ 
-            color: isActive ? '#4caf50' : '#f44336', 
-            fontSize: 12,
-            filter: 'drop-shadow(0 0 1px rgba(128,128,128,0.8))'
-          }} 
+            <Box
+              sx={{
+                width: 16,
+                height: 16,
+                borderRadius: '50%',
+                backgroundColor: isActive ? '#4caf50' : '#f44336',
+                border: '2px solid #d3d3d3',
+                filter: 'drop-shadow(0 0 1px rgba(128,128,128,0.8))'
+              }}
             />
           </Box>
           <Switch

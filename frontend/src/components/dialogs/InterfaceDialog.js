@@ -35,7 +35,8 @@ const InterfaceDialog = ({
   const isEdit = Boolean(interface_);
 
   useEffect(() => {
-    if (interface_) {
+    if (open && interface_) {
+      // Always use the current interface data when dialog opens
       setFormData({
         ifname: interface_.ifname || '',
         endpoint: interface_.endpoint || '',
@@ -46,7 +47,9 @@ const InterfaceDialog = ({
         fwMark: interface_.fwMark || ''
       });
       setIsEnabled(interface_.enabled || false);
-    } else {
+      setError('');
+    } else if (open && !interface_) {
+      // New interface
       setFormData({
         ifname: '',
         endpoint: '',
@@ -57,8 +60,8 @@ const InterfaceDialog = ({
         fwMark: ''
       });
       setIsEnabled(false);
+      setError('');
     }
-    setError('');
   }, [interface_, open]);
 
   const handleChange = (field) => (event) => {

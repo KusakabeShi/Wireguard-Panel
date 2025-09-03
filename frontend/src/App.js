@@ -84,7 +84,9 @@ function AppContent() {
   };
 
   const handleEditInterface = (interface_) => {
-    setInterfaceDialog({ open: true, interface: interface_ });
+    // Always use the current interface data from the interfaces list
+    const currentInterface = interfaces.find(i => i.id === interface_.id) || interface_;
+    setInterfaceDialog({ open: true, interface: currentInterface });
   };
 
   const handleSaveInterface = async (interfaceData) => {
@@ -136,7 +138,19 @@ function AppContent() {
   const handleToggleInterface = async (interfaceId, enabled) => {
     try {
       await apiService.setInterfaceEnabled(interfaceId, enabled);
-      await loadInterfaces();
+      const updatedInterfaces = await apiService.getInterfaces();
+      setInterfaces(updatedInterfaces);
+      
+      // Update the interface in the dialog if it's the same one
+      if (interfaceDialog.interface && interfaceDialog.interface.id === interfaceId) {
+        const updatedInterface = updatedInterfaces.find(i => i.id === interfaceId);
+        if (updatedInterface) {
+          setInterfaceDialog(prev => ({
+            ...prev,
+            interface: updatedInterface
+          }));
+        }
+      }
     } catch (error) {
       console.error('Failed to toggle interface:', error);
       showError(error, 'Failed to Toggle Interface');

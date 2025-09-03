@@ -254,11 +254,11 @@ func (s *WireGuardService) GetPeerStats(interfaceName string) (map[string]*model
 		}
 
 		parts := strings.Split(line, "\t")
-		if len(parts) < 9 {
+		if len(parts) < 8 {
 			continue
 		}
 
-		publicKey := parts[1]
+		publicKey := parts[0]
 		if publicKey == "" {
 			continue
 		}
@@ -266,27 +266,27 @@ func (s *WireGuardService) GetPeerStats(interfaceName string) (map[string]*model
 		state := &models.WGState{}
 
 		// Parse endpoint
-		if parts[3] != "(none)" && parts[3] != "" {
-			endpoint := parts[3]
+		if parts[2] != "(none)" && parts[2] != "" {
+			endpoint := parts[2]
 			state.Endpoint = &endpoint
 		}
 
 		// Parse latest handshake
-		if parts[5] != "0" && parts[5] != "" {
-			if timestamp := parseUnixTimestamp(parts[5]); timestamp != nil {
+		if parts[4] != "0" && parts[4] != "" {
+			if timestamp := parseUnixTimestamp(parts[4]); timestamp != nil {
 				state.LatestHandshake = timestamp
 			}
 		}
 
 		// Parse transfer stats
-		if parts[6] != "0" && parts[6] != "" {
-			if rx := parseInt64(parts[6]); rx != nil {
+		if parts[5] != "0" && parts[5] != "" {
+			if rx := parseInt64(parts[5]); rx != nil {
 				state.TransferRx = rx
 			}
 		}
 
-		if parts[7] != "0" && parts[7] != "" {
-			if tx := parseInt64(parts[7]); tx != nil {
+		if parts[6] != "0" && parts[6] != "" {
+			if tx := parseInt64(parts[6]); tx != nil {
 				state.TransferTx = tx
 			}
 		}

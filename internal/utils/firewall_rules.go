@@ -90,10 +90,10 @@ func GenerateSNATRules(iptablesCmd string, config *models.ServerNetworkConfig, c
 		serverNetwork := config.Network.NetworkStr()
 		targetNetwork := config.Snat.SnatIPNet.NetworkStr()
 
-		rules = append(rules, fmt.Sprintf("%s -t nat -A PREROUTING -s %s %s -j NETMAP --to %s -m comment --comment %s",
+		rules = append(rules, fmt.Sprintf("%s -t nat -A POSTROUTING -s %s %s -j NETMAP --to %s -m comment --comment %s",
 			iptablesCmd, serverNetwork, destExclusion, targetNetwork, comment))
-		rules = append(rules, fmt.Sprintf("%s -t nat -A PREROUTING -s %s %s -j NETMAP --to %s -m comment --comment %s",
-			iptablesCmd, targetNetwork, destExclusion, serverNetwork, comment))
+		rules = append(rules, fmt.Sprintf("%s -t nat -A PREROUTING -d %s -j NETMAP --to %s -m comment --comment %s",
+			iptablesCmd, targetNetwork, serverNetwork, comment))
 	}
 
 	return rules
