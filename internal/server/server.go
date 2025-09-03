@@ -149,7 +149,7 @@ func (s *Server) setupRoutes(
 			return
 		}
 
-		// Check if request is for frontend (starts with SiteURLPrefix)
+		// Check if request is for frontend (starts with BasePath)
 		if len(requestPath) >= len(sitePrefix) && requestPath[:len(sitePrefix)] == sitePrefix {
 			// Remove site prefix to get relative path
 			relativePath := requestPath[len(sitePrefix):]

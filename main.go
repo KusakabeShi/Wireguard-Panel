@@ -101,7 +101,6 @@ func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, e
 			ListenIP:            "0.0.0.0",
 			ListenPort:          5000,
 			BasePath:            "/",
-			SiteFrontendPath:    "./frontend/build",
 			APIPrefix:           "/api",
 			ServerId:            serverId,
 			Interfaces:          make(map[string]*models.Interface),

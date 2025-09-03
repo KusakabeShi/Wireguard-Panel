@@ -264,9 +264,7 @@ The backend service uses a `config.json` file that is automatically managed. Key
 - **Password**: bcrypt-hashed password
 - **ListenIP**: Service bind address (default: `::`)
 - **ListenPort**: HTTP server port (default: `5000`)
-- **SiteURLPrefix**: Web interface URL prefix (default: `/`)
-- **SiteFrontendPath**: Frontend static files path (default: `./frontend/build`)
-- **APIPrefix**: API endpoint prefix (default: `/api`)
+- **BasePath**: Web interface URL prefix (default: `/`)
 
 ### First Run
 

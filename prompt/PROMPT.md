@@ -19,9 +19,7 @@ I'm going to implement a WireGuard server panel:
 *   **Password:** The bcrypt-hashed password.
 *   **ListenIP:** The listen IP for the service, default "::"
 *   **ListenPort:** The listen port for the service. default 5000
-*   **SiteURLPrefix:** The prefix to serve frontend static files. Default: `/`.
-*   **SiteFrontendPath:** The file path of frontend files. Default: `./frontend/build`
-*   **APIPrefix:** The prefix for backend APIs, appended to the `SiteURLPrefix`. Default: `/api`. For example, if `SiteURLPrefix` is `/wgpanel`, the full API path becomes `/wgpanel/api`.
+*   **BasePath:** The prefix to serve frontend static files. Default: `/`.
 
 ### Interface:
 *   **ifname:** The interface's short name, matching `^[A-Za-z0-9_-]{1,12}$`. Must be unique. The actual system interface name will be `wg-[ifname]`.

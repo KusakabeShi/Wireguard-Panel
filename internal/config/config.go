@@ -29,7 +29,6 @@ type Config struct {
 	ListenIP            string                       `json:"listenIP"`
 	ListenPort          int                          `json:"listenPort"`
 	BasePath            string                       `json:"basePath"`
-	SiteFrontendPath    string                       `json:"siteFrontendPath"`
 	APIPrefix           string                       `json:"apiPrefix"`
 	ServerId            string                       `json:"serverId"`
 	Interfaces          map[string]*models.Interface `json:"interfaces"`
