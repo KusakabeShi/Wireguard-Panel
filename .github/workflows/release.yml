@@ -1,0 +1,184 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            goos: linux
+            goarch: amd64
+          - os: linux
+            arch: arm64
+            goos: linux
+            goarch: arm64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Get version from tag or input
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm ci
+        npm run build
+
+    - name: Set build variables
+      id: build_vars
+      run: |
+        echo "COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        echo "BUILD_DATE=$(date -u '+%Y-%m-%d_%H:%M:%S')" >> $GITHUB_OUTPUT
+        echo "BUILD_USER=github-actions" >> $GITHUB_OUTPUT
+
+    - name: Build Go binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        BINARY_NAME="wg-panel"
+        if [ "${{ matrix.goos }}" == "windows" ]; then
+          BINARY_NAME="wg-panel.exe"
+        fi
+        
+        LDFLAGS="-X wg-panel/internal/version.Version=${{ steps.version.outputs.VERSION }} \
+        -X wg-panel/internal/version.GitCommit=${{ steps.build_vars.outputs.COMMIT }} \
+        -X wg-panel/internal/version.BuildDate=${{ steps.build_vars.outputs.BUILD_DATE }} \
+        -X wg-panel/internal/version.BuildUser=${{ steps.build_vars.outputs.BUILD_USER }} \
+        -w -s"
+        
+        go build -ldflags "${LDFLAGS}" -o ${BINARY_NAME} .
+        
+        # Create archive
+        ARCHIVE_NAME="wg-panel-${{ steps.version.outputs.VERSION }}-${{ matrix.os }}-${{ matrix.arch }}"
+        if [ "${{ matrix.goos }}" == "windows" ]; then
+          zip "${ARCHIVE_NAME}.zip" ${BINARY_NAME}
+          echo "ASSET_PATH=${ARCHIVE_NAME}.zip" >> $GITHUB_ENV
+        else
+          tar -czf "${ARCHIVE_NAME}.tar.gz" ${BINARY_NAME}
+          echo "ASSET_PATH=${ARCHIVE_NAME}.tar.gz" >> $GITHUB_ENV
+        fi
+        
+        echo "ASSET_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ env.ASSET_NAME }}
+        path: ${{ env.ASSET_PATH }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Get version from tag or input
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: ./artifacts
+
+    - name: Display structure of downloaded files
+      run: ls -la artifacts/
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.version.outputs.VERSION }}
+        release_name: WG-Panel ${{ steps.version.outputs.VERSION }}
+        draft: false
+        prerelease: ${{ contains(steps.version.outputs.VERSION, 'alpha') || contains(steps.version.outputs.VERSION, 'beta') || contains(steps.version.outputs.VERSION, 'rc') }}
+        body: |
+          ## WG-Panel ${{ steps.version.outputs.VERSION }}
+          
+          ### Features
+          - WireGuard VPN panel with web interface
+          - Multi-interface support with SNAT roaming
+          - Pseudo-bridge networking
+          - VLAN filtering for improved performance
+          
+          ### Downloads
+          **Linux-only**: This application requires Linux due to netlink and libpcap dependencies.
+          - **Linux AMD64**: `wg-panel-${{ steps.version.outputs.VERSION }}-linux-amd64.tar.gz`
+          - **Linux ARM64**: `wg-panel-${{ steps.version.outputs.VERSION }}-linux-arm64.tar.gz`
+          
+          ### Installation
+          1. Download the appropriate binary for your platform
+          2. Extract the archive
+          3. Run `./wg-panel -v` to verify the installation
+          4. Run `./wg-panel` to start the application
+          
+          ### Changes in this release
+          - Built from commit: ${{ github.sha }}
+          - Build date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+    - name: Upload Release Assets
+      run: |
+        for dir in artifacts/*/; do
+          if [ -d "$dir" ]; then
+            for file in "$dir"*; do
+              if [ -f "$file" ]; then
+                echo "Uploading $file"
+                filename=$(basename "$file")
+                curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                     -H "Content-Type: application/octet-stream" \
+                     --data-binary @"$file" \
+                     "https://uploads.github.com/repos/${{ github.repository }}/releases/${{ steps.create_release.outputs.id }}/assets?name=$filename"
+              fi
+            done
+          fi
+        done

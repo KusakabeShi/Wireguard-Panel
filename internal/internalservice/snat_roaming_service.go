@@ -262,7 +262,7 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 		if err != nil {
 			logging.LogError("Failed to calculate target_network: %v", err)
 		}
-		if err := l.fw.AddIpAndFwRules(l.interfaceName, simulatedConfig); err != nil {
+		if err := l.fw.AddSnatRules(simulatedConfig, simulatedConfig.CommentString); err != nil {
 			logging.LogError("Failed to add firewall rules: %v", err)
 		} else {
 			logging.LogVerbose("Successfully added SNAT roaming rules for %s on interface %s", key, l.interfaceName)
@@ -274,8 +274,8 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 		if err != nil {
 			logging.LogError("Failed to calculate target_network: %v", err)
 		}
-		l.fw.RemoveSnatRules(l.interfaceName, simulatedConfig, simulatedConfig.CommentString)
-		if err := l.fw.AddSnatRules(l.interfaceName, simulatedConfig, simulatedConfig.CommentString); err != nil {
+		l.fw.RemoveSnatRules(simulatedConfig, simulatedConfig.CommentString)
+		if err := l.fw.AddSnatRules(simulatedConfig, simulatedConfig.CommentString); err != nil {
 			logging.LogError("Failed to add firewall rules: %v", err)
 		} else {
 			logging.LogVerbose("Successfully updated SNAT roaming rules for %s on interface %s", key, l.interfaceName)
@@ -287,7 +287,7 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 		if err != nil {
 			logging.LogError("Failed to calculate target_network: %v", err)
 		}
-		l.fw.RemoveSnatRules(l.interfaceName, simulatedConfig, simulatedConfig.CommentString)
+		l.fw.RemoveSnatRules(simulatedConfig, simulatedConfig.CommentString)
 		logging.LogVerbose("Successfully removed SNAT roaming rules for %s on interface %s", key, l.interfaceName)
 	}
 }

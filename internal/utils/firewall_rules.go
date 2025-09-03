@@ -24,7 +24,7 @@ func GenerateServerFirewallRules(interfaceName string, config *models.ServerNetw
 		if config.Snat.RoamingMasterInterface != nil && *config.Snat.RoamingMasterInterface != "" {
 			// If roaming is enabled, SNAT rules must managed by the roaming service
 		} else {
-			rules = append(rules, GenerateSNATRules(iptablesCmd, interfaceName, config, comment)...)
+			rules = append(rules, GenerateSNATRules(iptablesCmd, config, comment)...)
 		}
 	}
 
@@ -36,7 +36,7 @@ func GenerateServerFirewallRules(interfaceName string, config *models.ServerNetw
 	return rules
 }
 
-func GenerateSNATRules(iptablesCmd, interfaceDevice string, config *models.ServerNetworkConfig, comment string) []string {
+func GenerateSNATRules(iptablesCmd string, config *models.ServerNetworkConfig, comment string) []string {
 	if config.Network == nil || config.Snat == nil {
 		return []string{}
 	}

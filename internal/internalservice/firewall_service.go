@@ -34,7 +34,7 @@ func (f *FirewallService) AddIpAndFwRules(interfaceName string, config *models.S
 		if config.Snat.RoamingMasterInterface != nil && *config.Snat.RoamingMasterInterface != "" {
 			// If roaming is enabled, SNAT rules must managed by the roaming service
 		} else {
-			if err := f.AddSnatRules(interfaceName, config, comment); err != nil {
+			if err := f.AddSnatRules(config, comment); err != nil {
 				return fmt.Errorf("failed to add SNAT rules: %v", err)
 			}
 		}
@@ -70,7 +70,7 @@ func (f *FirewallService) RemoveIpAndFwRules(interfaceName string, config *model
 	}
 }
 
-func (f *FirewallService) AddSnatRules(interfaceDevice string, config *models.ServerNetworkConfig, comment string) error {
+func (f *FirewallService) AddSnatRules(config *models.ServerNetworkConfig, comment string) error {
 	if config.Network == nil || config.Snat == nil {
 		return nil
 	}
@@ -85,7 +85,7 @@ func (f *FirewallService) AddSnatRules(interfaceDevice string, config *models.Se
 		return fmt.Errorf("cannot add SNAT rules: roaming is enabled, rules must be managed by the roaming service")
 	}
 	// Generate SNAT rules using shared function
-	rules := utils.GenerateSNATRules(iptablesCmd, interfaceDevice, config, comment)
+	rules := utils.GenerateSNATRules(iptablesCmd, config, comment)
 
 	// Apply each rule
 	for _, rule := range rules {
@@ -102,7 +102,7 @@ func (f *FirewallService) AddSnatRules(interfaceDevice string, config *models.Se
 	return nil
 }
 
-func (f *FirewallService) RemoveSnatRules(interfaceDevice string, config *models.ServerNetworkConfig, comment string) error {
+func (f *FirewallService) RemoveSnatRules(config *models.ServerNetworkConfig, comment string) error {
 	if err := utils.CleanupRules(comment, config.Network.Version, &[]string{"nat"}, false); err != nil {
 		return fmt.Errorf("failed to remove SNAT rules: %v", err)
 	}

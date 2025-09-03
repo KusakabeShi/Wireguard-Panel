@@ -197,7 +197,7 @@ func (r *InterfaceResponder) mainLoop() {
 				continue
 			}
 			packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
-			logging.LogInfo("Pseudo-bridge Responder for %s started, listening ARP and NS on main network", r.interfaceName)
+			logging.LogInfo("Pseudo-bridge Responder for %s started, listening ARP and NS", r.interfaceName)
 		} else if packetSource == nil {
 			packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
 		} else {

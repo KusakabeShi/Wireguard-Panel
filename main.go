@@ -16,6 +16,7 @@ import (
 	"wg-panel/internal/models"
 	"wg-panel/internal/server"
 	"wg-panel/internal/utils"
+	"wg-panel/internal/version"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -26,7 +27,13 @@ var frontendFS embed.FS
 func main() {
 	var configPath = flag.String("c", "./config.json", "Path to configuration file")
 	var newPassword = flag.String("p", "", "Set new password in configuration file")
+	var showVersion = flag.Bool("v", false, "Show version information")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version.GetVersionInfo())
+		return
+	}
 
 	// Ensure absolute path
 	if !filepath.IsAbs(*configPath) {
@@ -53,7 +60,7 @@ func main() {
 
 	// Initialize logger with configured log level
 	logging.InitLogger(cfg.LogLevel)
-	logging.LogInfo("Starting WireGuard Panel with log level: %s", cfg.LogLevel.String())
+	logging.LogInfo("Starting %s with log level: %s", version.GetVersionInfo(), cfg.LogLevel.String())
 
 	// Initialize services
 	firewallService := internalservice.NewFirewallService()
