@@ -145,10 +145,13 @@ func (s *SNATRoamingService) mainLoop() {
 				s.mu.RUnlock()
 				if ok {
 					logging.LogVerbose("Syncing IP addresses for interface: %s", ifname)
-					listener.SyncIpFromIface()
-					listener.UpdateConfigsAndSyncFw(listener.configs, true)
+					ipchanged := listener.SyncIpFromIface()
+					if ipchanged {
+						logging.LogInfo("IP change detected for interface: %s, updating firewall rules", ifname)
+						listener.UpdateConfigsAndSyncFw(listener.configs, true)
+					}
 				} else {
-					logging.LogVerbose("No SNAT roaming listener found for interface: %s", ifname)
+					logging.LogVerbose("No SNAT roaming listener found for interface: %s, ignoring", ifname)
 				}
 
 			case addrUpdate, ok := <-addrUpdates:
@@ -167,8 +170,11 @@ func (s *SNATRoamingService) mainLoop() {
 				s.mu.RUnlock()
 				if ok {
 					logging.LogVerbose("Syncing IP addresses for interface: %s after address change", ifname)
-					listener.SyncIpFromIface()
-					listener.UpdateConfigsAndSyncFw(listener.configs, true)
+					ipchanged := listener.SyncIpFromIface()
+					if ipchanged {
+						logging.LogInfo("IP change detected for interface: %s, updating firewall rules", ifname)
+						listener.UpdateConfigsAndSyncFw(listener.configs, true)
+					}
 				} else {
 					logging.LogVerbose("No SNAT roaming listener found for interface: %s", ifname)
 				}
@@ -236,7 +242,7 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 	toDel := make(map[string]*models.ServerNetworkConfig)
 
 	for key, newconf := range configs {
-		if newconf == nil || !newconf.Enabled || newconf.Snat == nil ||
+		if newconf == nil || newconf.Network == nil || newconf.CommentString == "" || !newconf.Enabled || newconf.Snat == nil ||
 			newconf.Snat.RoamingMasterInterface == nil || len(*newconf.Snat.RoamingMasterInterface) == 0 {
 			continue
 		}
@@ -262,7 +268,7 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 		if err != nil {
 			logging.LogError("Failed to calculate target_network: %v", err)
 		}
-		if err := l.fw.AddSnatRules(simulatedConfig, simulatedConfig.CommentString); err != nil {
+		if err := l.fw.AddSnatRules(simulatedConfig, config.CommentString); err != nil {
 			logging.LogError("Failed to add firewall rules: %v", err)
 		} else {
 			logging.LogVerbose("Successfully added SNAT roaming rules for %s on interface %s", key, l.interfaceName)
@@ -274,8 +280,8 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 		if err != nil {
 			logging.LogError("Failed to calculate target_network: %v", err)
 		}
-		l.fw.RemoveSnatRules(simulatedConfig, simulatedConfig.CommentString)
-		if err := l.fw.AddSnatRules(simulatedConfig, simulatedConfig.CommentString); err != nil {
+		l.fw.RemoveSnatRules(config.Network.Version, config.CommentString)
+		if err := l.fw.AddSnatRules(simulatedConfig, config.CommentString); err != nil {
 			logging.LogError("Failed to add firewall rules: %v", err)
 		} else {
 			logging.LogVerbose("Successfully updated SNAT roaming rules for %s on interface %s", key, l.interfaceName)
@@ -283,13 +289,10 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 	}
 	for key, config := range toDel {
 		logging.LogVerbose("Removing SNAT roaming rules for %s on interface %s", key, l.interfaceName)
-		simulatedConfig, err := l.getSimulatedConfig(config)
-		if err != nil {
-			logging.LogError("Failed to calculate target_network: %v", err)
-		}
-		l.fw.RemoveSnatRules(simulatedConfig, simulatedConfig.CommentString)
+		l.fw.RemoveSnatRules(config.Network.Version, config.CommentString)
 		logging.LogVerbose("Successfully removed SNAT roaming rules for %s on interface %s", key, l.interfaceName)
 	}
+	l.configs = configs
 }
 
 func (l *InterfaceIPNetListener) getSimulatedConfig(config *models.ServerNetworkConfig) (*models.ServerNetworkConfig, error) {
@@ -330,15 +333,18 @@ func (l *InterfaceIPNetListener) getSimulatedConfig(config *models.ServerNetwork
 	return simulatedIfConfig, nil
 }
 
-func (l *InterfaceIPNetListener) SyncIpFromIface() {
+func (l *InterfaceIPNetListener) SyncIpFromIface() (changed bool) {
 	ipv4, ipv6, err := utils.GetInterfaceIP(l.interfaceName)
 	if err != nil {
 		logging.LogError("Read IP from %v failed, err: %v", l.interfaceName, err)
 	} else {
 		logging.LogVerbose("Synced primary IPs for %s: IPv4=%v, IPv6=%v", l.interfaceName, ipv4, ipv6)
 	}
-	l.ifIPs[4] = ipv4
-	l.ifIPs[6] = ipv6
+	if l.ifIPs[4].Equal(ipv4) || l.ifIPs[6].Equal(ipv6) {
+		l.ifIPs[4] = ipv4
+		l.ifIPs[6] = ipv6
+		changed = true
+	}
 	ipv4s, ipv6s, err := utils.GetInterfaceIPs(l.interfaceName)
 	if err != nil {
 		logging.LogError("Failed to get all bound IPs for %v: %v", l.interfaceName, err)
@@ -346,6 +352,7 @@ func (l *InterfaceIPNetListener) SyncIpFromIface() {
 		logging.LogVerbose("Synced all IPs for %s: %d IPv4 addresses, %d IPv6 addresses", l.interfaceName, len(ipv4s), len(ipv6s))
 	}
 	l.pseudoBridgeService.UpdateIfaceBindInfo(l.interfaceName, ipv4, ipv6, ipv4s, ipv6s)
+	return changed
 }
 
 func (l *InterfaceIPNetListener) Stop() {

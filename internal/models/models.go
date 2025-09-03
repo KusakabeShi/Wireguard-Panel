@@ -27,9 +27,30 @@ type ServerNetworkConfig struct {
 func (src *ServerNetworkConfig) Copy() (dst *ServerNetworkConfig) {
 	dst = &ServerNetworkConfig{}
 	*dst = *src
-	*dst.Network = *src.Network
-	*dst.PseudoBridgeMasterInterface = *src.PseudoBridgeMasterInterface
-	*dst.Snat = *src.Snat
+	if src.Network != nil {
+		dst.Network = &IPNetWrapper{}
+		*dst.Network = *src.Network
+	}
+	if src.PseudoBridgeMasterInterface != nil {
+		dst.PseudoBridgeMasterInterface = new(string)
+		*dst.PseudoBridgeMasterInterface = *src.PseudoBridgeMasterInterface
+	}
+	if src.Snat != nil {
+		dst.Snat = &SnatConfig{}
+		*dst.Snat = *src.Snat
+		if src.Snat.SnatIPNet != nil {
+			dst.Snat.SnatIPNet = &IPNetWrapper{}
+			*dst.Snat.SnatIPNet = *src.Snat.SnatIPNet
+		}
+		if src.Snat.SnatExcludedNetwork != nil {
+			dst.Snat.SnatExcludedNetwork = &IPNetWrapper{}
+			*dst.Snat.SnatExcludedNetwork = *src.Snat.SnatExcludedNetwork
+		}
+		if src.Snat.RoamingMasterInterface != nil {
+			dst.Snat.RoamingMasterInterface = new(string)
+			*dst.Snat.RoamingMasterInterface = *src.Snat.RoamingMasterInterface
+		}
+	}
 	copy(dst.RoutedNetworks, src.RoutedNetworks)
 	return
 }

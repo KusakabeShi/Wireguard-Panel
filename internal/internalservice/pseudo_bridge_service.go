@@ -317,7 +317,7 @@ func (r *InterfaceResponder) handleARPRequest(packet gopacket.Packet, arp *layer
 			return
 		}
 	}
-	logging.LogVerbose("ARP request for %s on %s - no matching networks, ignoring", targetIP.String(), r.interfaceName)
+	//logging.LogVerbose("ARP request for %s on %s - no matching networks, ignoring", targetIP.String(), r.interfaceName)
 }
 
 func (r *InterfaceResponder) handleNeighborSolicitation(packet gopacket.Packet, icmp6 *layers.ICMPv6) {
@@ -351,7 +351,7 @@ func (r *InterfaceResponder) handleNeighborSolicitation(packet gopacket.Packet, 
 			return
 		}
 	}
-	logging.LogVerbose("Neighbor solicitation for %s on %s - no matching networks, ignoring", targetIP.String(), r.interfaceName)
+	//logging.LogVerbose("Neighbor solicitation for %s on %s - no matching networks, ignoring", targetIP.String(), r.interfaceName)
 }
 
 func (r *InterfaceResponder) sendARPReply(requestPacket gopacket.Packet, requestARP *layers.ARP) {

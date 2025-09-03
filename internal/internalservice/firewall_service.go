@@ -71,7 +71,7 @@ func (f *FirewallService) RemoveIpAndFwRules(interfaceName string, config *model
 }
 
 func (f *FirewallService) AddSnatRules(config *models.ServerNetworkConfig, comment string) error {
-	if config.Network == nil || config.Snat == nil {
+	if config == nil || !config.Enabled || config.Network == nil || config.Snat == nil {
 		return nil
 	}
 
@@ -102,8 +102,8 @@ func (f *FirewallService) AddSnatRules(config *models.ServerNetworkConfig, comme
 	return nil
 }
 
-func (f *FirewallService) RemoveSnatRules(config *models.ServerNetworkConfig, comment string) error {
-	if err := utils.CleanupRules(comment, config.Network.Version, &[]string{"nat"}, false); err != nil {
+func (f *FirewallService) RemoveSnatRules(af int, comment string) error {
+	if err := utils.CleanupRules(comment, af, &[]string{"nat"}, false); err != nil {
 		return fmt.Errorf("failed to remove SNAT rules: %v", err)
 	}
 	return nil

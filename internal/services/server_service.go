@@ -158,15 +158,15 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 			s.fw.RemoveIpAndFwRules(iface.Ifname, server.IPv6)
 		}
 	}
-
-	// Regenerate WireGuard configuration
-	logging.LogVerbose("Syncing WireGuard configuration after server enable/disable")
-	if err := s.wg.SyncToConfAndInterface(iface); err != nil {
-		logging.LogError("Failed to sync WireGuard configuration for server %s: %v", serverID, err)
-		return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
-	}
 	server.Enabled = enabled
 	if syncServiceAndConfig {
+		// Regenerate WireGuard configuration
+		logging.LogVerbose("Syncing WireGuard configuration after server enable/disable")
+		if err := s.wg.SyncToConfAndInterface(iface); err != nil {
+			logging.LogError("Failed to sync WireGuard configuration for server %s: %v", serverID, err)
+			return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
+		}
+
 		s.cfg.SyncToInternalService()
 	}
 	s.cfg.SetInterface(interfaceID, iface)
