@@ -77,6 +77,18 @@ const ClientItem = ({
             <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
           {client.name}
             </Typography>
+            <Box sx={{ ml: 2, display: 'flex', flexDirection: 'column' }}>
+              {client.ip && (
+                <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.75rem' }}>
+                  {client.ip}
+                </Typography>
+              )}
+              {client.ipv6 && (
+                <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.75rem' }}>
+                  {client.ipv6}
+                </Typography>
+              )}
+            </Box>
           </Box>
           <Box sx={{ mr: 2, display: 'flex', alignItems: 'center' }}>
             <Typography variant="body2" sx={{ color: 'rgb(255, 255, 255)', mr: 1 }}>
