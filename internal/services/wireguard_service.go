@@ -162,6 +162,7 @@ func (s *WireGuardService) SyncToInterface(ifname string, enabled bool, checkWgK
 	if enabled {
 		if !interfaceExists {
 			// Situation 1: Interface not found and enable=true, wg-quick up normally
+			logging.LogInfo("Bringing up WireGuard interface %s", interfaceName)
 			if err := utils.RunCommand("wg-quick", "up", configFile); err != nil {
 				return fmt.Errorf("failed to bring up interface with wg-quick: %v", err)
 			}
@@ -181,6 +182,7 @@ func (s *WireGuardService) SyncToInterface(ifname string, enabled bool, checkWgK
 				return fmt.Errorf("failed to strip config: %v", err)
 			}
 
+			logging.LogInfo("Syncing configuration to WireGuard interface %s", interfaceName)
 			if err := s.syncConfToInterface(interfaceName, strippedConfig); err != nil {
 				return fmt.Errorf("failed to sync interface configuration: %v", err)
 			}
@@ -201,6 +203,7 @@ func (s *WireGuardService) SyncToInterface(ifname string, enabled bool, checkWgK
 			}
 
 			// Use wg-quick down to properly disable the interface
+			logging.LogInfo("Bringing down WireGuard interface %s", interfaceName)
 			if err := utils.RunCommand("wg-quick", "down", configFile); err != nil {
 				return fmt.Errorf("failed to disable interface: %v", err)
 			}
@@ -211,9 +214,11 @@ func (s *WireGuardService) SyncToInterface(ifname string, enabled bool, checkWgK
 }
 
 func (s *WireGuardService) RemoveConfig(ifname string) error {
+	logging.LogInfo("Removing WireGuard configuration for interface %s", ifname)
 	configFile := filepath.Join(s.configPath, fmt.Sprintf("%s.conf", ifname))
 
 	// Remove config file
+	logging.LogInfo("Removing WireGuard config file %s", configFile)
 	if err := os.Remove(configFile); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove config file: %v", err)
 	}

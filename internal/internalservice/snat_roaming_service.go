@@ -74,7 +74,11 @@ func (s *SNATRoamingService) UpdateConfiguration(waitnigInterface map[string]map
 			delIF[runningIF] = runningNets
 		}
 	}
-
+	for ifname := range delIF {
+		s.listeners[ifname].Stop()
+		delete(s.runningInterface, ifname)
+		delete(s.listeners, ifname)
+	}
 	for ifname, configs := range addIF {
 		s.runningInterface[ifname] = &SNATRoamingSynced{
 			ExistsInNewConfig: false,
@@ -87,11 +91,7 @@ func (s *SNATRoamingService) UpdateConfiguration(waitnigInterface map[string]map
 		s.listeners[ifname].SyncIpFromIface()
 		s.listeners[ifname].UpdateConfigsAndSyncFw(configs, true)
 	}
-	for ifname := range delIF {
-		s.listeners[ifname].Stop()
-		delete(s.runningInterface, ifname)
-		delete(s.listeners, ifname)
-	}
+
 }
 
 func (s *SNATRoamingService) mainLoop() {
@@ -264,6 +264,11 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 			toDel[key] = l.configs[key]
 		}
 	}
+	for key, config := range toDel {
+		logging.LogVerbose("Removing SNAT roaming rules for %s on interface %s", key, l.interfaceName)
+		l.fw.RemoveSnatRules(config.Network.Version, config.CommentString)
+		logging.LogVerbose("Successfully removed SNAT roaming rules for %s on interface %s", key, l.interfaceName)
+	}
 	for key, config := range toAdd {
 		logging.LogVerbose("Adding SNAT roaming rules for %s on interface %s", key, l.interfaceName)
 		simulatedConfig, err := l.getSimulatedConfig(config)
@@ -289,11 +294,7 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 			logging.LogVerbose("Successfully updated SNAT roaming rules for %s on interface %s", key, l.interfaceName)
 		}
 	}
-	for key, config := range toDel {
-		logging.LogVerbose("Removing SNAT roaming rules for %s on interface %s", key, l.interfaceName)
-		l.fw.RemoveSnatRules(config.Network.Version, config.CommentString)
-		logging.LogVerbose("Successfully removed SNAT roaming rules for %s on interface %s", key, l.interfaceName)
-	}
+
 	l.configs = configs
 }
 

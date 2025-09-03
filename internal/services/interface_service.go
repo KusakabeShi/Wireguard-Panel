@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"wg-panel/internal/config"
+	"wg-panel/internal/logging"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
 
@@ -104,6 +105,7 @@ func (s *InterfaceService) CreateInterface(req InterfaceCreateRequest) (*models.
 }
 
 func (s *InterfaceService) SetInterfaceEnabled(id string, enabled bool) error {
+	logging.LogInfo("Setting interface %s enabled=%t", id, enabled)
 	iface := s.cfg.GetInterface(id)
 	if iface == nil {
 		return fmt.Errorf("interface not found")
@@ -265,6 +267,7 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 }
 
 func (s *InterfaceService) DeleteInterface(id string) error {
+	logging.LogInfo("Deleting interface %s", id)
 	iface := s.cfg.GetInterface(id)
 	if iface == nil {
 		return fmt.Errorf("interface not found")

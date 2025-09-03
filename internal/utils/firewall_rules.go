@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"wg-panel/internal/logging"
 	"wg-panel/internal/models"
 )
 
@@ -149,6 +150,8 @@ func CleanupRules(comment string, version int, targetTable *[]string, matchPrefi
 	if comment == "" {
 		return fmt.Errorf("cleanFirewallRuleByComment: comment can't be empty")
 	}
+
+	logging.LogInfo("Cleaning up firewall rules with comment: %s (version: %d)", comment, version)
 	if version == 46 {
 		err4 := CleanupRules(comment, 4, targetTable, matchPrefix)
 		err6 := CleanupRules(comment, 6, targetTable, matchPrefix)
@@ -202,7 +205,14 @@ func CleanupRules(comment string, version int, targetTable *[]string, matchPrefi
 	}
 
 	for _, arg := range commands {
+		logging.LogInfo("Removing firewall rule: %s %s", iptablesCmd, strings.Join(arg, " "))
 		_, err = RunCommandWithOutput(iptablesCmd, arg...)
+	}
+
+	if len(commands) > 0 {
+		logging.LogInfo("Cleaned up %d firewall rules with comment: %s", len(commands), comment)
+	} else {
+		logging.LogInfo("No firewall rules found to clean up with comment: %s", comment)
 	}
 
 	return err

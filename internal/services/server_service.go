@@ -135,7 +135,7 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 
 	if enabled {
 		// Enable: add IP addresses, firewall rules, and sync config
-		logging.LogVerbose("Enabling server %s - adding firewall rules", serverID)
+		logging.LogInfo("Enabling server %s - adding firewall rules", serverID)
 		if iface.Enabled && server.IPv4 != nil && server.IPv4.Enabled {
 			if err := s.fw.AddIpAndFwRules(iface.Ifname, server.IPv4); err != nil {
 				logging.LogError("Failed to add IPv4 firewall rules for server %s: %v", serverID, err)
@@ -150,7 +150,7 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 		}
 	} else {
 		// Disable: remove IP addresses, firewall rules, and sync config
-		logging.LogVerbose("Disabling server %s - removing firewall rules", serverID)
+		logging.LogInfo("Disabling server %s - removing firewall rules", serverID)
 		if iface.Enabled && server.IPv4 != nil && server.IPv4.Enabled {
 			s.fw.RemoveIpAndFwRules(iface.Ifname, server.IPv4)
 		}

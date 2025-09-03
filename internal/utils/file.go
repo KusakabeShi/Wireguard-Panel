@@ -6,10 +6,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"wg-panel/internal/logging"
 )
 
 // WriteFileAtomic writes data to a file atomically by writing to a temporary file first
 func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
+	logging.LogInfo("Writing file %s (%d bytes)", filename, len(data))
 	dir := filepath.Dir(filename)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %v", err)
@@ -26,6 +29,7 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 		return fmt.Errorf("failed to rename temporary file: %v", err)
 	}
 	
+	logging.LogInfo("Successfully wrote file %s", filename)
 	return nil
 }
 

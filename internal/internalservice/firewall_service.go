@@ -20,6 +20,8 @@ func (f *FirewallService) AddIpAndFwRules(interfaceName string, config *models.S
 		return nil
 	}
 
+	logging.LogInfo("Adding firewall rules and IP configuration for interface %s", interfaceName)
+
 	comment := config.CommentString
 
 	// Add IP address to interface (only if not already present)
@@ -54,6 +56,8 @@ func (f *FirewallService) RemoveIpAndFwRules(interfaceName string, config *model
 	if config == nil || !config.Enabled {
 		return
 	}
+
+	logging.LogInfo("Removing firewall rules and IP configuration for interface %s", interfaceName)
 
 	interfaceDevice := fmt.Sprintf("%s", interfaceName)
 	comment := config.CommentString
@@ -149,6 +153,7 @@ func (f *FirewallService) addIPAddressIfNotExists(interfaceDevice, ipAddr string
 	}
 
 	// Add the IP address
+	logging.LogInfo("Adding IP address %s to interface %s", ipAddr, interfaceDevice)
 	if err := utils.RunCommand("ip", "addr", "add", ipAddr, "dev", interfaceDevice); err != nil {
 		return err
 	}
@@ -165,6 +170,7 @@ func (f *FirewallService) removeIPAddressIfExists(interfaceDevice, ipAddr string
 	}
 
 	// Remove the IP address
+	logging.LogInfo("Removing IP address %s from interface %s", ipAddr, interfaceDevice)
 	utils.RunCommandIgnoreError("ip", "addr", "del", ipAddr, "dev", interfaceDevice)
 }
 
@@ -195,6 +201,7 @@ func (f *FirewallService) addIptablesRuleIfNotExists(iptablesCmd string, ruleArg
 	}
 
 	// Add the rule
+	logging.LogInfo("Adding firewall rule: %s %s", iptablesCmd, strings.Join(ruleArgs, " "))
 	if err := utils.RunCommand(iptablesCmd, ruleArgs...); err != nil {
 		return err
 	}
