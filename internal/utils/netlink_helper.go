@@ -32,6 +32,15 @@ func GetInterfaceIP(ifname string) (*models.IPNetWrapper, *models.IPNetWrapper, 
 		if addr.IP == nil || addr.IPNet == nil {
 			continue
 		}
+		if addr.IP.IsLinkLocalMulticast() {
+			continue
+		}
+		if addr.IP.IsLinkLocalUnicast() {
+			continue
+		}
+		if addr.IP.IsLoopback() {
+			continue
+		}
 		if addr.IP.To4() != nil {
 			v4s = append(v4s, addr)
 		} else if addr.IP.To16() != nil {
@@ -113,23 +122,24 @@ func comparePrefix(a, b netlink.Addr) int {
 
 	isV6 := a.IP.To4() == nil
 	if isV6 {
-		// prefer >= /64
-		if aLen >= 64 && bLen < 64 {
-			return -1
+		// IPv6 priority: [64~48] > (48,32] > [124~64) > (32~0] > [128>124)
+		aPriority := getIPv6Priority(aLen)
+		bPriority := getIPv6Priority(bLen)
+		
+		if aPriority != bPriority {
+			return aPriority - bPriority
 		}
-		if bLen >= 64 && aLen < 64 {
-			return 1
-		}
-		// both >= /64 → larger prefix (more specific) wins
-		if aLen >= 64 && bLen >= 64 && aLen != bLen {
+		
+		// Same priority group, apply group-specific sorting
+		if aPriority == 1 || aPriority == 3 || aPriority == 5 {
+			// Groups 1, 3, 5: bigger better (smaller mask length)
+			return aLen - bLen
+		} else {
+			// Groups 2, 4: smaller better (larger mask length) 
 			return bLen - aLen
 		}
-		// both < /64 → smaller prefix wins
-		if aLen != bLen {
-			return aLen - bLen
-		}
 	} else {
-		// IPv4 case
+		// IPv4 case - unchanged
 		if aLen >= 24 && bLen < 24 {
 			return -1
 		}
@@ -144,6 +154,27 @@ func comparePrefix(a, b netlink.Addr) int {
 		}
 	}
 	return 0
+}
+
+// getIPv6Priority returns priority group for IPv6 mask lengths
+// Priority: 1 (highest) > 2 > 3 > 4 > 5 (lowest)
+func getIPv6Priority(maskLen int) int {
+	if maskLen >= 48 && maskLen <= 64 {
+		return 1 // [48~64] - bigger better (/48 > /56 > /64)
+	}
+	if maskLen > 32 && maskLen < 48 {
+		return 2 // (32,48) - smaller better (/47 > /40 > /33)
+	}
+	if maskLen > 64 && maskLen <= 124 {
+		return 3 // (64,124] - bigger better (/65 > /80 > /124)  
+	}
+	if maskLen >= 0 && maskLen <= 32 {
+		return 4 // [0,32] - smaller better (/24 > /16 > /8)
+	}
+	if maskLen > 124 && maskLen <= 128 {
+		return 5 // (124,128] - bigger better (/125 > /126 > /127 > /128)
+	}
+	return 6 // fallback (should not happen)
 }
 
 func compareScope(a, b netlink.Addr) int {

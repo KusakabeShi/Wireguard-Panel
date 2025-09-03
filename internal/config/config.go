@@ -317,21 +317,32 @@ func (c *Config) SyncToInternalService() {
 					server.IPv6.Snat.SnatIPNet != nil &&
 					server.IPv6.Snat.RoamingMasterInterface != nil &&
 					*server.IPv6.Snat.RoamingMasterInterface != "" {
+					// Roaming enabled
 					ifname := *server.IPv6.Snat.RoamingMasterInterface
 					network := server.IPv6.Snat.SnatIPNet
-					if network.EqualZero(6) && !server.IPv6.Snat.RoamingPseudoBridge {
-						//addPbsConf(pbsConfig, "v6o", ifname, network)
-						addSrsConf(srsConfig, ifname, server.IPv6)
-					} else if server.IPv6.Snat.RoamingPseudoBridge {
-						if server.IPv6.Network != nil {
-							if server.IPv6.Network.Masklen() == network.Masklen() {
-								addPbsConf(pbsConfig, "v6o", ifname, network)
-								addSrsConf(srsConfig, ifname, server.IPv6)
-							} else {
-								logging.LogError("Error to set snat roaming for interface: %v server: %v at interface %v, network.Masklen= %v which is not /128 for SNAT mode, nor same as server network: %v for NETMAP mode", iface.Ifname, server.Name, ifname, network.Masklen(), server.IPv6.Network.String())
-							}
+
+					if network.EqualZero(6) {
+						// SNAT Roaming
+						if !server.IPv6.Snat.RoamingPseudoBridge {
+							// No Roaming pseudo bridge
+							//addPbsConf(pbsConfig, "v6o", ifname, network)
+							addSrsConf(srsConfig, ifname, server.IPv6)
+						} else {
+							// Roaming pseudo bridge
+							logging.LogError("Roaming pseudo bridge for SNAT mode is not supported, use NETMAP mode instead for interface: %v server: %v at interface %v", iface.Ifname, server.Name, ifname)
 						}
-						logging.LogError("Error to set snat roaming for interface: %v server: %v at interface %v, network.Masklen= %v which is not /128 for SNAT mode, nor same as server network: %v for NETMAP mode", iface.Ifname, server.Name, ifname, network.Masklen(), "nil")
+					} else {
+						// NETMAP Roaming
+						if server.IPv6.Network != nil && server.IPv6.Network.Masklen() == network.Masklen() {
+							if server.IPv6.Snat.RoamingPseudoBridge {
+								// Roaming pseudo bridge
+								addPbsConf(pbsConfig, "v6o", ifname, network)
+							}
+							// Pure NETMAP Roaming
+							addSrsConf(srsConfig, ifname, server.IPv6)
+						} else {
+							logging.LogError("Error to set snat roaming for interface: %v server: %v at interface %v, network.Masklen= %v which is not /128 for SNAT mode, nor same as server network: %v for NETMAP mode", iface.Ifname, server.Name, ifname, network.Masklen(), server.IPv6.Network.String())
+						}
 					}
 				}
 			}

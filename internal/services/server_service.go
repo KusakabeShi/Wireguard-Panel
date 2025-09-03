@@ -543,17 +543,17 @@ func (s *ServerService) validateRoutedNetworksOverlap(af int, routedNetworks []s
 
 func (s *ServerService) validateSnatConfiguration(af int, serverNetwork *models.IPNetWrapper, snat *SnatConfigRequest) error {
 	isRoaming := false
+	snatmode := ""
 	if snat.RoamingMasterInterface != nil && len(*snat.RoamingMasterInterface) > 0 {
 		isRoaming = true
-
 	}
 	if snat.SnatIPNet == "" {
 		// MASQUERADE mode
+		snatmode = "MASQUERADE"
 		if isRoaming {
 			return fmt.Errorf("masquerade mode doesn't support roaming, SnatIPNet must be set, or unset RoamingMasterInterface")
 		}
-	}
-	if snat.SnatIPNet != "" {
+	} else {
 		var snatNet *models.IPNetWrapper
 		var err error
 		switch af {
@@ -571,6 +571,7 @@ func (s *ServerService) validateSnatConfiguration(af int, serverNetwork *models.
 		switch af {
 		case 4:
 			if snatNet.Masklen() == 32 {
+				snatmode = "SNAT"
 				if isRoaming && !snatNet.EqualZero(af) {
 					return fmt.Errorf("in roaming mode, SNAT IP must be 0.0.0.0/32")
 				}
@@ -579,10 +580,13 @@ func (s *ServerService) validateSnatConfiguration(af int, serverNetwork *models.
 			}
 		case 6:
 			if snatNet.Masklen() == 128 {
+				snatmode = "SNAT"
 				if isRoaming && !snatNet.EqualZero(af) {
 					return fmt.Errorf("in roaming mode, SNAT IP must be ::/128")
 				}
 			} else {
+				snatmode = "NETMAP"
+				// NETMAP mode, must match server network masklen
 				if snatNet.Masklen() != serverNetwork.Masklen() {
 					return fmt.Errorf("IPv6 SNAT IP must be /128 (SNAT mode) or equal with ServerNet /%d (NETMAP mode)", serverNetwork.Masklen())
 				}
@@ -594,8 +598,14 @@ func (s *ServerService) validateSnatConfiguration(af int, serverNetwork *models.
 		if err != nil {
 			return err
 		}
-
 	}
+	if snat.RoamingPseudoBridge && !isRoaming {
+		return fmt.Errorf("RoamingPseudoBridge can be true only if RoamingMasterInterface is set")
+	}
+	if snat.RoamingPseudoBridge && (snatmode != "NETMAP") {
+		return fmt.Errorf("RoamingPseudoBridge can only works in NETMAP mode instead of %s mode", snatmode)
+	}
+
 	return nil
 }
 

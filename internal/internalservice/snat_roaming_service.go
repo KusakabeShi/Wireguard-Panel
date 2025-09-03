@@ -81,12 +81,11 @@ func (s *SNATRoamingService) UpdateConfiguration(waitnigInterface map[string]map
 		}
 		s.listeners[ifname] = NewInterfaceIPNetListener(ifname, s.pseudoBridgeService, s.fw)
 		s.listeners[ifname].SyncIpFromIface()
-		s.listeners[ifname].UpdateConfigsAndSyncFw(configs, false)
-
+		s.listeners[ifname].UpdateConfigsAndSyncFw(configs, true)
 	}
 	for ifname, configs := range updateIF {
 		s.listeners[ifname].SyncIpFromIface()
-		s.listeners[ifname].UpdateConfigsAndSyncFw(configs, false)
+		s.listeners[ifname].UpdateConfigsAndSyncFw(configs, true)
 	}
 	for ifname := range delIF {
 		s.listeners[ifname].Stop()
@@ -250,7 +249,10 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 		oldconf, ok := l.configs[key]
 		if ok {
 			oldsynced[key] = true
-			if forceUpdateAll || !oldconf.Network.Equal(newconf.Network) || !oldconf.Snat.SnatExcludedNetwork.Equal(newconf.Snat.SnatExcludedNetwork) || !models.NetworksEqualNP(oldconf.RoutedNetworks, newconf.RoutedNetworks) {
+			if forceUpdateAll ||
+				!oldconf.Network.Equal(newconf.Network) || !oldconf.Snat.SnatIPNet.Equal(newconf.Snat.SnatIPNet) ||
+				!oldconf.Snat.SnatExcludedNetwork.Equal(newconf.Snat.SnatExcludedNetwork) ||
+				!models.NetworksEqualNP(oldconf.RoutedNetworks, newconf.RoutedNetworks) {
 				toUpdate[key] = newconf
 			}
 		} else {
@@ -340,7 +342,7 @@ func (l *InterfaceIPNetListener) SyncIpFromIface() (changed bool) {
 	} else {
 		logging.LogVerbose("Synced primary IPs for %s: IPv4=%v, IPv6=%v", l.interfaceName, ipv4, ipv6)
 	}
-	if l.ifIPs[4].Equal(ipv4) || l.ifIPs[6].Equal(ipv6) {
+	if !l.ifIPs[4].Equal(ipv4) || !l.ifIPs[6].Equal(ipv6) {
 		l.ifIPs[4] = ipv4
 		l.ifIPs[6] = ipv6
 		changed = true

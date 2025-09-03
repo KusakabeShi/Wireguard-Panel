@@ -189,7 +189,7 @@ func (w *IPNetWrapper) CheckOffsetValid(offset IPWrapper) error {
 	// Check that offset does not exceed the host bits
 	for i := 0; i < len(offset); i++ {
 		if offset[i]&mask[i] != 0 {
-			return fmt.Errorf("offset %v exceeds host bits for mask %v", offset, mask)
+			return fmt.Errorf("offset %v exceeds host bits for mask %v.", offset, mask)
 		}
 	}
 	return nil
@@ -241,6 +241,38 @@ func (w *IPNetWrapper) GetNetByOffset(offset *IPNetWrapper) (*IPNetWrapper, erro
 	}
 	if offset.Masklen() < w.Masklen() {
 		return nil, fmt.Errorf("offset masklen is smaller than original masklen")
+	}
+	if offset.Masklen() == w.Masklen() {
+		if !offset.IP.IsUnspecified() {
+			return nil, fmt.Errorf("same size of network and offset, offset IP must be zero")
+		}
+		return w, nil
+	}
+
+	max_offset_bits := offset.Masklen() - w.Masklen()
+	// offset.IP must not exceed the available host bits in the base network
+	// for ipv4: if base is /16 and offset is /24, max_offset_bits = 8, offset.IP must be in 0.0.0.0~0.0.255.0
+	// for ipv6: if base is /64 and offset is /96, max_offset_bits = 32, offset.IP must be in ::~::ffff:ffff:0
+	
+	if max_offset_bits > 0 {
+		// Create a mask for the allowed offset bits
+		var totalBits int
+		if offset.Version == 4 {
+			totalBits = 32
+		} else {
+			totalBits = 128
+		}
+		
+		// Create mask that allows only the offset bits to be set
+		offsetMask := net.CIDRMask(w.Masklen(), totalBits)
+		
+		// Check if offset.IP has any bits set outside the allowed range
+		for i := 0; i < len(offset.IP); i++ {
+			if i < len(offsetMask) && (offset.IP[i] & offsetMask[i]) != 0 {
+				return nil, fmt.Errorf("offset IP %s exceeds allowed range for base network %s", 
+					offset.IP.String(), w.BaseNet.String())
+			}
+		}
 	}
 
 	// Check that offset network is properly aligned within the base network
@@ -295,23 +327,41 @@ func (w *IPNetWrapper) IsOverlap(w2 *IPNetWrapper) bool {
 
 func IPNetLess(pw, pw2 *IPNetWrapper) bool {
 	if pw == nil {
-		return true
+		return pw2 != nil // nil is less than non-nil
 	}
 	if pw2 == nil {
-		return false
+		return false // non-nil is not less than nil
 	}
 	w := *pw
 	w2 := *pw2
+
+	// First compare by version (IPv4 < IPv6)
 	if w.Version != w2.Version {
 		return w.Version < w2.Version
 	}
+
+	// Then compare by IP address bytes
 	for i, v := range w.IP {
+		if i >= len(w2.IP) {
+			return false // w is longer, so it's greater
+		}
 		v2 := w2.IP[i]
 		if v < v2 {
 			return true
 		}
+		if v > v2 {
+			return false
+		}
+		// if v == v2, continue to next byte
 	}
-	return false
+
+	// Handle case where w2.IP is longer than w.IP
+	if len(w.IP) < len(w2.IP) {
+		return true // w is shorter, so it's less
+	}
+
+	// IPs are equal, compare by mask length (more specific is "greater", so reverse comparison)
+	return w.Masklen() > w2.Masklen()
 }
 
 func IPLess(po1, po2 *net.IP) bool {
@@ -393,6 +443,7 @@ func (w *IPNetWrapper) Equal(w2 *IPNetWrapper) bool {
 }
 
 func NetworksEqual(s1, s2 []*IPNetWrapper) bool {
+	// Compare two slices of IPNetWrapper for equality, ignoring order
 	if s1 == nil && s2 == nil {
 		return true
 	}
@@ -402,17 +453,24 @@ func NetworksEqual(s1, s2 []*IPNetWrapper) bool {
 	if len(s1) != len(s2) {
 		return false
 	}
-	// Sort both slices
-	sort.Slice(s1, func(i, j int) bool {
-		return IPNetLess(s1[i], s1[j])
+
+	// Create copies to avoid modifying original slices
+	s1Copy := make([]*IPNetWrapper, len(s1))
+	s2Copy := make([]*IPNetWrapper, len(s2))
+	copy(s1Copy, s1)
+	copy(s2Copy, s2)
+
+	// Sort both copied slices
+	sort.Slice(s1Copy, func(i, j int) bool {
+		return IPNetLess(s1Copy[i], s1Copy[j])
 	})
-	sort.Slice(s2, func(i, j int) bool {
-		return IPNetLess(s2[i], s2[j])
+	sort.Slice(s2Copy, func(i, j int) bool {
+		return IPNetLess(s2Copy[i], s2Copy[j])
 	})
 
 	// Compare each element
-	for i := 0; i < len(s1); i++ {
-		if !s1[i].Equal(s2[i]) {
+	for i := 0; i < len(s1Copy); i++ {
+		if !s1Copy[i].Equal(s2Copy[i]) {
 			return false
 		}
 	}
@@ -430,17 +488,24 @@ func IPsEqual(s1, s2 []net.IP) bool {
 	if len(s1) != len(s2) {
 		return false
 	}
-	// Sort both slices
-	sort.Slice(s1, func(i, j int) bool {
-		return IPLess(&s1[i], &s1[j])
+
+	// Create copies to avoid modifying original slices
+	s1Copy := make([]net.IP, len(s1))
+	s2Copy := make([]net.IP, len(s2))
+	copy(s1Copy, s1)
+	copy(s2Copy, s2)
+
+	// Sort both copied slices
+	sort.Slice(s1Copy, func(i, j int) bool {
+		return IPLess(&s1Copy[i], &s1Copy[j])
 	})
-	sort.Slice(s2, func(i, j int) bool {
-		return IPLess(&s2[i], &s2[j])
+	sort.Slice(s2Copy, func(i, j int) bool {
+		return IPLess(&s2Copy[i], &s2Copy[j])
 	})
 
 	// Compare each element
-	for i := 0; i < len(s1); i++ {
-		if !s1[i].Equal(s2[i]) {
+	for i := 0; i < len(s1Copy); i++ {
+		if !s1Copy[i].Equal(s2Copy[i]) {
 			return false
 		}
 	}
