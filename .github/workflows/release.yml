@@ -39,6 +39,23 @@ jobs:
       with:
         go-version: '1.21'
 
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        if [ "${{ matrix.goarch }}" == "arm64" ]; then
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          # Download and compile libpcap for ARM64
+          wget https://www.tcpdump.org/release/libpcap-1.10.4.tar.gz
+          tar -xzf libpcap-1.10.4.tar.gz
+          cd libpcap-1.10.4
+          CC=aarch64-linux-gnu-gcc ./configure --host=aarch64-linux-gnu --prefix=/usr/local/aarch64-linux-gnu
+          make -j$(nproc)
+          sudo make install
+          cd ..
+        else
+          sudo apt-get install -y libpcap-dev
+        fi
+
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
@@ -72,7 +89,11 @@ jobs:
       env:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
-        CGO_ENABLED: 0
+        CGO_ENABLED: 1
+        CC: ${{ matrix.goarch == 'arm64' && 'aarch64-linux-gnu-gcc' || 'gcc' }}
+        PKG_CONFIG_PATH: ${{ matrix.goarch == 'arm64' && '/usr/local/aarch64-linux-gnu/lib/pkgconfig' || '' }}
+        CGO_CFLAGS: ${{ matrix.goarch == 'arm64' && '-I/usr/local/aarch64-linux-gnu/include' || '' }}
+        CGO_LDFLAGS: ${{ matrix.goarch == 'arm64' && '-L/usr/local/aarch64-linux-gnu/lib' || '' }}
       run: |
         BINARY_NAME="wg-panel"
         if [ "${{ matrix.goos }}" == "windows" ]; then
@@ -100,7 +121,7 @@ jobs:
         echo "ASSET_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ env.ASSET_NAME }}
         path: ${{ env.ASSET_PATH }}
@@ -125,7 +146,7 @@ jobs:
         fi
 
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: ./artifacts
 
