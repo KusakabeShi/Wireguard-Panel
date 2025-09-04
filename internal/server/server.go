@@ -125,7 +125,9 @@ func (s *Server) setupRoutes(
 				c.String(http.StatusNotFound, "File not found")
 				return
 			}
-			c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+			// Inject runtime configuration for index.html
+			html := s.injectRuntimeConfig(string(data))
+			c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 		})
 	} else {
 		s.engine.GET(sitePrefix, func(c *gin.Context) {
@@ -134,11 +136,13 @@ func (s *Server) setupRoutes(
 				c.String(http.StatusNotFound, "File not found")
 				return
 			}
-			c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+			// Inject runtime configuration for index.html
+			html := s.injectRuntimeConfig(string(data))
+			c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 		})
 	}
 
-	// Handle all other routes - serve static files or SPA fallback
+	// Handle all other routes - serve static files
 	s.engine.NoRoute(func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 
@@ -158,7 +162,7 @@ func (s *Server) setupRoutes(
 			}
 
 			// Try to serve static file from embedded filesystem
-			embedPath := "frontend/build/" + relativePath
+			embedPath := "frontend/build" + relativePath
 			if data, err := s.frontendFS.ReadFile(embedPath); err == nil {
 				// Determine content type based on file extension
 				contentType := "text/plain"
@@ -187,18 +191,43 @@ func (s *Server) setupRoutes(
 				c.Data(http.StatusOK, contentType, data)
 				return
 			}
-
-			// Fallback to index.html for SPA routing
-			// if data, err := s.frontendFS.ReadFile("frontend/build/index.html"); err == nil {
-			// 	c.Data(http.StatusOK, "text/html; charset=utf-8", data)
-			// } else {
-			// 	c.String(http.StatusNotFound, "File not found")
-			// }
-			// return
+			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+			return
 		}
 		// Not a frontend or API request
 		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 	})
+}
+
+func (s *Server) injectRuntimeConfig(html string) string {
+	// Only inject if this looks like HTML (contains <head> and <html>)
+	if !strings.Contains(html, "<html") || !strings.Contains(html, "<head>") {
+		return html
+	}
+
+	basePath := s.cfg.BasePath
+	if basePath != "/" && !strings.HasSuffix(basePath, "/") {
+		basePath += "/"
+	}
+
+	// Inject the API path configuration for JavaScript
+	runtimeScript := fmt.Sprintf(`
+<script>
+  window.RUNTIME_API_PATH = "%s";
+</script>`, s.cfg.BasePath+s.cfg.APIPrefix)
+
+	// Add base tag for static assets
+	baseTag := fmt.Sprintf(`<base href="%s">`, basePath)
+
+	// Insert the script before the closing </head> tag
+	result := strings.Replace(html, "</head>", runtimeScript+"\n</head>", 1)
+
+	// Add base tag after <head>
+	if !strings.Contains(result, "<base") {
+		result = strings.Replace(result, "<head>", "<head>\n  "+baseTag, 1)
+	}
+
+	return result
 }
 
 func CustomLogger(level logging.LogLevel) gin.HandlerFunc {

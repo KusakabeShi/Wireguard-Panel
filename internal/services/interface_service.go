@@ -30,8 +30,8 @@ func NewInterfaceService(cfg *config.Config, wgService *WireGuardService) *Inter
 
 func (s *InterfaceService) CreateInterface(req InterfaceCreateRequest) (*models.Interface, error) {
 	// Validate ifname
-	if !utils.IsValidIfname(req.Ifname) {
-		return nil, fmt.Errorf("invalid ifname: must match ^[A-Za-z0-9_-]{1,12}$")
+	if err := utils.IsValidIfname(s.cfg.WgIfPrefix, req.Ifname); err != nil {
+		return nil, err
 	}
 
 	// Check if ifname already exists in configuration
@@ -157,8 +157,8 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 
 	// Update fields
 	if req.Ifname != "" && req.Ifname != iface.Ifname {
-		if !utils.IsValidIfname(req.Ifname) {
-			return nil, fmt.Errorf("invalid ifname: must match ^[A-Za-z0-9_-]{1,12}$")
+		if err := utils.IsValidIfname(s.cfg.WgIfPrefix, req.Ifname); err != nil {
+			return nil, err
 		}
 		// Check if new ifname already exists in configuration
 		for _, otherIface := range s.cfg.GetAllInterfaces() {

@@ -490,7 +490,7 @@ func (s *ServerService) validateSingleServerNetworkConfig(af int, iface *models.
 
 	// 5. Validate SNAT configuration
 	if cfg.Snat != nil && cfg.Snat.Enabled {
-		if err := s.validateSnatConfiguration(af, network, cfg.Snat); err != nil {
+		if err := s.validateSnatConfiguration(af, network, cfg.Snat, excludeServerID); err != nil {
 			return fmt.Errorf("SNAT validation failed: %v", err)
 		}
 	}
@@ -541,7 +541,7 @@ func (s *ServerService) validateRoutedNetworksOverlap(af int, routedNetworks []s
 	return nil
 }
 
-func (s *ServerService) validateSnatConfiguration(af int, serverNetwork *models.IPNetWrapper, snat *SnatConfigRequest) error {
+func (s *ServerService) validateSnatConfiguration(af int, serverNetwork *models.IPNetWrapper, snat *SnatConfigRequest, excludeServerID *string) error {
 	isRoaming := false
 	snatmode := ""
 	if snat.RoamingMasterInterface != nil && len(*snat.RoamingMasterInterface) > 0 {
@@ -604,6 +604,18 @@ func (s *ServerService) validateSnatConfiguration(af int, serverNetwork *models.
 	}
 	if snat.RoamingPseudoBridge && (snatmode != "NETMAP") {
 		return fmt.Errorf("RoamingPseudoBridge can only works in NETMAP mode instead of %s mode", snatmode)
+	}
+	if isRoaming && snatmode == "NETMAP" {
+		var snatNet *models.IPNetWrapper
+		switch af {
+		case 4:
+			snatNet, _ = models.ParseCIDRFromIPAf(4, snat.SnatIPNet)
+		case 6:
+			snatNet, _ = models.ParseCIDRFromIPAf(6, snat.SnatIPNet)
+		}
+		if err := s.cfg.CheckSnatOffsetOverlapsInRoamingMasterInterface(*snat.RoamingMasterInterface, snatNet, excludeServerID); err != nil {
+			return err
+		}
 	}
 
 	return nil

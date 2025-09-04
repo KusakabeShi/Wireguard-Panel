@@ -26,9 +26,16 @@ func TestGetNetByOffset(t *testing.T) {
 			expected: "192.168.0.0/16",
 		},
 		{
+			name:        "IPv4 zero offset same mask2",
+			base:        "192.168.0.0/16",
+			offset:      "0.0.0.1/16",
+			expectError: true,
+			expected:    "same size of network and offset, offset IP must be zero",
+		},
+		{
 			name:        "IPv4 offset exceeds base network",
 			base:        "192.168.0.0/16",
-			offset:      "1.0.0.0/24",
+			offset:      "0.1.0.0/24",
 			expectError: true,
 			errorMsg:    "exceeds allowed range",
 		},
@@ -37,13 +44,26 @@ func TestGetNetByOffset(t *testing.T) {
 			base:        "192.168.0.0/24",
 			offset:      "10.0.0.0/16",
 			expectError: true,
-			errorMsg:    "offset masklen is smaller than original masklen",
+			errorMsg:    "must <= basenet block siz",
 		},
 		{
 			name:     "IPv6 valid offset within range",
 			base:     "2001:db8::/32",
 			offset:   "0:0:1::/64",
 			expected: "2001:db8:1::/64",
+		},
+		{
+			name:     "IPv6 valid offset within range",
+			base:     "2001:db8::/64",
+			offset:   "0:0:0:0:8000::/65",
+			expected: "2001:db8:0:0:8000::/65",
+		},
+		{
+			name:        "IPv6 valid offset within range",
+			base:        "2001:db8::/64",
+			offset:      "0:0:0:1::/65",
+			expectError: true,
+			errorMsg:    "exceeds allowed range for base network",
 		},
 		{
 			name:     "IPv6 zero offset same mask",
@@ -105,7 +125,7 @@ func TestGetNetByOffset(t *testing.T) {
 				t.Fatalf("Failed to parse offset CIDR %s: %v", tt.offset, err)
 			}
 
-			result, err := base.GetNetByOffset(offset)
+			result, err := base.GetSubnetByOffset(offset)
 
 			if tt.expectError {
 				if err == nil {
@@ -130,8 +150,8 @@ func TestGetNetByOffsetNilCases(t *testing.T) {
 	t.Run("Nil base network", func(t *testing.T) {
 		var base *IPNetWrapper = nil
 		offset, _ := ParseCIDR("10.0.0.0/24")
-		
-		result, err := base.GetNetByOffset(offset)
+
+		result, err := base.GetSubnetByOffset(offset)
 		if err == nil {
 			t.Errorf("Expected error for nil base, got result: %v", result)
 		}
@@ -142,8 +162,8 @@ func TestGetNetByOffsetNilCases(t *testing.T) {
 
 	t.Run("Nil offset returns base", func(t *testing.T) {
 		base, _ := ParseCIDR("192.168.0.0/16")
-		
-		result, err := base.GetNetByOffset(nil)
+
+		result, err := base.GetSubnetByOffset(nil)
 		if err != nil {
 			t.Errorf("Expected no error for nil offset, got: %v", err)
 		}
@@ -155,8 +175,8 @@ func TestGetNetByOffsetNilCases(t *testing.T) {
 
 // Helper function to check if string contains substring
 func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || 
-		(len(s) > len(substr) && 
+	return len(s) >= len(substr) && (s == substr ||
+		(len(s) > len(substr) &&
 			(findSubstring(s, substr) != -1)))
 }
 

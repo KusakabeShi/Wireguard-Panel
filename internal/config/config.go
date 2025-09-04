@@ -23,6 +23,7 @@ type Session struct {
 type Config struct {
 	ConfigPath          string                       `json:"-"`
 	WireGuardConfigPath string                       `json:"wireguardConfigPath"`
+	WgIfPrefix          string                       `json:"wgIfPrefix"`
 	LogLevel            logging.LogLevel             `json:"logLevel"`
 	User                string                       `json:"user"`
 	Password            string                       `json:"password"`
@@ -252,6 +253,75 @@ func (c *Config) CheckNetworkOverlapsInVRF(vrfName *string, skipedIfaceID *strin
 			}
 		}
 
+	}
+	return nil
+}
+
+func (c *Config) CheckSnatOffsetOverlapsInRoamingMasterInterface(ifname string, offset *models.IPNetWrapper, excludeServerID *string) error {
+	if offset == nil {
+		return nil
+	}
+	var ifaceNetwork *models.IPNetWrapper
+	af := offset.Version
+	var aflen int
+	if ipv4, ipv6, err := utils.GetInterfaceIP(ifname); err != nil {
+		return fmt.Errorf("failed to get interface %v IP address for SNAT roaming: %v", ifname, err)
+	} else {
+		switch af {
+		case 4:
+			ifaceNetwork = ipv4
+			aflen = 32
+		case 6:
+			ifaceNetwork = ipv6
+			aflen = 128
+		default:
+			return fmt.Errorf("invalid IP version %v for SNAT roaming", af)
+		}
+	}
+	if ifaceNetwork == nil {
+		return fmt.Errorf("no IP address found on interface %v for SNAT roaming", ifname)
+	}
+
+	if ifaceNetwork.Masklen() < offset.Masklen() {
+		return fmt.Errorf("invalid SNAT offset %v, it exceeds the size of the network %v on interface %v ", offset, ifaceNetwork.Network(), ifname)
+	}
+	//check offser ip part
+	if offset.IpExceed2PowerN(ifaceNetwork.Masklen()) {
+		return fmt.Errorf("offset: %s exceeds the range of the netowrk: %s detected from interface: %v", offset, ifaceNetwork.NetworkStr(), ifname)
+	}
+
+	// Verify that the offset network's base IP is properly aligned for its mask
+	if !offset.IsHostbitAllZero() {
+		return fmt.Errorf("non-zero host bits: offset %s is not properly aligned for its mask", offset.String())
+	}
+
+	for _, iface := range c.GetAllInterfaces() {
+		// Check for network overlaps among child servers
+		for _, server := range iface.Servers {
+			if excludeServerID != nil && server.ID == *excludeServerID {
+				continue
+			}
+			var snatconf *models.SnatConfig
+			switch af {
+			case 4:
+				if server.IPv4 != nil {
+					snatconf = server.IPv4.Snat
+				}
+			case 6:
+				if server.IPv6 != nil {
+					snatconf = server.IPv6.Snat
+				}
+			}
+			if snatconf == nil || !snatconf.Enabled ||
+				snatconf.SnatIPNet == nil || snatconf.SnatIPNet.Masklen() != aflen ||
+				snatconf.RoamingMasterInterface == nil || *snatconf.RoamingMasterInterface != ifname {
+				continue
+			}
+			// Check for overlap
+			if offset.IsOverlap(snatconf.SnatIPNet) {
+				return fmt.Errorf("SNAT offset %v is overlapped with SNAT roaming address %v at server %v in interface %v", offset, snatconf.SnatIPNet, server.Name, iface.Ifname)
+			}
+		}
 	}
 	return nil
 }

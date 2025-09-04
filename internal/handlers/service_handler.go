@@ -29,6 +29,7 @@ func (h *ServiceHandler) GetServiceConfig(c *gin.Context) {
 		"listenPort":          h.cfg.ListenPort,
 		"siteUrlPrefix":       h.cfg.BasePath,
 		"apiPrefix":           h.cfg.APIPrefix,
+		"wgIfPrefix":          h.cfg.WgIfPrefix,
 	}
 
 	c.JSON(http.StatusOK, response)

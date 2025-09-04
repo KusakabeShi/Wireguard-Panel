@@ -1,9 +1,12 @@
-const API_BASE_URL = '/api';
-
 class ApiService {
+  getApiBaseUrl() {
+    // Use injected runtime configuration, fallback to default
+    return window.RUNTIME_API_PATH || './api';
+  }
+
   async request(endpoint, options = {}) {
     // debugger; // Uncomment this line to break here in any browser debugger
-    const url = `${API_BASE_URL}${endpoint}`;
+    const url = `${this.getApiBaseUrl()}${endpoint}`;
     const config = {
       credentials: 'include',
       headers: {

@@ -1,8 +1,11 @@
-const API_BASE_URL = '/api';
-
 class AuthService {
+  getApiBaseUrl() {
+    // Use injected runtime configuration, fallback to default
+    return window.RUNTIME_API_PATH || './api';
+  }
+
   async login(username, password) {
-    const response = await fetch(`${API_BASE_URL}/service/login`, {
+    const response = await fetch(`${this.getApiBaseUrl()}/service/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -19,7 +22,7 @@ class AuthService {
   }
 
   async logout() {
-    const response = await fetch(`${API_BASE_URL}/service/logout`, {
+    const response = await fetch(`${this.getApiBaseUrl()}/service/logout`, {
       method: 'POST',
       credentials: 'include',
     });
@@ -32,7 +35,7 @@ class AuthService {
   }
 
   async getServiceConfig() {
-    const response = await fetch(`${API_BASE_URL}/service/config`, {
+    const response = await fetch(`${this.getApiBaseUrl()}/service/config`, {
       credentials: 'include',
     });
 
@@ -44,7 +47,7 @@ class AuthService {
   }
 
   async setServicePassword(password) {
-    const response = await fetch(`${API_BASE_URL}/service/password`, {
+    const response = await fetch(`${this.getApiBaseUrl()}/service/password`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

@@ -95,6 +95,7 @@ func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, e
 
 		cfg := &config.Config{
 			WireGuardConfigPath: "/etc/wireguard",
+			WgIfPrefix:          "wg-",
 			LogLevel:            logging.LogLevelInfo,
 			User:                "admin",
 			Password:            string(hashedPassword),

@@ -5,6 +5,7 @@ import (
 	"net"
 	"regexp"
 	"sort"
+	"strings"
 	"syscall"
 	"unicode/utf8"
 	"wg-panel/internal/models"
@@ -56,6 +57,10 @@ func GetInterfaceIP(ifname string) (*models.IPNetWrapper, *models.IPNetWrapper, 
 			IP:      v4s[0].IP,
 			BaseNet: *v4s[0].IPNet,
 		}
+		bestV4.BaseNet = net.IPNet{
+			IP:   bestV4.BaseNet.IP.Mask(bestV4.BaseNet.Mask),
+			Mask: bestV4.BaseNet.Mask,
+		}
 	}
 	if len(v6s) > 0 {
 		sort.Slice(v6s, func(i, j int) bool { return better(v6s[i], v6s[j]) })
@@ -63,6 +68,10 @@ func GetInterfaceIP(ifname string) (*models.IPNetWrapper, *models.IPNetWrapper, 
 			Version: 6,
 			IP:      v6s[0].IP,
 			BaseNet: *v6s[0].IPNet,
+		}
+		bestV6.BaseNet = net.IPNet{
+			IP:   bestV6.BaseNet.IP.Mask(bestV6.BaseNet.Mask),
+			Mask: bestV6.BaseNet.Mask,
 		}
 	}
 
@@ -125,17 +134,17 @@ func comparePrefix(a, b netlink.Addr) int {
 		// IPv6 priority: [64~48] > (48,32] > [124~64) > (32~0] > [128>124)
 		aPriority := getIPv6Priority(aLen)
 		bPriority := getIPv6Priority(bLen)
-		
+
 		if aPriority != bPriority {
 			return aPriority - bPriority
 		}
-		
+
 		// Same priority group, apply group-specific sorting
 		if aPriority == 1 || aPriority == 3 || aPriority == 5 {
 			// Groups 1, 3, 5: bigger better (smaller mask length)
 			return aLen - bLen
 		} else {
-			// Groups 2, 4: smaller better (larger mask length) 
+			// Groups 2, 4: smaller better (larger mask length)
 			return bLen - aLen
 		}
 	} else {
@@ -166,7 +175,7 @@ func getIPv6Priority(maskLen int) int {
 		return 2 // (32,48) - smaller better (/47 > /40 > /33)
 	}
 	if maskLen > 64 && maskLen <= 124 {
-		return 3 // (64,124] - bigger better (/65 > /80 > /124)  
+		return 3 // (64,124] - bigger better (/65 > /80 > /124)
 	}
 	if maskLen >= 0 && maskLen <= 32 {
 		return 4 // [0,32] - smaller better (/24 > /16 > /8)
@@ -243,10 +252,19 @@ func isULA(ip net.IP) bool {
 }
 
 // isValidIfName checks whether the input string is a valid Linux interface name.
-var ifNameRegexp = regexp.MustCompile("^[A-Za-z0-9_-]{1,12}$")
+var ifNameRegexp = regexp.MustCompile("^[A-Za-z0-9_-]{1,15}$")
 
-func IsValidIfname(ifname string) bool {
-	return ifNameRegexp.MatchString(ifname)
+func IsValidIfname(prefix, ifname string) error {
+	if !strings.HasPrefix(ifname, prefix) {
+		return fmt.Errorf("interface name must start with prefix %q", prefix)
+	}
+	if len(ifname) > 15 {
+		return fmt.Errorf("interface name %q is too long: got %d characters, max allowed is 15", ifname, len(ifname))
+	}
+	if !ifNameRegexp.MatchString(ifname) {
+		return fmt.Errorf("interface name %q contains invalid characters: allowed are letters, digits, '_', '-'", ifname)
+	}
+	return nil
 }
 
 var allowedIfNameChars = regexp.MustCompile(`^[A-Za-z0-9._@-]+$`)

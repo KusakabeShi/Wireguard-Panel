@@ -312,7 +312,7 @@ func (l *InterfaceIPNetListener) getSimulatedConfig(config *models.ServerNetwork
 		return nil, fmt.Errorf("interface %v has no IP for version %v", l.interfaceName, config.Network.Version)
 	}
 
-	target_network, err := l.ifIPs[config.Network.Version].GetNetByOffset(config.Snat.SnatIPNet)
+	target_network, err := l.ifIPs[config.Network.Version].GetSubnetByOffset(config.Snat.SnatIPNet)
 
 	if err != nil {
 		return nil, fmt.Errorf("error get target_network, err: %v", err)

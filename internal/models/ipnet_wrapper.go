@@ -46,17 +46,17 @@ func ParseCIDR(cidr string) (*IPNetWrapper, error) {
 	}, nil
 }
 
-func (w *IPNetWrapper) EqualZero(af int) bool {
-	if w == nil {
+func (basenet *IPNetWrapper) EqualZero(af int) bool {
+	if basenet == nil {
 		return false
 	}
 	if af == 4 {
 		zerov4, _ := ParseCIDR("0.0.0.0/32")
-		return w.Equal(zerov4)
+		return basenet.Equal(zerov4)
 	}
 	if af == 6 {
 		zerov6, _ := ParseCIDR("::/128")
-		return w.Equal(zerov6)
+		return basenet.Equal(zerov6)
 	}
 	return false
 }
@@ -99,16 +99,16 @@ func ParseCIDRFromIPAf(af int, cidr string) (ipnet *IPNetWrapper, err error) {
 	return
 }
 
-func (w IPNetWrapper) String() string {
-	masklen := w.Masklen()
-	return w.IP.String() + "/" + strconv.Itoa(masklen)
+func (basenet IPNetWrapper) String() string {
+	masklen := basenet.Masklen()
+	return basenet.IP.String() + "/" + strconv.Itoa(masklen)
 }
 
-func (w IPNetWrapper) MarshalJSON() ([]byte, error) {
-	return json.Marshal(w.String())
+func (basenet IPNetWrapper) MarshalJSON() ([]byte, error) {
+	return json.Marshal(basenet.String())
 }
 
-func (w *IPNetWrapper) UnmarshalJSON(data []byte) error {
+func (basenet *IPNetWrapper) UnmarshalJSON(data []byte) error {
 	var cidr string
 	if err := json.Unmarshal(data, &cidr); err != nil {
 		return err
@@ -118,46 +118,46 @@ func (w *IPNetWrapper) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	w.Version = IPNet.Version
-	w.IP = IPNet.IP
-	w.BaseNet = IPNet.BaseNet
+	basenet.Version = IPNet.Version
+	basenet.IP = IPNet.IP
+	basenet.BaseNet = IPNet.BaseNet
 
 	return nil
 }
 
-func (w IPNetWrapper) Masklen() int {
-	masklen, _ := w.BaseNet.Mask.Size()
+func (basenet IPNetWrapper) Masklen() int {
+	masklen, _ := basenet.BaseNet.Mask.Size()
 	return masklen
 }
 
-func (w IPNetWrapper) NetworkStr() string {
-	return w.BaseNet.String()
+func (basenet IPNetWrapper) NetworkStr() string {
+	return basenet.BaseNet.String()
 }
 
-func (w IPNetWrapper) Network() IPNetWrapper {
+func (basenet IPNetWrapper) Network() IPNetWrapper {
 	return IPNetWrapper{
-		Version: w.Version,
-		IP:      w.BaseNet.IP,
-		BaseNet: w.BaseNet,
+		Version: basenet.Version,
+		IP:      basenet.BaseNet.IP,
+		BaseNet: basenet.BaseNet,
 	}
 }
 
-func (w *IPNetWrapper) Contains(ip net.IP) bool {
-	if w == nil {
+func (basenet *IPNetWrapper) Contains(ip net.IP) bool {
+	if basenet == nil {
 		return false
 	}
-	return w.BaseNet.Contains(ip)
+	return basenet.BaseNet.Contains(ip)
 }
 
-func (w *IPNetWrapper) GetOffset() (IPWrapper, error) {
-	if w == nil {
+func (basenet *IPNetWrapper) GetOffset() (IPWrapper, error) {
+	if basenet == nil {
 		return IPWrapper{}, fmt.Errorf("IPNetWrapper is nil")
 	}
-	if !w.BaseNet.Contains(w.IP) {
-		return IPWrapper{}, fmt.Errorf("IP: %v exceeds the network range: %v", w.IP, w.BaseNet)
+	if !basenet.BaseNet.Contains(basenet.IP) {
+		return IPWrapper{}, fmt.Errorf("IP: %v exceeds the network range: %v", basenet.IP, basenet.BaseNet)
 	}
-	mask := w.BaseNet.Mask
-	tip := w.IP
+	mask := basenet.BaseNet.Mask
+	tip := basenet.IP
 	networkIP := tip.Mask(mask)
 
 	offset := make(IPWrapper, len(tip))
@@ -167,21 +167,21 @@ func (w *IPNetWrapper) GetOffset() (IPWrapper, error) {
 	return offset, nil
 }
 
-func (w *IPNetWrapper) CheckOffsetValid(offset IPWrapper) error {
-	if w == nil {
+func (basenet *IPNetWrapper) CheckOffsetValid(offset IPWrapper) error {
+	if basenet == nil {
 		return fmt.Errorf("base ipnet is nil")
 	}
 	// Normalize offset length to match w.IP
-	if len(w.IP) == 4 && len(offset) == 16 {
+	if len(basenet.IP) == 4 && len(offset) == 16 {
 		offset = offset.To4()
-	} else if len(w.IP) == 16 && len(offset) == 4 {
+	} else if len(basenet.IP) == 16 && len(offset) == 4 {
 		offset = offset.To16()
 	}
-	if offset == nil || len(w.IP) != len(offset) {
-		return fmt.Errorf("IP:%v and offset:%v length mismatch", w.IP, offset)
+	if offset == nil || len(basenet.IP) != len(offset) {
+		return fmt.Errorf("IP:%v and offset:%v length mismatch", basenet.IP, offset)
 	}
 	// Check if offset exceeds the max value based on the mask
-	mask := w.BaseNet.Mask
+	mask := basenet.BaseNet.Mask
 	masklen, bits := mask.Size()
 	if masklen < 0 || bits < 0 {
 		return fmt.Errorf("invalid mask: %v", mask)
@@ -195,99 +195,100 @@ func (w *IPNetWrapper) CheckOffsetValid(offset IPWrapper) error {
 	return nil
 }
 
-func (w *IPNetWrapper) GetByOffset(offset IPWrapper) (*IPNetWrapper, error) {
+func (basenet *IPNetWrapper) GetByOffset(offset IPWrapper) (*IPNetWrapper, error) {
 	// Normalize offset length to match w.IP
-	if w == nil {
+	if basenet == nil {
 		return nil, fmt.Errorf("base ipnet is nil")
 	}
-	if len(w.IP) == 4 && len(offset) == 16 {
+	if len(basenet.IP) == 4 && len(offset) == 16 {
 		offset = offset.To4()
-	} else if len(w.IP) == 16 && len(offset) == 4 {
+	} else if len(basenet.IP) == 16 && len(offset) == 4 {
 		offset = offset.To16()
 	}
-	if offset == nil || len(w.IP) != len(offset) {
-		return nil, fmt.Errorf("IP:%v and offset:%v length mismatch", w.IP, offset)
+	if offset == nil || len(basenet.IP) != len(offset) {
+		return nil, fmt.Errorf("IP:%v and offset:%v length mismatch", basenet.IP, offset)
 	}
 
 	// Check if offset exceeds the max value based on the mask
-	err := w.CheckOffsetValid(offset)
+	err := basenet.CheckOffsetValid(offset)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make(net.IP, len(w.IP))
-	for i := 0; i < len(w.IP); i++ {
-		result[i] = w.BaseNet.IP[i] | offset[i]
+	result := make(net.IP, len(basenet.IP))
+	for i := 0; i < len(basenet.IP); i++ {
+		result[i] = basenet.BaseNet.IP[i] | offset[i]
 	}
 	return &IPNetWrapper{
-		Version: w.Version,
+		Version: basenet.Version,
 		IP:      result,
-		BaseNet: w.BaseNet,
+		BaseNet: basenet.BaseNet,
 	}, nil
 }
 
-func (w *IPNetWrapper) GetNetByOffset(offset *IPNetWrapper) (*IPNetWrapper, error) {
+func (offset *IPNetWrapper) IpExceed2PowerN(powern int) bool {
+	var totalBits int
+	if offset.Version == 4 {
+		totalBits = 32
+	} else {
+		totalBits = 128
+	}
+
+	// Create mask that allows only the offset bits to be set
+	offsetMask := net.CIDRMask(powern, totalBits)
+
+	// Check if offset.IP has any bits set outside the allowed range
+	for i := 0; i < len(offset.IP); i++ {
+		if i < len(offsetMask) && (offset.IP[i]&offsetMask[i]) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (offset *IPNetWrapper) IsHostbitAllZero() bool {
+	offsetMask := net.CIDRMask(offset.Masklen(), len(offset.IP)*8)
+	return offset.IP.Equal(offset.IP.Mask(offsetMask))
+}
+
+func (basenet *IPNetWrapper) GetSubnetByOffset(offset *IPNetWrapper) (*IPNetWrapper, error) {
 	// Get smaller block of networks from w based on offset.
 	// Example: w= 2a0d:3a87::/64. offset= ::980d:0/112, returns 2a0d:3a87::980d:0/112
 	// Raise error if offset is not aligned, like w= 2a0d:3a87::/64. offset= ::980d:0/96, returns 2a0d:3a87::980d:0/96 but 2a0d:3a87::980d:0/96 is not a valid base network
-	if w == nil {
+	if basenet == nil {
 		return nil, fmt.Errorf("w is nil")
 	}
 	if offset == nil {
-		return w, nil
+		return basenet, nil
 	}
-	if w.Version != offset.Version {
-		return nil, fmt.Errorf("w and offset in different address family")
+	if basenet.Version != offset.Version {
+		return nil, fmt.Errorf("basenet and offset in different address family")
 	}
-	if offset.Masklen() < w.Masklen() {
-		return nil, fmt.Errorf("offset masklen is smaller than original masklen")
+	if offset.Masklen() < basenet.Masklen() {
+		return nil, fmt.Errorf("offset block size(/%v) must <= basenet block size(/%v)", offset.Masklen(), basenet.Masklen())
 	}
-	if offset.Masklen() == w.Masklen() {
+	if offset.Masklen() == basenet.Masklen() {
 		if !offset.IP.IsUnspecified() {
 			return nil, fmt.Errorf("same size of network and offset, offset IP must be zero")
 		}
-		return w, nil
+		return basenet, nil
 	}
 
-	max_offset_bits := offset.Masklen() - w.Masklen()
 	// offset.IP must not exceed the available host bits in the base network
-	// for ipv4: if base is /16 and offset is /24, max_offset_bits = 8, offset.IP must be in 0.0.0.0~0.0.255.0
-	// for ipv6: if base is /64 and offset is /96, max_offset_bits = 32, offset.IP must be in ::~::ffff:ffff:0
-	
-	if max_offset_bits > 0 {
-		// Create a mask for the allowed offset bits
-		var totalBits int
-		if offset.Version == 4 {
-			totalBits = 32
-		} else {
-			totalBits = 128
-		}
-		
-		// Create mask that allows only the offset bits to be set
-		offsetMask := net.CIDRMask(w.Masklen(), totalBits)
-		
-		// Check if offset.IP has any bits set outside the allowed range
-		for i := 0; i < len(offset.IP); i++ {
-			if i < len(offsetMask) && (offset.IP[i] & offsetMask[i]) != 0 {
-				return nil, fmt.Errorf("offset IP %s exceeds allowed range for base network %s", 
-					offset.IP.String(), w.BaseNet.String())
-			}
-		}
-	}
+	// for ipv4: if base is /16 and offset is /24, offset.IP must be in 0.0.0.0~0.0.255.0
+	// for ipv6: if base is /64 and offset is /96, offset.IP must be in ::~::ffff:ffff:0
 
-	// Check that offset network is properly aligned within the base network
-	err := w.CheckOffsetValid(IPWrapper(offset.IP))
-	if err != nil {
-		return nil, fmt.Errorf("offset network not valid within base network: %v", err)
+	// Create a mask for the allowed offset bits
+	if offset.IpExceed2PowerN(basenet.Masklen()) {
+		return nil, fmt.Errorf("offset %s exceeds allowed range for base network %s", offset, basenet.BaseNet.String())
 	}
 
 	// Verify that the offset network's base IP is properly aligned for its mask
-	offsetMask := net.CIDRMask(offset.Masklen(), len(offset.IP)*8)
-	if !offset.IP.Equal(offset.IP.Mask(offsetMask)) {
-		return nil, fmt.Errorf("offset network %s is not properly aligned for its mask", offset.String())
+	if !offset.IsHostbitAllZero() {
+		return nil, fmt.Errorf("non-zero host bits: offset %s is not properly aligned for its mask", offset.String())
 	}
 
-	new_IP, err := w.GetByOffset(IPWrapper(offset.IP))
+	new_IP, err := basenet.GetByOffset(IPWrapper(offset.IP))
 	if err != nil {
 		return nil, err
 	}
@@ -301,8 +302,8 @@ func (w *IPNetWrapper) GetNetByOffset(offset *IPNetWrapper) (*IPNetWrapper, erro
 	resultIP := new_IP.IP.Mask(mask)
 
 	// Verify the result is within the original network bounds
-	if !w.BaseNet.Contains(resultIP) {
-		return nil, fmt.Errorf("resulting network %s/%d exceeds original network bounds %s", resultIP, offset.Masklen(), w.BaseNet.String())
+	if !basenet.BaseNet.Contains(resultIP) {
+		return nil, fmt.Errorf("resulting network %s/%d exceeds original network bounds %s", resultIP, offset.Masklen(), basenet.BaseNet.String())
 	}
 
 	return &IPNetWrapper{
@@ -315,14 +316,14 @@ func (w *IPNetWrapper) GetNetByOffset(offset *IPNetWrapper) (*IPNetWrapper, erro
 	}, nil
 }
 
-func (w *IPNetWrapper) IsOverlap(w2 *IPNetWrapper) bool {
-	if w == nil || w2 == nil {
+func (basenet *IPNetWrapper) IsOverlap(w2 *IPNetWrapper) bool {
+	if basenet == nil || w2 == nil {
 		return false
 	}
-	if w.Version != w2.Version {
+	if basenet.Version != w2.Version {
 		return false
 	}
-	return w.BaseNet.Contains(w2.BaseNet.IP) || w2.BaseNet.Contains(w.BaseNet.IP)
+	return basenet.BaseNet.Contains(w2.BaseNet.IP) || w2.BaseNet.Contains(basenet.BaseNet.IP)
 }
 
 func IPNetLess(pw, pw2 *IPNetWrapper) bool {
@@ -420,23 +421,23 @@ func IncrementIP2Power(ip net.IP, power int) net.IP {
 	return net.IP(result[len(result)-ipLen:])
 }
 
-func (w *IPNetWrapper) Equal(w2 *IPNetWrapper) bool {
-	if w == nil && w2 == nil {
+func (basenet *IPNetWrapper) Equal(w2 *IPNetWrapper) bool {
+	if basenet == nil && w2 == nil {
 		return true
 	}
-	if w == nil || w2 == nil {
+	if basenet == nil || w2 == nil {
 		return false
 	}
-	if w.Version != w2.Version {
+	if basenet.Version != w2.Version {
 		return false
 	}
-	if !w.IP.Equal(w2.IP) {
+	if !basenet.IP.Equal(w2.IP) {
 		return false
 	}
-	if !w.BaseNet.IP.Equal(w2.BaseNet.IP) {
+	if !basenet.BaseNet.IP.Equal(w2.BaseNet.IP) {
 		return false
 	}
-	if w.Masklen() != w2.Masklen() {
+	if basenet.Masklen() != w2.Masklen() {
 		return false
 	}
 	return true

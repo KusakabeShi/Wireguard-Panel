@@ -33,6 +33,7 @@ function AppContent() {
   const [interfaces, setInterfaces] = useState([]);
   const [selectedInterface, setSelectedInterface] = useState(null);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   
   // Dialog states
   const [interfaceDialog, setInterfaceDialog] = useState({ open: false, interface: null });
@@ -289,6 +290,8 @@ function AppContent() {
           selectedInterface={selectedInterface}
           onInterfaceSelect={setSelectedInterface}
           onAddInterface={handleAddInterface}
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
         />
         
         <MainContent

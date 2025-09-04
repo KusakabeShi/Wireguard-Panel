@@ -9,6 +9,7 @@ import {
   Box,
   Alert
 } from '@mui/material';
+import apiService from '../../services/apiService';
 
 const InterfaceDialog = ({ 
   open, 
@@ -31,8 +32,19 @@ const InterfaceDialog = ({
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
+  const [serviceConfig, setServiceConfig] = useState(null);
+  const [validationError, setValidationError] = useState('');
 
   const isEdit = Boolean(interface_);
+
+  // Fetch service configuration when dialog opens
+  useEffect(() => {
+    if (open && !serviceConfig) {
+      apiService.getServiceConfig()
+        .then(config => setServiceConfig(config))
+        .catch(err => console.error('Failed to fetch service config:', err));
+    }
+  }, [open, serviceConfig]);
 
   useEffect(() => {
     if (open && interface_) {
@@ -48,6 +60,7 @@ const InterfaceDialog = ({
       });
       setIsEnabled(interface_.enabled || false);
       setError('');
+      setValidationError('');
     } else if (open && !interface_) {
       // New interface
       setFormData({
@@ -61,19 +74,43 @@ const InterfaceDialog = ({
       });
       setIsEnabled(false);
       setError('');
+      setValidationError('');
     }
   }, [interface_, open]);
 
+  const validateInterfaceName = (name) => {
+    if (!serviceConfig || !serviceConfig.wgIfPrefix) return '';
+    
+    if (name && !name.startsWith(serviceConfig.wgIfPrefix)) {
+      return `Interface name must start with "${serviceConfig.wgIfPrefix}"`;
+    }
+    return '';
+  };
+
   const handleChange = (field) => (event) => {
+    const value = event.target.value;
     setFormData(prev => ({
       ...prev,
-      [field]: event.target.value
+      [field]: value
     }));
+
+    // Validate interface name if it's the ifname field
+    if (field === 'ifname') {
+      setValidationError(validateInterfaceName(value));
+    }
   };
 
   const handleSave = async () => {
     setError('');
     setLoading(true);
+
+    // Check validation first
+    const nameValidationError = validateInterfaceName(formData.ifname);
+    if (nameValidationError) {
+      setValidationError(nameValidationError);
+      setLoading(false);
+      return;
+    }
 
     try {
       const data = {
@@ -157,6 +194,8 @@ const InterfaceDialog = ({
             required
             fullWidth
             variant="outlined"
+            error={!!validationError}
+            helperText={validationError || ""}
           />
           
           <TextField

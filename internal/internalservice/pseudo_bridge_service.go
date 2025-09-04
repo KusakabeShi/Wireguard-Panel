@@ -251,7 +251,7 @@ func (r *InterfaceResponder) setupWorkingNets() {
 	r.workingNetworks.V6Networks = r.networks.V6Networks
 	if r.ipv4Base != nil {
 		for _, v4offset := range r.networks.V4Offsets {
-			newnet, err := r.ipv4Base.GetNetByOffset(v4offset)
+			newnet, err := r.ipv4Base.GetSubnetByOffset(v4offset)
 			if err != nil {
 				logging.LogError("Failed to get IPv4 net by offset: %v from base: %v, err: %v", v4offset, r.ipv4Base, err)
 				continue
@@ -261,7 +261,7 @@ func (r *InterfaceResponder) setupWorkingNets() {
 	}
 	if r.ipv6Base != nil {
 		for _, v6offset := range r.networks.V6Offsets {
-			newnet, err := r.ipv6Base.GetNetByOffset(v6offset)
+			newnet, err := r.ipv6Base.GetSubnetByOffset(v6offset)
 			if err != nil {
 				logging.LogError("Failed to get IPv6 net by offset: %v from base: %v, err: %v", v6offset, r.ipv6Base, err)
 				continue
