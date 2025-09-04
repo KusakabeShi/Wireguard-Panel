@@ -59,14 +59,14 @@ func (s *ClientService) CreateClient(interfaceID, serverID string, req ClientCre
 		privateKey = *req.PrivateKey
 		publicKey, err = utils.PrivToPublic(privateKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to derive public key: %v", err)
+			return nil, fmt.Errorf("failed to derive public key:-> %v", err)
 		}
 	} else if req.PublicKey != nil && *req.PublicKey != "" {
 		publicKey = *req.PublicKey
 	} else {
 		privateKey, publicKey, err = utils.GenerateWGKeyPair()
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate keypair: %v", err)
+			return nil, fmt.Errorf("failed to generate keypair:-> %v", err)
 		}
 	}
 
@@ -87,13 +87,13 @@ func (s *ClientService) CreateClient(interfaceID, serverID string, req ClientCre
 	// Allocate IP addresses
 	if req.IP != nil && *req.IP != "" {
 		if err := s.allocateIPv4(client, server, *req.IP); err != nil {
-			return nil, fmt.Errorf("IPv4 allocation failed: %v", err)
+			return nil, fmt.Errorf("IPv4 allocation failed:-> %v", err)
 		}
 	}
 
 	if req.IPv6 != nil && *req.IPv6 != "" {
 		if err := s.allocateIPv6(client, server, *req.IPv6); err != nil {
-			return nil, fmt.Errorf("IPv6 allocation failed: %v", err)
+			return nil, fmt.Errorf("IPv6 allocation failed:-> %v", err)
 		}
 	}
 
@@ -102,7 +102,7 @@ func (s *ClientService) CreateClient(interfaceID, serverID string, req ClientCre
 	s.cfg.SetInterface(interfaceID, iface)
 
 	if err := s.cfg.Save(); err != nil {
-		return nil, fmt.Errorf("failed to save configuration: %v", err)
+		return nil, fmt.Errorf("failed to save configuration:-> %v", err)
 	}
 
 	return client, nil
@@ -198,7 +198,7 @@ func (s *ClientService) UpdateClient(interfaceID, serverID, clientID string, req
 		if *req.PrivateKey != "" {
 			publicKey, err := utils.PrivToPublic(*req.PrivateKey)
 			if err != nil {
-				return nil, fmt.Errorf("failed to derive public key: %v", err)
+				return nil, fmt.Errorf("failed to derive public key:-> %v", err)
 			}
 			client.PrivateKey = req.PrivateKey
 			client.PublicKey = publicKey
@@ -225,7 +225,7 @@ func (s *ClientService) UpdateClient(interfaceID, serverID, clientID string, req
 			client.IPv4Offset = nil
 		} else {
 			if err := s.updateClientIPv4(client, server, *req.IP); err != nil {
-				return nil, fmt.Errorf("IPv4 update failed: %v", err)
+				return nil, fmt.Errorf("IPv4 update failed:-> %v", err)
 			}
 		}
 		needsWGSync = true
@@ -236,7 +236,7 @@ func (s *ClientService) UpdateClient(interfaceID, serverID, clientID string, req
 			client.IPv6Offset = nil
 		} else {
 			if err := s.updateClientIPv6(client, server, *req.IPv6); err != nil {
-				return nil, fmt.Errorf("IPv6 update failed: %v", err)
+				return nil, fmt.Errorf("IPv6 update failed:-> %v", err)
 			}
 		}
 		needsWGSync = true
@@ -244,13 +244,13 @@ func (s *ClientService) UpdateClient(interfaceID, serverID, clientID string, req
 
 	s.cfg.SetInterface(interfaceID, iface)
 	if err := s.cfg.Save(); err != nil {
-		return nil, fmt.Errorf("failed to save configuration: %v", err)
+		return nil, fmt.Errorf("failed to save configuration:-> %v", err)
 	}
 
 	// Sync WireGuard if needed
 	if needsWGSync && server.Enabled {
 		if err := s.wg.SyncToConfAndInterface(iface); err != nil {
-			return nil, fmt.Errorf("failed to sync WireGuard configuration: %v", err)
+			return nil, fmt.Errorf("failed to sync WireGuard configuration:-> %v", err)
 		}
 	}
 
@@ -280,13 +280,13 @@ func (s *ClientService) SetClientEnabled(interfaceID, serverID, clientID string,
 	client.Enabled = enabled
 	s.cfg.SetInterface(interfaceID, iface)
 	if err := s.cfg.Save(); err != nil {
-		return fmt.Errorf("failed to save configuration: %v", err)
+		return fmt.Errorf("failed to save configuration:-> %v", err)
 	}
 
 	// Sync WireGuard configuration
 	if server.Enabled {
 		if err := s.wg.SyncToConfAndInterface(iface); err != nil {
-			return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
+			return fmt.Errorf("failed to sync WireGuard configuration:-> %v", err)
 		}
 	}
 
@@ -307,7 +307,7 @@ func (s *ClientService) DeleteClient(interfaceID, serverID, clientID string) err
 	// Disable first
 	if client, err := s.cfg.GetClient(interfaceID, serverID, clientID); err == nil && client.Enabled {
 		if err := s.SetClientEnabled(interfaceID, serverID, clientID, false); err != nil {
-			return fmt.Errorf("failed to disable client before deletion: %v", err)
+			return fmt.Errorf("failed to disable client before deletion:-> %v", err)
 		}
 	}
 

@@ -52,14 +52,14 @@ func (s *InterfaceService) CreateInterface(req InterfaceCreateRequest) (*models.
 		var err error
 		privateKey, err = utils.GenerateWGPrivateKey()
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate private key: %v", err)
+			return nil, fmt.Errorf("failed to generate private key:-> %v", err)
 		}
 	}
 
 	// Generate public key
 	publicKey, err := utils.PrivToPublic(privateKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate public key: %v", err)
+		return nil, fmt.Errorf("failed to generate public key:-> %v", err)
 	}
 
 	// Validate endpoint
@@ -94,12 +94,12 @@ func (s *InterfaceService) CreateInterface(req InterfaceCreateRequest) (*models.
 
 	s.cfg.SetInterface(iface.ID, iface)
 	if err := s.cfg.Save(); err != nil {
-		return nil, fmt.Errorf("failed to save configuration: %v", err)
+		return nil, fmt.Errorf("failed to save configuration:-> %v", err)
 	}
 
 	// Generate and apply WireGuard configuration
 	if err := s.wg.SyncToConf(iface); err != nil {
-		return nil, fmt.Errorf("failed to save WireGuard configuration: %v", err)
+		return nil, fmt.Errorf("failed to save WireGuard configuration:-> %v", err)
 	}
 
 	return s.sanitizeInterface(iface), nil
@@ -114,17 +114,17 @@ func (s *InterfaceService) SetInterfaceEnabled(id string, enabled bool) error {
 
 	// Regenerate WireGuard configuration
 	if err := s.wg.SyncToConf(iface); err != nil {
-		return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
+		return fmt.Errorf("failed to sync WireGuard configuration:-> %v", err)
 	}
 	if err := s.wg.SyncToInterface(iface.Ifname, enabled, iface.PrivateKey); err != nil {
-		return fmt.Errorf("failed to apply WireGuard configuration: %v", err)
+		return fmt.Errorf("failed to apply WireGuard configuration:-> %v", err)
 	}
 
 	iface.Enabled = enabled
 
 	s.cfg.SetInterface(iface.ID, iface)
 	if err := s.cfg.Save(); err != nil {
-		return fmt.Errorf("failed to save configuration: %v", err)
+		return fmt.Errorf("failed to save configuration:-> %v", err)
 	}
 
 	return nil
@@ -223,7 +223,7 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 	if req.PrivateKey != "" && req.PrivateKey != iface.PrivateKey {
 		publicKey, err := utils.PrivToPublic(req.PrivateKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate public key: %v", err)
+			return nil, fmt.Errorf("failed to generate public key:-> %v", err)
 		}
 		iface.PrivateKey = req.PrivateKey
 		iface.PublicKey = publicKey
@@ -234,36 +234,36 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 		// Apply system changes
 		if needsWGRegeneration {
 			if err := s.wg.SyncToConf(iface); err != nil {
-				return nil, fmt.Errorf("failed to regenerate WireGuard configuration: %v", err)
+				return nil, fmt.Errorf("failed to regenerate WireGuard configuration:-> %v", err)
 			}
 		}
 
 		if needsMTUUpdate {
 			if err := s.wg.SetInterfaceMTU(iface.Ifname, iface.MTU); err != nil {
-				return nil, fmt.Errorf("failed to update MTU: %v", err)
+				return nil, fmt.Errorf("failed to update MTU:-> %v", err)
 			}
 		}
 	} else {
 		// Remove old interface
 		if err := s.wg.SyncToInterface(needsWGReCreateOldName, false, iface.PrivateKey); err != nil {
-			return nil, fmt.Errorf("failed to bring down old WireGuard interface: %v", err)
+			return nil, fmt.Errorf("failed to bring down old WireGuard interface:-> %v", err)
 		}
 		if err := s.wg.RemoveConfig(needsWGReCreateOldName); err != nil {
-			return nil, fmt.Errorf("failed to remove old WireGuard interface: %v", err)
+			return nil, fmt.Errorf("failed to remove old WireGuard interface:-> %v", err)
 		}
 		// Create new interface
 		if err := s.wg.SyncToConf(iface); err != nil {
-			return nil, fmt.Errorf("failed to create new WireGuard interface: %v", err)
+			return nil, fmt.Errorf("failed to create new WireGuard interface:-> %v", err)
 		}
 	}
 	if iface.Enabled {
 		if err := s.wg.SyncToInterface(iface.Ifname, true, iface.PrivateKey); err != nil {
-			return nil, fmt.Errorf("failed to bring up new WireGuard interface: %v", err)
+			return nil, fmt.Errorf("failed to bring up new WireGuard interface:-> %v", err)
 		}
 	}
 
 	if err := s.cfg.Save(); err != nil {
-		return nil, fmt.Errorf("failed to save configuration: %v", err)
+		return nil, fmt.Errorf("failed to save configuration:-> %v", err)
 	}
 
 	return s.sanitizeInterface(iface), nil
@@ -278,10 +278,10 @@ func (s *InterfaceService) DeleteInterface(id string) error {
 
 	// Remove WireGuard interface
 	if err := s.wg.RemoveConfig(iface.Ifname); err != nil {
-		return fmt.Errorf("failed to remove WireGuard config: %v", err)
+		return fmt.Errorf("failed to remove WireGuard config:-> %v", err)
 	}
 	if err := s.wg.SyncToInterface(iface.Ifname, false, iface.PrivateKey); err != nil {
-		return fmt.Errorf("failed to delete WireGuard interface: %v", err)
+		return fmt.Errorf("failed to delete WireGuard interface:-> %v", err)
 	}
 
 	s.cfg.DeleteInterface(id)
@@ -314,12 +314,12 @@ func (s *InterfaceService) CheckUDPPortAvailable(port int) error {
 	// Try to bind to the UDP port
 	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", port))
 	if err != nil {
-		return fmt.Errorf("failed to resolve UDP address: %v", err)
+		return fmt.Errorf("failed to resolve UDP address:-> %v", err)
 	}
 
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
-		return fmt.Errorf("UDP port %d is not available: %v", port, err)
+		return fmt.Errorf("UDP port %d is not available:-> %v", port, err)
 	}
 	defer conn.Close()
 

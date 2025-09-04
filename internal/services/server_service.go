@@ -49,7 +49,7 @@ func (s *ServerService) CreateServer(interfaceID string, req ServerCreateRequest
 	logging.LogVerbose("Saving configuration after server creation")
 	if err := s.cfg.Save(); err != nil {
 		logging.LogError("Failed to save configuration after creating server %s: %v", req.Name, err)
-		return nil, fmt.Errorf("failed to save configuration: %v", err)
+		return nil, fmt.Errorf("failed to save configuration:-> %v", err)
 	}
 
 	logging.LogInfo("Successfully created server %s (ID: %s) for interface %s", server.Name, server.ID, interfaceID)
@@ -108,7 +108,7 @@ func (s *ServerService) UpdateServer(interfaceID, serverID string, req ServerCre
 	// Update network configurations and determine if firewall update is needed
 	s.cfg.SetInterface(interfaceID, iface)
 	if err := s.cfg.Save(); err != nil {
-		return nil, fmt.Errorf("failed to save configuration: %v", err)
+		return nil, fmt.Errorf("failed to save configuration:-> %v", err)
 	}
 
 	return server, nil
@@ -139,13 +139,13 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 		if iface.Enabled && server.IPv4 != nil && server.IPv4.Enabled {
 			if err := s.fw.AddIpAndFwRules(iface.Ifname, server.IPv4); err != nil {
 				logging.LogError("Failed to add IPv4 firewall rules for server %s: %v", serverID, err)
-				return fmt.Errorf("failed to add IPv4 firewall rules: %v", err)
+				return fmt.Errorf("failed to add IPv4 firewall rules:-> %v", err)
 			}
 		}
 		if iface.Enabled && server.IPv6 != nil && server.IPv6.Enabled {
 			if err := s.fw.AddIpAndFwRules(iface.Ifname, server.IPv6); err != nil {
 				logging.LogError("Failed to add IPv6 firewall rules for server %s: %v", serverID, err)
-				return fmt.Errorf("failed to add IPv6 firewall rules: %v", err)
+				return fmt.Errorf("failed to add IPv6 firewall rules:-> %v", err)
 			}
 		}
 	} else {
@@ -164,7 +164,7 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 		logging.LogVerbose("Syncing WireGuard configuration after server enable/disable")
 		if err := s.wg.SyncToConfAndInterface(iface); err != nil {
 			logging.LogError("Failed to sync WireGuard configuration for server %s: %v", serverID, err)
-			return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
+			return fmt.Errorf("failed to sync WireGuard configuration:-> %v", err)
 		}
 
 		s.cfg.SyncToInternalService()
@@ -173,7 +173,7 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 	if syncServiceAndConfig {
 		if err := s.cfg.Save(); err != nil {
 			logging.LogError("Failed to save configuration after setting server enabled: %v", err)
-			return fmt.Errorf("failed to save configuration: %v", err)
+			return fmt.Errorf("failed to save configuration:-> %v", err)
 		}
 	}
 	logging.LogInfo("Successfully set server %s enabled=%t for interface %s", serverID, enabled, interfaceID)
@@ -199,7 +199,7 @@ func (s *ServerService) DeleteServer(interfaceID, serverID string) error {
 		logging.LogVerbose("Disabling server %s before deletion", serverID)
 		if err := s.SetServerEnabled(interfaceID, serverID, false, true); err != nil {
 			logging.LogError("Failed to disable server %s before deletion: %v", serverID, err)
-			return fmt.Errorf("failed to disable server before deletion: %v", err)
+			return fmt.Errorf("failed to disable server before deletion:-> %v", err)
 		}
 	}
 
@@ -237,7 +237,7 @@ func (s *ServerService) MoveServer(interfaceID, serverID, newInterfaceID string)
 	wasEnabled := server.Enabled
 	if wasEnabled {
 		if err := s.SetServerEnabled(interfaceID, serverID, false, true); err != nil {
-			return fmt.Errorf("failed to disable server for move: %v", err)
+			return fmt.Errorf("failed to disable server for move:-> %v", err)
 		}
 	}
 
@@ -256,22 +256,22 @@ func (s *ServerService) MoveServer(interfaceID, serverID, newInterfaceID string)
 	s.cfg.SetInterface(interfaceID, srcIface)
 	s.cfg.SetInterface(newInterfaceID, destIface)
 	if err := s.cfg.Save(); err != nil {
-		return fmt.Errorf("failed to save configuration: %v", err)
+		return fmt.Errorf("failed to save configuration:-> %v", err)
 	}
 
 	// Re-enable on destination if it was enabled
 	if wasEnabled {
 		if err := s.SetServerEnabled(newInterfaceID, serverID, true, true); err != nil {
-			return fmt.Errorf("failed to re-enable server after move: %v", err)
+			return fmt.Errorf("failed to re-enable server after move:-> %v", err)
 		}
 	}
 
 	// Sync both interfaces
 	if err := s.wg.SyncToConfAndInterface(srcIface); err != nil {
-		return fmt.Errorf("failed to sync source interface: %v", err)
+		return fmt.Errorf("failed to sync source interface:-> %v", err)
 	}
 	if err := s.wg.SyncToConfAndInterface(destIface); err != nil {
-		return fmt.Errorf("failed to sync destination interface: %v", err)
+		return fmt.Errorf("failed to sync destination interface:-> %v", err)
 	}
 	s.cfg.SyncToInternalService()
 
@@ -314,7 +314,7 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 	// 2. Validate IPv4 configuration if filled
 	if ipv4.Network != "" {
 		if err := s.validateSingleServerNetworkConfig(4, iface, ipv4, exid); err != nil {
-			return nil, fmt.Errorf("IPv4 validation failed: %v", err)
+			return nil, fmt.Errorf("IPv4 validation failed:-> %v", err)
 		}
 	} else if ipv4.Enabled {
 		return nil, fmt.Errorf("ipv4 Enabled but network is nil")
@@ -323,7 +323,7 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 	// 3. Validate IPv6 configuration if filled
 	if ipv6.Network != "" {
 		if err := s.validateSingleServerNetworkConfig(6, iface, ipv6, exid); err != nil {
-			return nil, fmt.Errorf("IPv6 validation failed: %v", err)
+			return nil, fmt.Errorf("IPv6 validation failed:-> %v", err)
 		}
 	} else if ipv6.Enabled {
 		return nil, fmt.Errorf("ipv6 Enabled but network is nil")
@@ -467,7 +467,7 @@ func (s *ServerService) validateSingleServerNetworkConfig(af int, iface *models.
 		network, err = models.ParseCIDRAf(6, cfg.Network)
 	}
 	if err != nil {
-		return fmt.Errorf("invalid network CIDR: %v", err)
+		return fmt.Errorf("invalid network CIDR:-> %v", err)
 	}
 
 	// 2. Check for network overlaps with other servers in the same VRF
@@ -491,7 +491,7 @@ func (s *ServerService) validateSingleServerNetworkConfig(af int, iface *models.
 	// 5. Validate SNAT configuration
 	if cfg.Snat != nil && cfg.Snat.Enabled {
 		if err := s.validateSnatConfiguration(af, network, cfg.Snat, excludeServerID); err != nil {
-			return fmt.Errorf("SNAT validation failed: %v", err)
+			return fmt.Errorf("SNAT validation failed:-> %v", err)
 		}
 	}
 
@@ -525,7 +525,7 @@ func (s *ServerService) validateRoutedNetworksOverlap(af int, routedNetworks []s
 	for _, routedNet := range routedNetworks {
 		network, err := models.ParseCIDRAf(af, routedNet)
 		if err != nil {
-			return fmt.Errorf("invalid routed network CIDR %s: %v", routedNet, err)
+			return fmt.Errorf("invalid routed network CIDR %s:-> %v", routedNet, err)
 		}
 		baseNetwork := network.Network()
 		networks = append(networks, &baseNetwork)
@@ -565,7 +565,7 @@ func (s *ServerService) validateSnatConfiguration(af int, serverNetwork *models.
 			return fmt.Errorf("invalid IP version for SNAT configuration")
 		}
 		if err != nil {
-			return fmt.Errorf("invalid SNAT IP/Net: %v", err)
+			return fmt.Errorf("invalid SNAT IP/Net:-> %v", err)
 		}
 
 		switch af {

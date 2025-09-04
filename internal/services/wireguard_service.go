@@ -41,7 +41,7 @@ func (s *WireGuardService) SyncToConf(iface *models.Interface) error {
 	// Write configuration file to wireguardConfigPath
 	configFile := filepath.Join(s.configPath, fmt.Sprintf("%s.conf", iface.Ifname))
 	if err := utils.WriteFileAtomic(configFile, []byte(config), 0600); err != nil {
-		return fmt.Errorf("failed to write config file: %v", err)
+		return fmt.Errorf("failed to write config file:-> %v", err)
 	}
 
 	logging.LogInfo("Generated standalone WireGuard configuration at %s", configFile)
@@ -152,7 +152,7 @@ func (s *WireGuardService) SyncToInterface(ifname string, enabled bool, checkWgK
 	if checkWgKey != "" {
 		wgPubkey, err = utils.PrivToPublic(checkWgKey)
 		if err != nil {
-			return fmt.Errorf("failed to derive public key from private key: %v", err)
+			return fmt.Errorf("failed to derive public key from private key:-> %v", err)
 		}
 	}
 
@@ -164,7 +164,7 @@ func (s *WireGuardService) SyncToInterface(ifname string, enabled bool, checkWgK
 			// Situation 1: Interface not found and enable=true, wg-quick up normally
 			logging.LogInfo("Bringing up WireGuard interface %s", interfaceName)
 			if err := utils.RunCommand("wg-quick", "up", configFile); err != nil {
-				return fmt.Errorf("failed to bring up interface with wg-quick: %v", err)
+				return fmt.Errorf("failed to bring up interface with wg-quick:-> %v", err)
 			}
 		} else {
 			// Situation 2: Interface exists, check if it's a WireGuard interface and public key
@@ -179,12 +179,12 @@ func (s *WireGuardService) SyncToInterface(ifname string, enabled bool, checkWgK
 			// Use Go native approach: first strip config, then sync
 			strippedConfig, err := s.stripWgQuickConfig(configFile)
 			if err != nil {
-				return fmt.Errorf("failed to strip config: %v", err)
+				return fmt.Errorf("failed to strip config:-> %v", err)
 			}
 
 			logging.LogInfo("Syncing configuration to WireGuard interface %s", interfaceName)
 			if err := s.syncConfToInterface(interfaceName, strippedConfig); err != nil {
-				return fmt.Errorf("failed to sync interface configuration: %v", err)
+				return fmt.Errorf("failed to sync interface configuration:-> %v", err)
 			}
 		}
 	} else {
@@ -205,7 +205,7 @@ func (s *WireGuardService) SyncToInterface(ifname string, enabled bool, checkWgK
 			// Use wg-quick down to properly disable the interface
 			logging.LogInfo("Bringing down WireGuard interface %s", interfaceName)
 			if err := utils.RunCommand("wg-quick", "down", configFile); err != nil {
-				return fmt.Errorf("failed to disable interface: %v", err)
+				return fmt.Errorf("failed to disable interface:-> %v", err)
 			}
 		}
 	}
@@ -220,7 +220,7 @@ func (s *WireGuardService) RemoveConfig(ifname string) error {
 	// Remove config file
 	logging.LogInfo("Removing WireGuard config file %s", configFile)
 	if err := os.Remove(configFile); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove config file: %v", err)
+		return fmt.Errorf("failed to remove config file:-> %v", err)
 	}
 
 	return nil
@@ -230,11 +230,11 @@ func (s *WireGuardService) SetInterfaceMTU(ifname string, mtu int) error {
 
 	// Check if interface exists before trying to set MTU
 	if err := utils.RunCommand("ip", "link", "show", ifname); err != nil {
-		return fmt.Errorf("interface %s does not exist: %v", ifname, err)
+		return fmt.Errorf("interface %s does not exist:-> %v", ifname, err)
 	}
 
 	if err := utils.RunCommand("ip", "link", "set", "dev", ifname, "mtu", fmt.Sprintf("%d", mtu)); err != nil {
-		return fmt.Errorf("failed to set MTU: %v", err)
+		return fmt.Errorf("failed to set MTU:-> %v", err)
 	}
 	return nil
 }
@@ -242,7 +242,7 @@ func (s *WireGuardService) SetInterfaceMTU(ifname string, mtu int) error {
 func (s *WireGuardService) GetPeerStats(interfaceName string) (map[string]*models.WGState, error) {
 	output, err := utils.RunCommandWithOutput("wg", "show", fmt.Sprintf("%s", interfaceName), "dump")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get peer stats: %v", err)
+		return nil, fmt.Errorf("failed to get peer stats:-> %v", err)
 	}
 
 	stats := make(map[string]*models.WGState)
@@ -401,7 +401,7 @@ func (s *WireGuardService) generatePreDownCommands(iface *models.Interface) (com
 func (s *WireGuardService) stripWgQuickConfig(configFile string) (string, error) {
 	output, err := utils.RunCommandWithOutput("wg-quick", "strip", configFile)
 	if err != nil {
-		return "", fmt.Errorf("failed to strip config file %s: %v", configFile, err)
+		return "", fmt.Errorf("failed to strip config file %s:-> %v", configFile, err)
 	}
 	return output, nil
 }
@@ -415,7 +415,7 @@ func (s *WireGuardService) syncConfToInterface(interfaceName, strippedConfig str
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to sync config to interface %s: %v, stderr: %s", interfaceName, err, stderr.String())
+		return fmt.Errorf("failed to sync config to interface %s:-> %v, stderr: %s", interfaceName, err, stderr.String())
 	}
 
 	return nil

@@ -46,13 +46,13 @@ func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		logging.LogError("Failed to read config file %s: %v", path, err)
-		return nil, fmt.Errorf("failed to read config file: %v", err)
+		return nil, fmt.Errorf("failed to read config file:-> %v", err)
 	}
 
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		logging.LogError("Failed to parse config file %s: %v", path, err)
-		return nil, fmt.Errorf("failed to parse config file: %v", err)
+		return nil, fmt.Errorf("failed to parse config file:-> %v", err)
 	}
 
 	cfg.ConfigPath = path
@@ -71,14 +71,14 @@ func LoadConfig(path string) (*Config, error) {
 		serverId, err := utils.GenerateRandomString("", 6)
 		if err != nil {
 			logging.LogError("Failed to generate server ID: %v", err)
-			return nil, fmt.Errorf("failed to generate server ID: %v", err)
+			return nil, fmt.Errorf("failed to generate server ID:-> %v", err)
 		}
 		cfg.ServerId = serverId
 		logging.LogInfo("Generated server ID: %s", serverId)
 		// Save the config with the new ServerId
 		if err := cfg.Save(); err != nil {
 			logging.LogError("Failed to save config with new server ID: %v", err)
-			return nil, fmt.Errorf("failed to save config with new server ID: %v", err)
+			return nil, fmt.Errorf("failed to save config with new server ID:-> %v", err)
 		}
 		logging.LogInfo("Saved configuration with new server ID")
 	}
@@ -97,7 +97,7 @@ func (c *Config) Save() error {
 
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal config: %v", err)
+		return fmt.Errorf("failed to marshal config:-> %v", err)
 	}
 
 	return utils.WriteFileAtomic(c.ConfigPath, data, 0600)
@@ -265,7 +265,7 @@ func (c *Config) CheckSnatOffsetOverlapsInRoamingMasterInterface(ifname string, 
 	af := offset.Version
 	var aflen int
 	if ipv4, ipv6, err := utils.GetInterfaceIP(ifname); err != nil {
-		return fmt.Errorf("failed to get interface %v IP address for SNAT roaming: %v", ifname, err)
+		return fmt.Errorf("failed to get interface %v IP address for SNAT roaming:-> %v", ifname, err)
 	} else {
 		switch af {
 		case 4:
@@ -282,17 +282,17 @@ func (c *Config) CheckSnatOffsetOverlapsInRoamingMasterInterface(ifname string, 
 		return fmt.Errorf("no IP address found on interface %v for SNAT roaming", ifname)
 	}
 
-	if ifaceNetwork.Masklen() < offset.Masklen() {
-		return fmt.Errorf("invalid SNAT offset %v, it exceeds the size of the network %v on interface %v ", offset, ifaceNetwork.Network(), ifname)
+	if ifaceNetwork.Masklen() > offset.Masklen() {
+		return fmt.Errorf("invalid SNAT offset [%v]:-> exceeds the size of the network [%v] on interface %v", offset, ifaceNetwork.Network(), ifname)
 	}
 	//check offser ip part
 	if offset.IpExceed2PowerN(ifaceNetwork.Masklen()) {
-		return fmt.Errorf("offset: %s exceeds the range of the netowrk: %s detected from interface: %v", offset, ifaceNetwork.NetworkStr(), ifname)
+		return fmt.Errorf("offset: [%s] exceeds the range of the netowrk: [%s] detected from interface: %v", offset, ifaceNetwork.NetworkStr(), ifname)
 	}
 
 	// Verify that the offset network's base IP is properly aligned for its mask
 	if !offset.IsHostbitAllZero() {
-		return fmt.Errorf("non-zero host bits: offset %s is not properly aligned for its mask", offset.String())
+		return fmt.Errorf("non-zero host bits:-> offset [%s] is not properly aligned for its mask", offset.String())
 	}
 
 	for _, iface := range c.GetAllInterfaces() {

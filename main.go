@@ -79,18 +79,18 @@ func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, e
 		// Create new config with random password
 		randomPassword, err := generateRandomPassword()
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to generate random password: %v", err)
+			return nil, false, fmt.Errorf("failed to generate random password:-> %v", err)
 		}
 
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(randomPassword), bcrypt.DefaultCost)
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to hash password: %v", err)
+			return nil, false, fmt.Errorf("failed to hash password:-> %v", err)
 		}
 
 		// Generate server ID
 		serverId, err := utils.GenerateRandomString("", 6)
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to generate server ID: %v", err)
+			return nil, false, fmt.Errorf("failed to generate server ID:-> %v", err)
 		}
 
 		cfg := &config.Config{
@@ -109,7 +109,7 @@ func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, e
 		}
 
 		if err := saveConfig(configPath, cfg); err != nil {
-			return nil, false, fmt.Errorf("failed to save new config: %v", err)
+			return nil, false, fmt.Errorf("failed to save new config:-> %v", err)
 		}
 
 		fmt.Printf("Generated random password: %s\n", randomPassword)
@@ -126,11 +126,11 @@ func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, e
 	if newPassword != "" {
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to hash new password: %v", err)
+			return nil, false, fmt.Errorf("failed to hash new password:-> %v", err)
 		}
 		cfg.Password = string(hashedPassword)
 		if err := saveConfig(configPath, cfg); err != nil {
-			return nil, false, fmt.Errorf("failed to save updated config: %v", err)
+			return nil, false, fmt.Errorf("failed to save updated config:-> %v", err)
 		}
 	}
 

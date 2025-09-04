@@ -315,7 +315,7 @@ func (l *InterfaceIPNetListener) getSimulatedConfig(config *models.ServerNetwork
 	target_network, err := l.ifIPs[config.Network.Version].GetSubnetByOffset(config.Snat.SnatIPNet)
 
 	if err != nil {
-		return nil, fmt.Errorf("error get target_network, err: %v", err)
+		return nil, fmt.Errorf("failed to get target_network:-> %v", err)
 	}
 	simulatedIfConfig := &models.ServerNetworkConfig{
 		Enabled:                     true,

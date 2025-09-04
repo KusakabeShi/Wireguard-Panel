@@ -16,22 +16,48 @@ const ErrorDialog = ({ open, onClose, error, title = "Error" }) => {
   const getErrorMessage = (error) => {
     if (!error) return 'An unknown error occurred';
     
-    // If it's a string, return it directly
-    if (typeof error === 'string') return error;
+    let errorStr;
     
+    // If it's a string, use it directly
+    if (typeof error === 'string') {
+      errorStr = error;
+    }
     // If it has a message property
-    if (error.message) return error.message;
-    
+    else if (error.message) {
+      errorStr = error.message;
+    }
     // If it's an object, try to stringify it
-    if (typeof error === 'object') {
+    else if (typeof error === 'object') {
       try {
-        return JSON.stringify(error, null, 2);
+        errorStr = JSON.stringify(error, null, 2);
       } catch (e) {
-        return 'Unable to parse error details';
+        errorStr = 'Unable to parse error details';
       }
+    } else {
+      errorStr = String(error);
     }
     
-    return String(error);
+    return errorStr;
+  };
+
+  const formatHierarchicalError = (errorMessage) => {
+    // Split by :-> to get error hierarchy
+    const parts = errorMessage.split(':->').map(part => part.trim());
+    
+    if (parts.length === 1) {
+      // No hierarchy, return as is
+      return errorMessage;
+    }
+    
+    // Format with hierarchy using └> symbol
+    return parts.map((part, index) => {
+      if (index === 0) {
+        return part;
+      } else {
+        const indent = '  '.repeat(index - 1); // Two spaces per level
+        return `${indent}└> ${part}`;
+      }
+    }).join('\n');
   };
 
   const handleClose = () => {
@@ -64,10 +90,11 @@ const ErrorDialog = ({ open, onClose, error, title = "Error" }) => {
             sx={{ 
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
-              fontFamily: 'inherit'
+              fontFamily: 'monospace',
+              lineHeight: 1.6
             }}
           >
-            {getErrorMessage(error)}
+            {formatHierarchicalError(getErrorMessage(error))}
           </Typography>
         </Alert>
         

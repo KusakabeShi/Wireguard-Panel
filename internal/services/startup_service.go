@@ -67,7 +67,7 @@ func (s *StartupService) initializeInterface(iface *models.Interface) error {
 
 	// Generate and apply WireGuard configuration
 	if err := s.wg.SyncToConfAndInterface(iface); err != nil {
-		return fmt.Errorf("failed to sync WireGuard configuration: %v", err)
+		return fmt.Errorf("failed to sync WireGuard configuration:-> %v", err)
 	}
 
 	// Apply firewall rules for all enabled servers
@@ -90,14 +90,14 @@ func (s *StartupService) initializeServerFirewallRules(ifname string, server *mo
 	// Apply IPv4 firewall rules
 	if server.IPv4 != nil && server.IPv4.Enabled {
 		if err := s.fw.AddIpAndFwRules(ifname, server.IPv4); err != nil {
-			return fmt.Errorf("failed to add IPv4 firewall rules: %v", err)
+			return fmt.Errorf("failed to add IPv4 firewall rules:-> %v", err)
 		}
 	}
 
 	// Apply IPv6 firewall rules
 	if server.IPv6 != nil && server.IPv6.Enabled {
 		if err := s.fw.AddIpAndFwRules(ifname, server.IPv6); err != nil {
-			return fmt.Errorf("failed to add IPv6 firewall rules: %v", err)
+			return fmt.Errorf("failed to add IPv6 firewall rules:-> %v", err)
 		}
 	}
 

@@ -148,7 +148,7 @@ func RunCommandWithTimeout(timeout time.Duration, name string, args ...string) (
 		return "", &CommandError{
 			Command:   name,
 			Args:      args,
-			SystemErr: fmt.Errorf("failed to start command: %v", err),
+			SystemErr: fmt.Errorf("failed to start command:-> %v", err),
 			Duration:  time.Since(start),
 		}
 	}

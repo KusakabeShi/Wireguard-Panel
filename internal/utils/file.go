@@ -15,20 +15,20 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 	logging.LogInfo("Writing file %s (%d bytes)", filename, len(data))
 	dir := filepath.Dir(filename)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %v", err)
+		return fmt.Errorf("failed to create directory:-> %v", err)
 	}
 
 	tmpFile := filename + ".tmp"
-	
+
 	if err := ioutil.WriteFile(tmpFile, data, perm); err != nil {
-		return fmt.Errorf("failed to write temporary file: %v", err)
+		return fmt.Errorf("failed to write temporary file:-> %v", err)
 	}
-	
+
 	if err := os.Rename(tmpFile, filename); err != nil {
 		os.Remove(tmpFile)
-		return fmt.Errorf("failed to rename temporary file: %v", err)
+		return fmt.Errorf("failed to rename temporary file:-> %v", err)
 	}
-	
+
 	logging.LogInfo("Successfully wrote file %s", filename)
 	return nil
 }

@@ -12,7 +12,7 @@ func GenerateWGPrivateKey() (string, error) {
 	var privateKey [32]byte
 	_, err := rand.Read(privateKey[:])
 	if err != nil {
-		return "", fmt.Errorf("failed to generate random data for private key: %v", err)
+		return "", fmt.Errorf("failed to generate random data for private key:-> %v", err)
 	}
 	privateKey[0] &= 248
 	privateKey[31] &= 127
@@ -23,7 +23,7 @@ func GenerateWGPrivateKey() (string, error) {
 func PrivToPublic(privateKeyB64 string) (string, error) {
 	privateKeyBytes, err := base64.StdEncoding.DecodeString(privateKeyB64)
 	if err != nil {
-		return "", fmt.Errorf("failed to decode base64 private key: %w", err)
+		return "", fmt.Errorf("failed to decode base64 private key:-> %w", err)
 	}
 	if len(privateKeyBytes) != 32 {
 		return "", fmt.Errorf("invalid private key length: expected 32 bytes, got %d", len(privateKeyBytes))

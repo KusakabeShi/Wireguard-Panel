@@ -27,7 +27,7 @@ func (f *FirewallService) AddIpAndFwRules(interfaceName string, config *models.S
 	// Add IP address to interface (only if not already present)
 	if config.Network != nil {
 		if err := f.addIPAddressIfNotExists(interfaceName, config.Network.String()); err != nil {
-			return fmt.Errorf("failed to add IP address: %v", err)
+			return fmt.Errorf("failed to add IP address:-> %v", err)
 		}
 	}
 
@@ -37,7 +37,7 @@ func (f *FirewallService) AddIpAndFwRules(interfaceName string, config *models.S
 			// If roaming is enabled, SNAT rules must managed by the roaming service
 		} else {
 			if err := f.AddSnatRules(config, comment); err != nil {
-				return fmt.Errorf("failed to add SNAT rules: %v", err)
+				return fmt.Errorf("failed to add SNAT rules:-> %v", err)
 			}
 		}
 	}
@@ -45,7 +45,7 @@ func (f *FirewallService) AddIpAndFwRules(interfaceName string, config *models.S
 	// Add routed networks firewall rules
 	if config.RoutedNetworksFirewall && len(config.RoutedNetworks) > 0 {
 		if err := f.addRoutedNetworksRules(interfaceName, config, comment); err != nil {
-			return fmt.Errorf("failed to add routed networks rules: %v", err)
+			return fmt.Errorf("failed to add routed networks rules:-> %v", err)
 		}
 	}
 
@@ -99,7 +99,7 @@ func (f *FirewallService) AddSnatRules(config *models.ServerNetworkConfig, comme
 			ruleArgs = ruleArgs[1:]
 		}
 		if err := f.addIptablesRuleIfNotExists(iptablesCmd, ruleArgs); err != nil {
-			return fmt.Errorf("failed to add SNAT rule: %v", err)
+			return fmt.Errorf("failed to add SNAT rule:-> %v", err)
 		}
 	}
 
@@ -108,7 +108,7 @@ func (f *FirewallService) AddSnatRules(config *models.ServerNetworkConfig, comme
 
 func (f *FirewallService) RemoveSnatRules(af int, comment string) error {
 	if err := utils.CleanupRules(comment, af, &[]string{"nat"}, false); err != nil {
-		return fmt.Errorf("failed to remove SNAT rules: %v", err)
+		return fmt.Errorf("failed to remove SNAT rules:-> %v", err)
 	}
 	return nil
 }
@@ -135,7 +135,7 @@ func (f *FirewallService) addRoutedNetworksRules(interfaceDevice string, config 
 			ruleArgs = ruleArgs[1:]
 		}
 		if err := f.addIptablesRuleIfNotExists(iptablesCmd, ruleArgs); err != nil {
-			return fmt.Errorf("failed to add routed network rule: %v", err)
+			return fmt.Errorf("failed to add routed network rule:-> %v", err)
 		}
 	}
 
@@ -146,7 +146,7 @@ func (f *FirewallService) addRoutedNetworksRules(interfaceDevice string, config 
 func (f *FirewallService) addIPAddressIfNotExists(interfaceDevice, ipAddr string) error {
 	// Check if the IP address already exists on the interface
 	if exists, err := f.ipAddressExists(interfaceDevice, ipAddr); err != nil {
-		return fmt.Errorf("failed to check IP address existence: %v", err)
+		return fmt.Errorf("failed to check IP address existence:-> %v", err)
 	} else if exists {
 		// IP address already exists, skip addition
 		return nil
@@ -194,7 +194,7 @@ func (f *FirewallService) ipAddressExists(interfaceDevice, ipAddr string) (bool,
 func (f *FirewallService) addIptablesRuleIfNotExists(iptablesCmd string, ruleArgs []string) error {
 	// Check if the rule already exists
 	if exists, err := f.iptablesRuleExists(iptablesCmd, ruleArgs); err != nil {
-		return fmt.Errorf("failed to check iptables rule existence: %v", err)
+		return fmt.Errorf("failed to check iptables rule existence:-> %v", err)
 	} else if exists {
 		// Rule already exists, skip addition
 		return nil

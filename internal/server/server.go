@@ -53,7 +53,7 @@ func (s *Server) Start(fw *internalservice.FirewallService, logLevel logging.Log
 		logging.LogError("Warning: failed to cleanup orphaned rules: %v", err)
 	}
 	if err := startupService.InitializeInterfaces(); err != nil {
-		return fmt.Errorf("failed to initialize interfaces: %v", err)
+		return fmt.Errorf("failed to initialize interfaces:-> %v", err)
 	}
 
 	// Setup middleware

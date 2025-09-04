@@ -6,9 +6,9 @@ import {
   DialogActions,
   TextField,
   Button,
-  Box,
-  Alert
+  Box
 } from '@mui/material';
+import ErrorDialog from './ErrorDialog';
 
 const ClientDialog = ({ 
   open, 
@@ -28,8 +28,8 @@ const ClientDialog = ({
     presharedKey: '',
     keepalive: ''
   });
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorDialog, setErrorDialog] = useState({ open: false, error: null, title: 'Error' });
 
   const isEdit = Boolean(client);
 
@@ -59,7 +59,6 @@ const ClientDialog = ({
         keepalive: ''
       });
     }
-    setError('');
   }, [client, open]);
 
   const handleChange = (field) => (event) => {
@@ -70,7 +69,6 @@ const ClientDialog = ({
   };
 
   const handleSave = async () => {
-    setError('');
     setLoading(true);
 
     try {
@@ -106,7 +104,11 @@ const ClientDialog = ({
       await onSave(data);
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to save client');
+      setErrorDialog({ 
+        open: true, 
+        error: err.message || 'Failed to save client', 
+        title: 'Save Failed' 
+      });
     } finally {
       setLoading(false);
     }
@@ -115,37 +117,36 @@ const ClientDialog = ({
   const handleDelete = async () => {
     if (!client) return;
     
-    setError('');
     setLoading(true);
 
     try {
       await onDelete(client.id);
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to delete client');
+      setErrorDialog({ 
+        open: true, 
+        error: err.message || 'Failed to delete client', 
+        title: 'Delete Failed' 
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        sx: { borderRadius: 2 }
-      }}
-    >
+    <>
+      <Dialog 
+        open={open} 
+        onClose={onClose}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2 }
+        }}
+      >
       <DialogTitle>{title || (isEdit ? 'Edit Client' : 'New Client')}</DialogTitle>
       
       <DialogContent>
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
         
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
           <TextField
@@ -253,7 +254,15 @@ const ClientDialog = ({
           SAVE
         </Button>
       </DialogActions>
-    </Dialog>
+      </Dialog>
+
+      <ErrorDialog
+        open={errorDialog.open}
+        onClose={() => setErrorDialog({ open: false, error: null, title: 'Error' })}
+        error={errorDialog.error}
+        title={errorDialog.title}
+      />
+    </>
   );
 };
 

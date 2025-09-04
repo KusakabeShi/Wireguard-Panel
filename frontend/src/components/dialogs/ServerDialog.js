@@ -13,6 +13,7 @@ import {
   Typography,
   Divider
 } from '@mui/material';
+import ErrorDialog from './ErrorDialog';
 
 const ServerDialog = ({ 
   open, 
@@ -57,9 +58,9 @@ const ServerDialog = ({
       }
     }
   });
-  const [error, setError] = useState('');
   const [warnings, setWarnings] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [errorDialog, setErrorDialog] = useState({ open: false, error: null, title: 'Error' });
 
   const isEdit = Boolean(server);
 
@@ -143,7 +144,6 @@ const ServerDialog = ({
         }
       });
     }
-    setError('');
     setWarnings([]);
   }, [server, open]);
 
@@ -179,11 +179,13 @@ const ServerDialog = ({
   };
 
   const handleSave = async () => {
-    setError('');
-    
     // Validate required fields
     if (!formData.ipv4.enabled && !formData.ipv6.enabled) {
-      setError('At least one of IPv4 or IPv6 must be enabled');
+      setErrorDialog({ 
+        open: true, 
+        error: 'At least one of IPv4 or IPv6 must be enabled', 
+        title: 'Validation Error' 
+      });
       return;
     }
 
@@ -243,7 +245,11 @@ const ServerDialog = ({
       await onSave(data);
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to save server');
+      setErrorDialog({ 
+        open: true, 
+        error: err.message || 'Failed to save server', 
+        title: 'Save Failed' 
+      });
     } finally {
       setLoading(false);
     }
@@ -252,14 +258,17 @@ const ServerDialog = ({
   const handleDelete = async () => {
     if (!server) return;
     
-    setError('');
     setLoading(true);
 
     try {
       await onDelete(server.id);
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to delete server');
+      setErrorDialog({ 
+        open: true, 
+        error: err.message || 'Failed to delete server', 
+        title: 'Delete Failed' 
+      });
     } finally {
       setLoading(false);
     }
@@ -410,23 +419,19 @@ const ServerDialog = ({
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{
-        sx: { borderRadius: 2 }
-      }}
-    >
+    <>
+      <Dialog 
+        open={open} 
+        onClose={onClose}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2 }
+        }}
+      >
       <DialogTitle>{title || (isEdit ? 'Edit Server' : 'New Server')}</DialogTitle>
       
       <DialogContent>
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
         
         {warnings.length > 0 && (
           <Alert severity="warning" sx={{ mb: 2 }}>
@@ -490,7 +495,15 @@ const ServerDialog = ({
           SAVE
         </Button>
       </DialogActions>
-    </Dialog>
+      </Dialog>
+
+      <ErrorDialog
+        open={errorDialog.open}
+        onClose={() => setErrorDialog({ open: false, error: null, title: 'Error' })}
+        error={errorDialog.error}
+        title={errorDialog.title}
+      />
+    </>
   );
 };
 

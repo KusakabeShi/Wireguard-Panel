@@ -156,7 +156,7 @@ func CleanupRules(comment string, version int, targetTable *[]string, matchPrefi
 		err4 := CleanupRules(comment, 4, targetTable, matchPrefix)
 		err6 := CleanupRules(comment, 6, targetTable, matchPrefix)
 		if err4 != nil && err6 != nil {
-			return fmt.Errorf("err4: %v, err6: %v", err4, err6)
+			return fmt.Errorf("err4:-> %v, err6:-> %v", err4, err6)
 		} else if err4 != nil {
 			return err4
 		} else if err6 != nil {

@@ -6,10 +6,10 @@ import {
   DialogActions,
   TextField,
   Button,
-  Box,
-  Alert
+  Box
 } from '@mui/material';
 import apiService from '../../services/apiService';
+import ErrorDialog from './ErrorDialog';
 
 const InterfaceDialog = ({ 
   open, 
@@ -29,11 +29,11 @@ const InterfaceDialog = ({
     vrfName: '',
     fwMark: ''
   });
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
   const [serviceConfig, setServiceConfig] = useState(null);
   const [validationError, setValidationError] = useState('');
+  const [errorDialog, setErrorDialog] = useState({ open: false, error: null, title: 'Error' });
 
   const isEdit = Boolean(interface_);
 
@@ -59,7 +59,6 @@ const InterfaceDialog = ({
         fwMark: interface_.fwMark || ''
       });
       setIsEnabled(interface_.enabled || false);
-      setError('');
       setValidationError('');
     } else if (open && !interface_) {
       // New interface
@@ -73,7 +72,6 @@ const InterfaceDialog = ({
         fwMark: ''
       });
       setIsEnabled(false);
-      setError('');
       setValidationError('');
     }
   }, [interface_, open]);
@@ -101,7 +99,6 @@ const InterfaceDialog = ({
   };
 
   const handleSave = async () => {
-    setError('');
     setLoading(true);
 
     // Check validation first
@@ -129,7 +126,11 @@ const InterfaceDialog = ({
       await onSave(data);
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to save interface');
+      setErrorDialog({ 
+        open: true, 
+        error: err.message || 'Failed to save interface', 
+        title: 'Save Failed' 
+      });
     } finally {
       setLoading(false);
     }
@@ -138,14 +139,17 @@ const InterfaceDialog = ({
   const handleDelete = async () => {
     if (!interface_) return;
     
-    setError('');
     setLoading(true);
 
     try {
       await onDelete(interface_.id);
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to delete interface');
+      setErrorDialog({ 
+        open: true, 
+        error: err.message || 'Failed to delete interface', 
+        title: 'Delete Failed' 
+      });
     } finally {
       setLoading(false);
     }
@@ -154,141 +158,147 @@ const InterfaceDialog = ({
   const handleToggleEnable = async () => {
     if (!interface_) return;
     
-    setError('');
     setLoading(true);
 
     try {
       await onToggleEnable(interface_.id, !isEnabled);
       setIsEnabled(!isEnabled);
     } catch (err) {
-      setError(err.message || 'Failed to update interface status');
+      setErrorDialog({ 
+        open: true, 
+        error: err.message || 'Failed to update interface status', 
+        title: 'Toggle Failed' 
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        sx: { borderRadius: 2 }
-      }}
-    >
-      <DialogTitle>{title || (isEdit ? 'Edit Interface' : 'New Interface')}</DialogTitle>
-      
-      <DialogContent>
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
+    <>
+      <Dialog 
+        open={open} 
+        onClose={onClose}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2 }
+        }}
+      >
+        <DialogTitle>{title || (isEdit ? 'Edit Interface' : 'New Interface')}</DialogTitle>
         
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-          <TextField
-            label="Name"
-            value={formData.ifname}
-            onChange={handleChange('ifname')}
-            required
-            fullWidth
-            variant="outlined"
-            error={!!validationError}
-            helperText={validationError || ""}
-          />
-          
-          <TextField
-            label="Endpoint"
-            value={formData.endpoint}
-            onChange={handleChange('endpoint')}
-            required
-            fullWidth
-            variant="outlined"
-          />
-          
-          <TextField
-            label="Port"
-            type="number"
-            value={formData.port}
-            onChange={handleChange('port')}
-            required
-            fullWidth
-            variant="outlined"
-          />
-          
-          <TextField
-            label="MTU"
-            type="number"
-            value={formData.mtu}
-            onChange={handleChange('mtu')}
-            fullWidth
-            variant="outlined"
-          />
-          
-          <TextField
-            label="Private Key"
-            value={formData.privateKey}
-            onChange={handleChange('privateKey')}
-            fullWidth
-            variant="outlined"
-            placeholder={isEdit ? "Leave empty to keep current key" : "Leave empty to generate new key"}
-          />
-          
-          <TextField
-            label="VRF Name"
-            value={formData.vrfName}
-            onChange={handleChange('vrfName')}
-            fullWidth
-            variant="outlined"
-          />
-          
-          <TextField
-            label="FWMark"
-            value={formData.fwMark}
-            onChange={handleChange('fwMark')}
-            fullWidth
-            variant="outlined"
-          />
-        </Box>
-      </DialogContent>
-      
-      <DialogActions sx={{ px: 3, pb: 3 }}>
-        {isEdit && (
+        <DialogContent>        
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <TextField
+              label="Name"
+              value={formData.ifname}
+              onChange={handleChange('ifname')}
+              required
+              fullWidth
+              variant="outlined"
+              error={!!validationError}
+              helperText={validationError || ""}
+            />
+            
+            <TextField
+              label="Endpoint"
+              value={formData.endpoint}
+              onChange={handleChange('endpoint')}
+              required
+              fullWidth
+              variant="outlined"
+            />
+            
+            <TextField
+              label="Port"
+              type="number"
+              value={formData.port}
+              onChange={handleChange('port')}
+              required
+              fullWidth
+              variant="outlined"
+            />
+            
+            <TextField
+              label="MTU"
+              type="number"
+              value={formData.mtu}
+              onChange={handleChange('mtu')}
+              fullWidth
+              variant="outlined"
+            />
+            
+            <TextField
+              label="Private Key"
+              value={formData.privateKey}
+              onChange={handleChange('privateKey')}
+              fullWidth
+              variant="outlined"
+              placeholder={isEdit ? "Leave empty to keep current key" : "Leave empty to generate new key"}
+            />
+            
+            <TextField
+              label="VRF Name"
+              value={formData.vrfName}
+              onChange={handleChange('vrfName')}
+              fullWidth
+              variant="outlined"
+            />
+            
+            <TextField
+              label="FWMark"
+              value={formData.fwMark}
+              onChange={handleChange('fwMark')}
+              fullWidth
+              variant="outlined"
+            />
+          </Box>
+        </DialogContent>
+        
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          {isEdit && (
+            <Button 
+              onClick={handleDelete}
+              color="error"
+              disabled={loading}
+            >
+              DELETE
+            </Button>
+          )}
+          {isEdit && (
+            <Button 
+              onClick={handleToggleEnable}
+              color={isEnabled ? "warning" : "success"}
+              disabled={loading}
+              sx={{ ml: 1 }}
+            >
+              {isEnabled ? "DISABLE" : "ENABLE"}
+            </Button>
+          )}
+          <Box sx={{ flexGrow: 1 }} />
           <Button 
-            onClick={handleDelete}
-            color="error"
+            onClick={onClose} 
             disabled={loading}
           >
-            DELETE
+            CANCEL
           </Button>
-        )}
-        {isEdit && (
           <Button 
-            onClick={handleToggleEnable}
-            color={isEnabled ? "warning" : "success"}
+            onClick={handleSave}
+            variant="contained"
             disabled={loading}
-            sx={{ ml: 1 }}
           >
-            {isEnabled ? "DISABLE" : "ENABLE"}
+            SAVE
           </Button>
-        )}
-        <Box sx={{ flexGrow: 1 }} />
-        <Button 
-          onClick={onClose} 
-          disabled={loading}
-        >
-          CANCEL
-        </Button>
-        <Button 
-          onClick={handleSave}
-          variant="contained"
-          disabled={loading}
-        >
-          SAVE
-        </Button>
-      </DialogActions>
-    </Dialog>
+        </DialogActions>
+      </Dialog>
+
+      <ErrorDialog
+        open={errorDialog.open}
+        onClose={() => setErrorDialog({ open: false, error: null, title: 'Error' })}
+        error={errorDialog.error}
+        title={errorDialog.title}
+      />
+    </>
   );
 };
 

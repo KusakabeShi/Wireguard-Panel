@@ -43,13 +43,13 @@ if err := utils.RunCommand("ip", "link", "show", "wg-test"); err != nil {
 cmd := exec.Command("wg", "show", "wg-test", "dump")
 output, err := cmd.Output()
 if err != nil {
-    return nil, fmt.Errorf("failed to get stats: %v", err)
+    return nil, fmt.Errorf("failed to get stats:-> %v", err)
 }
 
 // New way
 output, err := utils.RunCommandWithOutput("wg", "show", "wg-test", "dump")
 if err != nil {
-    return nil, fmt.Errorf("failed to get stats: %v", err)
+    return nil, fmt.Errorf("failed to get stats:-> %v", err)
 }
 ```
 
@@ -68,7 +68,7 @@ utils.RunCommandIgnoreError("ip", "addr", "del", "192.168.1.1/24", "dev", "wg-te
 // Prevent hanging on problematic commands
 output, err := utils.RunCommandWithTimeout(30*time.Second, "wg-quick", "up", "/etc/wireguard/wg-test.conf")
 if err != nil {
-    return fmt.Errorf("interface setup timed out: %v", err)
+    return fmt.Errorf("interface setup timed out:-> %v", err)
 }
 ```
 

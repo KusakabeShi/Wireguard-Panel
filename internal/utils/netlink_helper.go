@@ -16,12 +16,12 @@ import (
 func GetInterfaceIP(ifname string) (*models.IPNetWrapper, *models.IPNetWrapper, error) {
 	link, err := netlink.LinkByName(ifname)
 	if err != nil {
-		return nil, nil, fmt.Errorf("get link %s: %w", ifname, err)
+		return nil, nil, fmt.Errorf("get link %s:-> %w", ifname, err)
 	}
 
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
 	if err != nil {
-		return nil, nil, fmt.Errorf("list addrs: %w", err)
+		return nil, nil, fmt.Errorf("list addrs:-> %w", err)
 	}
 
 	var v4s, v6s []netlink.Addr
@@ -81,12 +81,12 @@ func GetInterfaceIP(ifname string) (*models.IPNetWrapper, *models.IPNetWrapper, 
 func GetInterfaceIPs(ifname string) ([]net.IP, []net.IP, error) {
 	link, err := netlink.LinkByName(ifname)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get link by name %v: %w", ifname, err)
+		return nil, nil, fmt.Errorf("failed to get link by name %v:-> %w", ifname, err)
 	}
 
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list addresses: %w", err)
+		return nil, nil, fmt.Errorf("failed to list addresses:-> %w", err)
 	}
 
 	var ipv4s, ipv6s []net.IP
@@ -293,7 +293,7 @@ func IsIfExists(ifname string) error {
 		if _, ok := err.(netlink.LinkNotFoundError); ok {
 			return fmt.Errorf("interface %s does not exist", ifname)
 		}
-		return fmt.Errorf("error checking interface %s: %v", ifname, err)
+		return fmt.Errorf("failed to check interface %s:-> %v", ifname, err)
 	}
 	return nil
 }
@@ -301,7 +301,7 @@ func IsIfExists(ifname string) error {
 func IsIfaceLayer2(ifname string) error {
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
-		return fmt.Errorf("interface %q not found: %w", ifname, err)
+		return fmt.Errorf("interface %q not found:-> %w", ifname, err)
 	}
 
 	// Check if it has a hardware (MAC) address
