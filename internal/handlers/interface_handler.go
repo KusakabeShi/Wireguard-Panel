@@ -121,11 +121,28 @@ func (h *InterfaceHandler) DeleteInterface(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+func (h *InterfaceHandler) GetInterfaceClientsState(c *gin.Context) {
+	ifId := c.Param("ifId")
+
+	clientsState, milliseconds, err := h.service.GetInterfaceClientsState(ifId)
+	if err != nil {
+		if err.Error() == "interface not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"state": clientsState, "timestamp": milliseconds})
+}
+
 func (h *InterfaceHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("", h.ListInterfaces)
 	router.POST("", h.CreateInterface)
 	router.GET("/:ifId", h.GetInterface)
 	router.PUT("/:ifId", h.UpdateInterface)
 	router.POST("/:ifId/set-enable", h.SetInterfaceEnabled)
+	router.GET("/:ifId/clients-state", h.GetInterfaceClientsState)
 	router.DELETE("/:ifId", h.DeleteInterface)
 }

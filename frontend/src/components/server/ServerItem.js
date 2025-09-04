@@ -16,6 +16,12 @@ import ClientList from '../client/ClientList';
 
 const ServerItem = ({ 
   server, 
+  clientsState,
+  previousClientsState,
+  lastUpdateTime,
+  previousUpdateTime,
+  trafficDisplayMode,
+  onTrafficModeToggle,
   expanded,
   expandedClients,
   onToggleExpanded,
@@ -94,6 +100,12 @@ const ServerItem = ({
         <Box sx={{ backgroundColor: '#f5f5f5', borderRadius: '0 0 4px 4px' }}>
           <ClientList
             clients={server.clients || []}
+            clientsState={clientsState[server.id] || {}}
+            previousClientsState={previousClientsState[server.id] || {}}
+            lastUpdateTime={lastUpdateTime}
+            previousUpdateTime={previousUpdateTime}
+            trafficDisplayMode={trafficDisplayMode}
+            onTrafficModeToggle={onTrafficModeToggle}
             expandedClients={expandedClients}
             onToggleExpanded={onToggleClientExpanded}
             onEdit={(client) => onEditClient(server, client)}

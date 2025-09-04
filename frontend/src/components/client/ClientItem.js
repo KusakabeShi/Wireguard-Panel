@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   Box, 
   Typography, 
@@ -13,11 +13,24 @@ import {
   Circle as CircleIcon
 } from '@mui/icons-material';
 import ClientDetails from './ClientDetails';
-import { formatBytes, formatLastHandshake, isClientActive } from '../../utils/formatUtils';
-import apiService from '../../services/apiService';
+import { 
+  formatBytes, 
+  formatLastHandshake, 
+  isClientActive, 
+  formatTransferRate, 
+  calculateTransferRate,
+  TRAFFIC_DISPLAY_MODES,
+  setTrafficDisplayMode
+} from '../../utils/formatUtils';
 
 const ClientItem = ({ 
   client, 
+  clientState,
+  previousClientState,
+  lastUpdateTime,
+  previousUpdateTime,
+  trafficDisplayMode,
+  onTrafficModeToggle,
   expanded,
   onToggleExpanded,
   onEdit,
@@ -26,39 +39,48 @@ const ClientItem = ({
   interfaceId,
   serverId
 }) => {
-  const [clientState, setClientState] = useState(null);
 
-  useEffect(() => {
-    // Always load client state to show traffic stats and status
-    loadClientState();
-    
-    // Set up interval to update client status every 5 seconds
-    const interval = setInterval(() => {
-      loadClientState();
-    }, 5000);
-    
-    // Cleanup interval on unmount or when client.id changes
-    return () => clearInterval(interval);
-  }, [client.id]);
+  const getTrafficText = () => {
+    if (trafficDisplayMode === TRAFFIC_DISPLAY_MODES.RATE) {
+      // Calculate transfer rates
+      if (!clientState || !previousClientState || !lastUpdateTime || !previousUpdateTime) {
+        return ' ↑ 0 Bps ↓ 0 Bps';
+      }
 
-  const loadClientState = async () => {
-    try {
-      const state = await apiService.getClientState(interfaceId, serverId, client.id);
-      setClientState(state);
-    } catch (error) {
-      console.error('Failed to load client state:', error);
-      setClientState(null);
+      const txRate = calculateTransferRate(
+        clientState.transferTx || 0,
+        previousClientState.transferTx || 0,
+        lastUpdateTime,
+        previousUpdateTime
+      );
+      
+      const rxRate = calculateTransferRate(
+        clientState.transferRx || 0,
+        previousClientState.transferRx || 0,
+        lastUpdateTime,
+        previousUpdateTime
+      );
+
+      return ` ↑ ${formatTransferRate(txRate)} ↓ ${formatTransferRate(rxRate)}`;
+    } else {
+      // Show total traffic (original behavior)
+      const tx = formatBytes(clientState?.transferTx || 0);
+      const rx = formatBytes(clientState?.transferRx || 0);
+      return ` ↑ ${tx} ↓ ${rx}`;
     }
   };
 
-  const getTrafficText = () => {
-    // Always show traffic stats, even if null (treat as 0)
-    const tx = formatBytes(clientState?.transferTx || 0);
-    const rx = formatBytes(clientState?.transferRx || 0);
-    return ` ↑ ${tx} ↓ ${rx}`;
+  const handleTrafficTextClick = () => {
+    // Save new mode to cookie and call parent toggle handler
+    const newMode = trafficDisplayMode === TRAFFIC_DISPLAY_MODES.TOTAL 
+      ? TRAFFIC_DISPLAY_MODES.RATE 
+      : TRAFFIC_DISPLAY_MODES.TOTAL;
+    
+    setTrafficDisplayMode(newMode);
+    onTrafficModeToggle();
   };
 
-  const isActive = isClientActive(clientState?.latestHandshake);
+  const isActive = isClientActive(lastUpdateTime,clientState?.latestHandshake);
 
   return (
     <Box sx={{ mb: 1 }}>
@@ -91,8 +113,21 @@ const ClientItem = ({
             </Box>
           </Box>
           <Box sx={{ mr: 2, display: 'flex', alignItems: 'center' }}>
-            <Typography variant="body2" sx={{ color: 'rgb(255, 255, 255)', mr: 1 }}>
-          {getTrafficText()}
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: 'rgb(255, 255, 255)', 
+                mr: 1, 
+                cursor: 'pointer',
+                '&:hover': {
+                  textDecoration: 'underline',
+                  opacity: 0.8
+                }
+              }}
+              onClick={handleTrafficTextClick}
+              title={`Click to switch between total traffic and transfer rate mode. Currently showing: ${trafficDisplayMode === TRAFFIC_DISPLAY_MODES.RATE ? 'Transfer Rate' : 'Total Traffic'}`}
+            >
+              {getTrafficText()}
             </Typography>
             <Box
               sx={{
@@ -141,6 +176,7 @@ const ClientItem = ({
           <ClientDetails 
             client={client}
             clientState={clientState}
+            lastUpdateTime={lastUpdateTime}
             interfaceId={interfaceId}
             serverId={serverId}
           />

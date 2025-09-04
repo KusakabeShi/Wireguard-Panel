@@ -148,19 +148,6 @@ func (h *ClientHandler) SetClientEnabled(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *ClientHandler) GetClientWGState(c *gin.Context) {
-	ifId := c.Param("ifId")
-	serverId := c.Param("serverId")
-	clientId := c.Param("clientId")
-
-	state, err := h.service.GetClientWGState(ifId, serverId, clientId)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Client, Server, or Interface not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, state)
-}
 
 func (h *ClientHandler) GetClientConfig(c *gin.Context) {
 	ifId := c.Param("ifId")
@@ -183,6 +170,5 @@ func (h *ClientHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.PUT("/clients/:clientId", h.UpdateClient)
 	router.DELETE("/clients/:clientId", h.DeleteClient)
 	router.POST("/clients/:clientId/set-enable", h.SetClientEnabled)
-	router.GET("/clients/:clientId/state", h.GetClientWGState)
 	router.GET("/clients/:clientId/config", h.GetClientConfig)
 }

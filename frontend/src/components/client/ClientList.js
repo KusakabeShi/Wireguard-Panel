@@ -4,6 +4,12 @@ import ClientItem from './ClientItem';
 
 const ClientList = ({ 
   clients,
+  clientsState,
+  previousClientsState,
+  lastUpdateTime,
+  previousUpdateTime,
+  trafficDisplayMode,
+  onTrafficModeToggle,
   expandedClients,
   onToggleExpanded,
   onEdit,
@@ -22,6 +28,12 @@ const ClientList = ({
         <ClientItem
           key={client.id}
           client={client}
+          clientState={clientsState[client.id] || null}
+          previousClientState={previousClientsState[client.id] || null}
+          lastUpdateTime={lastUpdateTime}
+          previousUpdateTime={previousUpdateTime}
+          trafficDisplayMode={trafficDisplayMode}
+          onTrafficModeToggle={onTrafficModeToggle}
           expanded={expandedClients.has(client.id)}
           onToggleExpanded={onToggleExpanded}
           onEdit={onEdit}

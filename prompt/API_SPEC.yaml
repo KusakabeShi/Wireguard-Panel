@@ -226,6 +226,61 @@ paths:
           description: Interface not found.
       security:
         - cookieAuth: []
+  /interfaces/{ifId}/clients-state:
+    parameters:
+      - $ref: '#/components/parameters/ifId'
+    get:
+      tags:
+        - Interfaces
+      summary: Get All Enabled Clients' Live WireGuard State for Interface
+      description: Retrieves WireGuard state (handshake, transfer, endpoint) for all enabled clients across all enabled servers in the specified interface. Returns a nested object structure organized by server ID and client ID.
+      operationId: getInterfaceClientsState
+      responses:
+        '200':
+          description: Live state data for all enabled clients in the interface, along with a timestamp.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  state:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      description: Map of server IDs to their clients
+                      additionalProperties:
+                        $ref: '#/components/schemas/ClientWithState'
+                    example:
+                      "server-id-1":
+                        "client-id-1":
+                          id: "client-id-1"
+                          name: "John's Laptop"
+                          enabled: true
+                          ip: "10.0.0.2"
+                          ipv6: "fd00::2"
+                          publicKey: "abc123..."
+                          latestHandshake: "2023-12-01T10:30:00Z"
+                          endpoint: "192.168.1.100:51820"
+                          transferRx: 1024
+                          transferTx: 2048
+                        "client-id-2":
+                          id: "client-id-2"
+                          name: "Jane's Phone"
+                          enabled: true
+                          ip: "10.0.0.3"
+                          publicKey: "def456..."
+                          latestHandshake: null
+                          endpoint: null
+                          transferRx: null
+                          transferTx: null
+                  timestamp:
+                    type: integer
+                    format: int64
+                    description: The timestamp of when the state was generated, in milliseconds since epoch.
+        '404':
+          description: Interface not found.
+      security:
+        - cookieAuth: []
   /interfaces/{ifId}/servers:
     parameters:
       - $ref: '#/components/parameters/ifId'
@@ -511,27 +566,6 @@ paths:
       responses:
         '204':
           description: Client state updated successfully.
-        '404':
-          description: Client, Server, or Interface not found.
-      security:
-        - cookieAuth: []
-  /interfaces/{ifId}/servers/{serverId}/clients/{clientId}/state:
-    parameters:
-      - $ref: '#/components/parameters/ifId'
-      - $ref: '#/components/parameters/serverId'
-      - $ref: '#/components/parameters/clientId'
-    get:
-      tags:
-        - Clients
-      summary: Get Client's Live WireGuard State (GetWGState)
-      operationId: getClientWGState
-      responses:
-        '200':
-          description: Live state data for the client (handshake, transfer, endpoint). Values may be null if the client has not connected.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WGState'
         '404':
           description: Client, Server, or Interface not found.
       security:

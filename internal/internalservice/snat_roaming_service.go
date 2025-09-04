@@ -298,7 +298,7 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 	l.configs = configs
 }
 
-func (l *InterfaceIPNetListener) getSimulatedConfig(config *models.ServerNetworkConfig) (*models.ServerNetworkConfig, error) {
+func (l *InterfaceIPNetListener) getSimulatedConfig(config *models.ServerNetworkConfig) (simulatedIfConfig *models.ServerNetworkConfig, err error) {
 	if config == nil {
 		return nil, fmt.Errorf("config is nil")
 	}
@@ -312,12 +312,22 @@ func (l *InterfaceIPNetListener) getSimulatedConfig(config *models.ServerNetwork
 		return nil, fmt.Errorf("interface %v has no IP for version %v", l.interfaceName, config.Network.Version)
 	}
 
-	target_network, err := l.ifIPs[config.Network.Version].GetSubnetByOffset(config.Snat.SnatIPNet)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get target_network:-> %v", err)
+	iplen := 32
+	if config.Network.Version == 6 {
+		iplen = 128
 	}
-	simulatedIfConfig := &models.ServerNetworkConfig{
+	var target_network *models.IPNetWrapper
+	if config.Snat.SnatIPNet.Masklen() == iplen {
+		// SNAT mode, use the interface IP directly
+		target_network = l.ifIPs[config.Network.Version]
+	} else {
+		// NETMAP mode, calculate the target network by offset
+		if target_network, err = l.ifIPs[config.Network.Version].GetSubnetByOffset(config.Snat.SnatIPNet); err != nil {
+			return nil, fmt.Errorf("failed to get target_network:-> %v", err)
+		}
+	}
+
+	simulatedIfConfig = &models.ServerNetworkConfig{
 		Enabled:                     true,
 		Network:                     config.Network,
 		PseudoBridgeMasterInterface: nil,

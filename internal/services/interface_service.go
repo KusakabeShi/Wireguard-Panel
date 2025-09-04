@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"wg-panel/internal/config"
 	"wg-panel/internal/logging"
@@ -351,6 +352,59 @@ func (s *InterfaceService) ValidateEndpoint(endpoint string) (string, error) {
 	}
 
 	return "", fmt.Errorf("endpoint must be a valid IPv4 address, IPv6 address, or domain name")
+}
+
+func (s *InterfaceService) GetInterfaceClientsState(id string) (map[string]map[string]*ClientWithState, int64, error) {
+	iface := s.cfg.GetInterface(id)
+	milliseconds := time.Now().UnixMilli()
+	if iface == nil {
+		return nil, milliseconds, fmt.Errorf("interface not found")
+	}
+
+	// Get WireGuard stats for the entire interface
+
+	stats, err := s.wg.GetPeerStats(iface.Ifname)
+	if err != nil {
+		stats = make(map[string]*models.WGState) // Continue with empty stats
+	}
+
+	result := make(map[string]map[string]*ClientWithState)
+
+	// Iterate through all servers in this interface
+	for _, server := range iface.Servers {
+		if !server.Enabled {
+			continue // Skip disabled servers
+		}
+
+		serverClients := make(map[string]*ClientWithState)
+
+		// Iterate through all clients in this server
+		for _, client := range server.Clients {
+			if !client.Enabled {
+				continue // Skip disabled clients
+			}
+
+			// Convert client to frontend format
+			clientWithIPs, _ := client.ToClientFrontend(server)
+
+			clientWithState := &ClientWithState{
+				ClientFrontend: *clientWithIPs,
+			}
+
+			// Add WG state if available
+			if state, exists := stats[client.PublicKey]; exists {
+				clientWithState.WGState = *state
+			}
+
+			serverClients[client.ID] = clientWithState
+		}
+
+		if len(serverClients) > 0 {
+			result[server.ID] = serverClients
+		}
+	}
+
+	return result, milliseconds, nil
 }
 
 func (s *InterfaceService) isValidDomain(domain string) bool {

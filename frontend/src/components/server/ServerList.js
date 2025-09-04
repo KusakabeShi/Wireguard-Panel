@@ -5,6 +5,12 @@ import ServerItem from './ServerItem';
 
 const ServerList = ({ 
   servers,
+  clientsState,
+  previousClientsState,
+  lastUpdateTime,
+  previousUpdateTime,
+  trafficDisplayMode,
+  onTrafficModeToggle,
   expandedServers,
   expandedClients,
   loading,
@@ -34,6 +40,12 @@ const ServerList = ({
         <ServerItem
           key={server.id}
           server={server}
+          clientsState={clientsState}
+          previousClientsState={previousClientsState}
+          lastUpdateTime={lastUpdateTime}
+          previousUpdateTime={previousUpdateTime}
+          trafficDisplayMode={trafficDisplayMode}
+          onTrafficModeToggle={onTrafficModeToggle}
           expanded={expandedServers.has(server.id)}
           expandedClients={expandedClients}
           onToggleExpanded={onToggleServerExpanded}

@@ -3,6 +3,7 @@ import { Box, Divider, Snackbar, Alert } from '@mui/material';
 import InterfaceHeader from './InterfaceHeader';
 import ServerList from '../server/ServerList';
 import apiService from '../../services/apiService';
+import { getTrafficDisplayMode, TRAFFIC_DISPLAY_MODES } from '../../utils/formatUtils';
 
 const InterfaceView = ({ 
   interface_, 
@@ -17,6 +18,11 @@ const InterfaceView = ({
   onToggleClient
 }) => {
   const [servers, setServers] = useState([]);
+  const [clientsState, setClientsState] = useState({});
+  const [previousClientsState, setPreviousClientsState] = useState({});
+  const [lastUpdateTime, setLastUpdateTime] = useState(null);
+  const [previousUpdateTime, setPreviousUpdateTime] = useState(null);
+  const [trafficDisplayMode, setTrafficDisplayMode] = useState(getTrafficDisplayMode());
   const [expandedServers, setExpandedServers] = useState(new Set());
   const [expandedClients, setExpandedClients] = useState(new Set());
   const [loading, setLoading] = useState(false);
@@ -25,8 +31,23 @@ const InterfaceView = ({
   useEffect(() => {
     if (interface_) {
       loadServers();
+      loadClientsState();
     }
   }, [interface_, interface_?.lastModified]);
+
+  useEffect(() => {
+    if (!interface_) return;
+
+    // Set up interval based on display mode
+    const refreshInterval = trafficDisplayMode === TRAFFIC_DISPLAY_MODES.RATE ? 1000 : 5000;
+    
+    const interval = setInterval(() => {
+      loadClientsState();
+    }, refreshInterval);
+
+    // Cleanup interval on unmount or when interface/mode changes
+    return () => clearInterval(interval);
+  }, [interface_?.id, trafficDisplayMode]);
 
   const loadServers = async () => {
     if (!interface_) return;
@@ -59,6 +80,46 @@ const InterfaceView = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadClientsState = async () => {
+    if (!interface_) return;
+    
+    try {
+      const clientsState = await apiService.getInterfaceClientsState(interface_.id);
+      const clientsStateData = clientsState.state
+      const currentTime = clientsState.timestamp
+      
+      setClientsState(prevClientsState => {
+        if (Object.keys(prevClientsState).length > 0) {
+          setPreviousClientsState(prevClientsState);
+        }
+        return clientsStateData || {};
+      });
+      
+      setLastUpdateTime(prevLastUpdateTime => {
+        if (prevLastUpdateTime) {
+          setPreviousUpdateTime(prevLastUpdateTime);
+        }
+        return currentTime;
+      });
+    } catch (error) {
+      console.error('Failed to load client states:', error);
+      // Don't show error to user for state updates, just reset to empty
+      setClientsState({});
+    }
+  };
+
+  const handleTrafficModeToggle = () => {
+    const newMode = trafficDisplayMode === TRAFFIC_DISPLAY_MODES.TOTAL 
+      ? TRAFFIC_DISPLAY_MODES.RATE 
+      : TRAFFIC_DISPLAY_MODES.TOTAL;
+    
+    setTrafficDisplayMode(newMode);
+    // Clear previous states when switching modes to avoid incorrect calculations
+    setPreviousClientsState({});
+    setLastUpdateTime(null);
+    setPreviousUpdateTime(null);
   };
 
   const handleToggleServerExpanded = (serverId) => {
@@ -118,6 +179,12 @@ const InterfaceView = ({
       <Divider />
       <ServerList
         servers={servers}
+        clientsState={clientsState}
+        previousClientsState={previousClientsState}
+        lastUpdateTime={lastUpdateTime}
+        previousUpdateTime={previousUpdateTime}
+        trafficDisplayMode={trafficDisplayMode}
+        onTrafficModeToggle={handleTrafficModeToggle}
         expandedServers={expandedServers}
         expandedClients={expandedClients}
         loading={loading}

@@ -17,7 +17,7 @@ import { formatBytes, formatLastHandshake } from '../../utils/formatUtils';
 import apiService from '../../services/apiService';
 import QRCodeDialog from '../dialogs/QRCodeDialog';
 
-const ClientDetails = ({ client, clientState, interfaceId, serverId }) => {
+const ClientDetails = ({ client, clientState,lastUpdateTime, interfaceId, serverId }) => {
   const [config, setConfig] = useState('');
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
@@ -78,7 +78,7 @@ const ClientDetails = ({ client, clientState, interfaceId, serverId }) => {
             </TableRow>
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold' }}>Last handshake:</TableCell>
-              <TableCell>{formatLastHandshake(clientState?.latestHandshake)}</TableCell>
+              <TableCell>{formatLastHandshake(lastUpdateTime, clientState?.latestHandshake)}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold' }}>Endpoint:</TableCell>

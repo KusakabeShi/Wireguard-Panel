@@ -292,7 +292,7 @@ const ServerDialog = ({
 
         <Box sx={{ ml: 4, opacity: isEnabled ? 1 : 0.5 }}>
           <TextField
-            label="Network"
+            label="IP/Network"
             value={ip.network}
             onChange={(e) => handleChange(`${ipVersion}.network`, e.target.value)}
             disabled={!isEnabled}
@@ -360,7 +360,7 @@ const ServerDialog = ({
 
           <Box sx={{ ml: 4, opacity: (isEnabled && ip.snat.enabled) ? 1 : 0.5 }}>
             <TextField
-              label="SNAT IP"
+              label="SNAT IP/Net"
               value={ip.snat.snatIpNet}
               onChange={(e) => handleChange(`${ipVersion}.snat.snatIpNet`, e.target.value)}
               disabled={!isEnabled || !ip.snat.enabled}

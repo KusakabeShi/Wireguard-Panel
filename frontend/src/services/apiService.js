@@ -98,6 +98,10 @@ class ApiService {
     });
   }
 
+  async getInterfaceClientsState(ifId) {
+    return this.request(`/interfaces/${ifId}/clients-state`);
+  }
+
   // Server endpoints
   async getServers(ifId) {
     return this.request(`/interfaces/${ifId}/servers`);
@@ -177,9 +181,6 @@ class ApiService {
     });
   }
 
-  async getClientState(ifId, serverId, clientId) {
-    return this.request(`/interfaces/${ifId}/servers/${serverId}/clients/${clientId}/state`);
-  }
 
   async getClientConfig(ifId, serverId, clientId) {
     return this.request(`/interfaces/${ifId}/servers/${serverId}/clients/${clientId}/config`);
