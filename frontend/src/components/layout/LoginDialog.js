@@ -7,8 +7,11 @@ import {
   TextField,
   Button,
   Alert,
-  Box
+  Box,
+  IconButton,
+  Tooltip
 } from '@mui/material';
+import { GitHub } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 
 const LoginDialog = ({ open, onClose }) => {
@@ -76,20 +79,31 @@ const LoginDialog = ({ open, onClose }) => {
             required
           />
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button 
-            onClick={onClose} 
-            disabled={loading}
-          >
-            Cancel
-          </Button>
-          <Button 
-            type="submit" 
-            variant="contained"
-            disabled={loading}
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </Button>
+        <DialogActions sx={{ px: 3, pb: 3, justifyContent: 'space-between' }}>
+          <Tooltip title="View on GitHub">
+            <IconButton
+              onClick={() => window.open('https://github.com/KusakabeShi/Wireguard-Panel', '_blank')}
+              sx={{ color: 'text.secondary' }}
+            >
+              <GitHub />
+            </IconButton>
+          </Tooltip>
+          <Box>
+            <Button 
+              onClick={onClose} 
+              disabled={loading}
+              sx={{ mr: 1 }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              variant="contained"
+              disabled={loading}
+            >
+              {loading ? 'Logging in...' : 'Login'}
+            </Button>
+          </Box>
         </DialogActions>
       </form>
     </Dialog>

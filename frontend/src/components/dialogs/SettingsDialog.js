@@ -12,8 +12,11 @@ import {
   Divider,
   Tab,
   Tabs,
-  Paper
+  Paper,
+  IconButton,
+  Tooltip
 } from '@mui/material';
+import { GitHub } from '@mui/icons-material';
 import apiService from '../../services/apiService';
 
 const TabPanel = ({ children, value, index, ...other }) => (
@@ -300,7 +303,15 @@ const SettingsDialog = ({ open, onClose, onSave }) => {
         </TabPanel>
       </DialogContent>
       
-      <DialogActions sx={{ px: 3, pb: 3 }}>
+      <DialogActions sx={{ px: 3, pb: 3, justifyContent: 'space-between' }}>
+        <Tooltip title="View on GitHub">
+          <IconButton
+            onClick={() => window.open('https://github.com/KusakabeShi/Wireguard-Panel', '_blank')}
+            sx={{ color: 'text.secondary' }}
+          >
+            <GitHub />
+          </IconButton>
+        </Tooltip>
         <Button onClick={onClose}>
           Close
         </Button>
