@@ -294,7 +294,6 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 			logging.LogVerbose("Successfully updated SNAT roaming rules for %s on interface %s", key, l.interfaceName)
 		}
 	}
-
 	l.configs = configs
 }
 
@@ -319,7 +318,9 @@ func (l *InterfaceIPNetListener) getSimulatedConfig(config *models.ServerNetwork
 	var target_network *models.IPNetWrapper
 	if config.Snat.SnatIPNet.Masklen() == iplen {
 		// SNAT mode, use the interface IP directly
-		target_network = l.ifIPs[config.Network.Version]
+		if ipnet, ok := l.ifIPs[config.Network.Version]; ok {
+			target_network, _ = models.ParseCIDRFromIP(ipnet.IP.String())
+		}
 	} else {
 		// NETMAP mode, calculate the target network by offset
 		if target_network, err = l.ifIPs[config.Network.Version].GetSubnetByOffset(config.Snat.SnatIPNet); err != nil {

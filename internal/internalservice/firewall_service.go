@@ -102,7 +102,6 @@ func (f *FirewallService) AddSnatRules(config *models.ServerNetworkConfig, comme
 			return fmt.Errorf("failed to add SNAT rule:-> %v", err)
 		}
 	}
-
 	return nil
 }
 

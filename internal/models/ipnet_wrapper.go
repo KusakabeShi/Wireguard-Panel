@@ -315,7 +315,23 @@ func (basenet *IPNetWrapper) GetSubnetByOffset(offset *IPNetWrapper) (*IPNetWrap
 		},
 	}, nil
 }
-
+func (basenet *IPNetWrapper) Copy() *IPNetWrapper {
+	if basenet == nil {
+		return nil
+	}
+	newIP := make(net.IP, len(basenet.IP))
+	copy(newIP, basenet.IP)
+	newMask := make(net.IPMask, len(basenet.BaseNet.Mask))
+	copy(newMask, basenet.BaseNet.Mask)
+	return &IPNetWrapper{
+		Version: basenet.Version,
+		IP:      newIP,
+		BaseNet: net.IPNet{
+			IP:   basenet.BaseNet.IP.Mask(newMask),
+			Mask: newMask,
+		},
+	}
+}
 func (basenet *IPNetWrapper) IsOverlap(w2 *IPNetWrapper) bool {
 	if basenet == nil || w2 == nil {
 		return false
