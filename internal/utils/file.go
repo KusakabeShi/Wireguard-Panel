@@ -3,7 +3,6 @@ package utils
 import (
 	"crypto/rand"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -20,7 +19,7 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 
 	tmpFile := filename + ".tmp"
 
-	if err := ioutil.WriteFile(tmpFile, data, perm); err != nil {
+	if err := os.WriteFile(tmpFile, data, perm); err != nil {
 		return fmt.Errorf("failed to write temporary file:-> %v", err)
 	}
 

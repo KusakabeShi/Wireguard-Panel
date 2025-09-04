@@ -59,12 +59,11 @@ func (f *FirewallService) RemoveIpAndFwRules(interfaceName string, config *model
 
 	logging.LogInfo("Removing firewall rules and IP configuration for interface %s", interfaceName)
 
-	interfaceDevice := fmt.Sprintf("%s", interfaceName)
 	comment := config.CommentString
 
 	// Remove IP address from interface (only if it exists)
 	if config.Network != nil {
-		f.removeIPAddressIfExists(interfaceDevice, config.Network.String())
+		f.removeIPAddressIfExists(interfaceName, config.Network.String())
 	}
 
 	// Remove firewall rules by comment

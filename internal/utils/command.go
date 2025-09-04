@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"wg-panel/internal/logging"
 )
 
 // CommandError represents a detailed command execution error
@@ -118,7 +119,7 @@ func RunCommandIgnoreError(name string, args ...string) (string, error) {
 	// Even if we ignore the error, we might want to log it for debugging
 	if err != nil {
 		// You could add logging here if needed
-		_ = &CommandError{
+		cmderr := &CommandError{
 			Command:   name,
 			Args:      args,
 			Stdout:    stdoutStr,
@@ -126,6 +127,7 @@ func RunCommandIgnoreError(name string, args ...string) (string, error) {
 			SystemErr: err,
 			Duration:  duration,
 		}
+		logging.LogVerbose("Ignored command error: %s", cmderr.Error())
 	}
 
 	return stdoutStr, err // Return original error for caller to decide
