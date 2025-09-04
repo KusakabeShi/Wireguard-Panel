@@ -46,14 +46,14 @@ class AuthService {
     return response.json();
   }
 
-  async setServicePassword(password) {
+  async setServicePassword(currentPassword, password) {
     const response = await fetch(`${this.getApiBaseUrl()}/service/password`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
       credentials: 'include',
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ currentPassword, password }),
     });
 
     if (!response.ok) {

@@ -109,11 +109,19 @@ func (a *AuthMiddleware) Logout(c *gin.Context) {
 
 func (a *AuthMiddleware) ChangePassword(c *gin.Context) {
 	var passwordReq struct {
-		Password string `json:"password" binding:"required"`
+		CurrentPassword string `json:"currentPassword" binding:"required"`
+		Password        string `json:"password" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&passwordReq); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Verify current password
+	err := bcrypt.CompareHashAndPassword([]byte(a.cfg.Password), []byte(passwordReq.CurrentPassword))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Current password is incorrect"})
 		return
 	}
 

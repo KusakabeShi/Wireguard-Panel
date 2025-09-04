@@ -39,6 +39,7 @@ const SettingsDialog = ({ open, onClose, onSave }) => {
     siteUrlPrefix: '',
     apiPrefix: '',
     // Password change
+    currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
@@ -52,6 +53,7 @@ const SettingsDialog = ({ open, onClose, onSave }) => {
       // Reset password fields when dialog opens
       setFormData(prev => ({
         ...prev,
+        currentPassword: '',
         newPassword: '',
         confirmPassword: ''
       }));
@@ -102,6 +104,11 @@ const SettingsDialog = ({ open, onClose, onSave }) => {
     setSuccess('');
     
     // Validation
+    if (!formData.currentPassword) {
+      setError('Current password is required');
+      return;
+    }
+    
     if (!formData.newPassword) {
       setError('New password is required');
       return;
@@ -120,11 +127,12 @@ const SettingsDialog = ({ open, onClose, onSave }) => {
     setLoading(true);
     
     try {
-      await apiService.updatePassword(formData.newPassword);
+      await apiService.updatePassword(formData.currentPassword, formData.newPassword);
       
       setSuccess('Password updated successfully!');
       setFormData(prev => ({
         ...prev,
+        currentPassword: '',
         newPassword: '',
         confirmPassword: ''
       }));
@@ -248,6 +256,17 @@ const SettingsDialog = ({ open, onClose, onSave }) => {
           
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 400 }}>
             <TextField
+              label="Current Password"
+              type="password"
+              value={formData.currentPassword}
+              onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
+              fullWidth
+              variant="outlined"
+              disabled={loading}
+              autoComplete="current-password"
+            />
+            
+            <TextField
               label="New Password"
               type="password"
               value={formData.newPassword}
@@ -272,7 +291,7 @@ const SettingsDialog = ({ open, onClose, onSave }) => {
             <Button
               variant="contained"
               onClick={handleSavePassword}
-              disabled={loading || !formData.newPassword || !formData.confirmPassword}
+              disabled={loading || !formData.currentPassword || !formData.newPassword || !formData.confirmPassword}
               sx={{ alignSelf: 'flex-start', mt: 1 }}
             >
               {loading ? 'Updating...' : 'Update Password'}

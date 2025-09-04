@@ -191,10 +191,10 @@ class ApiService {
     return this.request('/service/config');
   }
 
-  async updatePassword(password) {
+  async updatePassword(currentPassword, password) {
     return this.request('/service/password', {
       method: 'PUT',
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ currentPassword, password }),
     });
   }
 
