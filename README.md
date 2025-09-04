@@ -1,3 +1,5 @@
+[繁體中文](README_zh.md)
+
 # WG-Panel
 
 WG-Panel is a user-friendly, web-based management panel for WireGuard, designed to simplify the setup and administration of your VPN server. It features a clear hierarchical structure (Interfaces > Servers > Clients) and powerful networking capabilities, including dynamic IP support and advanced NAT configurations.
@@ -48,7 +50,7 @@ WG-Panel organizes your WireGuard setup into three levels: **Interfaces**, **Ser
 An interface represents a physical WireGuard network device (e.g., `wg0`).
 
 1.  Navigate to the "Interfaces" section and click "Create".
-2.  **Name**: A short name for the interface (e.g., `home-vpn`). The actual system interface will be named `wg-home-vpn`.
+2.  **Name**: A short name for the interface (e.g., `wg-home-vpn`).
 3.  **Endpoint**: The public domain or IP address of your server. This will be used as the endpoint in the generated client configuration files.
 4.  **Private Key**: Leave this empty to automatically generate a secure private key, or provide your own.
 5.  Save the interface. It will be created but disabled by default. Enable it from the main interface list.
