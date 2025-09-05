@@ -189,7 +189,7 @@ func (basenet *IPNetWrapper) CheckOffsetValid(offset IPWrapper) error {
 	// Check that offset does not exceed the host bits
 	for i := 0; i < len(offset); i++ {
 		if offset[i]&mask[i] != 0 {
-			return fmt.Errorf("offset %v exceeds host bits for mask %v.", offset, mask)
+			return fmt.Errorf("offset %v exceeds host bits for mask %v", offset, mask)
 		}
 	}
 	return nil
@@ -256,7 +256,7 @@ func (basenet *IPNetWrapper) GetSubnetByOffset(offset *IPNetWrapper) (*IPNetWrap
 	// Example: w= 2a0d:3a87::/64. offset= ::980d:0/112, returns 2a0d:3a87::980d:0/112
 	// Raise error if offset is not aligned, like w= 2a0d:3a87::/64. offset= ::980d:0/96, returns 2a0d:3a87::980d:0/96 but 2a0d:3a87::980d:0/96 is not a valid base network
 	if basenet == nil {
-		return nil, fmt.Errorf("w is nil")
+		return nil, fmt.Errorf("basenet is nil")
 	}
 	if offset == nil {
 		return basenet, nil
@@ -265,11 +265,11 @@ func (basenet *IPNetWrapper) GetSubnetByOffset(offset *IPNetWrapper) (*IPNetWrap
 		return nil, fmt.Errorf("basenet and offset in different address family")
 	}
 	if offset.Masklen() < basenet.Masklen() {
-		return nil, fmt.Errorf("offset block size(/%v) must <= basenet block size(/%v)", offset.Masklen(), basenet.Masklen())
+		return nil, fmt.Errorf("cannot get subnet from %v by offset: %v, offset larger than basenet", basenet.NetworkStr(), offset)
 	}
 	if offset.Masklen() == basenet.Masklen() {
 		if !offset.IP.IsUnspecified() {
-			return nil, fmt.Errorf("same size of network and offset, offset IP must be zero")
+			return nil, fmt.Errorf("cannot get subnet from %v by offset: %v, result exceeds the basenet", basenet.NetworkStr(), offset)
 		}
 		return basenet, nil
 	}
@@ -277,15 +277,14 @@ func (basenet *IPNetWrapper) GetSubnetByOffset(offset *IPNetWrapper) (*IPNetWrap
 	// offset.IP must not exceed the available host bits in the base network
 	// for ipv4: if base is /16 and offset is /24, offset.IP must be in 0.0.0.0~0.0.255.0
 	// for ipv6: if base is /64 and offset is /96, offset.IP must be in ::~::ffff:ffff:0
+	// Verify that the offset network's base IP is properly aligned for its mask
+	if !offset.IsHostbitAllZero() {
+		return nil, fmt.Errorf("offset: %s has non-zero host bits, it is not aligned for its mask", offset.String())
+	}
 
 	// Create a mask for the allowed offset bits
 	if offset.IpExceed2PowerN(basenet.Masklen()) {
-		return nil, fmt.Errorf("offset %s exceeds allowed range for base network %s", offset, basenet.BaseNet.String())
-	}
-
-	// Verify that the offset network's base IP is properly aligned for its mask
-	if !offset.IsHostbitAllZero() {
-		return nil, fmt.Errorf("non-zero host bits: offset %s is not properly aligned for its mask", offset.String())
+		return nil, fmt.Errorf("cannot get subnet from %v by offset: %v, result exceeds the basenet", offset, basenet.NetworkStr())
 	}
 
 	new_IP, err := basenet.GetByOffset(IPWrapper(offset.IP))
@@ -303,7 +302,7 @@ func (basenet *IPNetWrapper) GetSubnetByOffset(offset *IPNetWrapper) (*IPNetWrap
 
 	// Verify the result is within the original network bounds
 	if !basenet.BaseNet.Contains(resultIP) {
-		return nil, fmt.Errorf("resulting network %s/%d exceeds original network bounds %s", resultIP, offset.Masklen(), basenet.BaseNet.String())
+		return nil, fmt.Errorf("cannot get subnet from %v by offset: %v, result %v exceeds the basenet", offset, basenet.NetworkStr(), resultIP)
 	}
 
 	return &IPNetWrapper{
@@ -379,6 +378,17 @@ func IPNetLess(pw, pw2 *IPNetWrapper) bool {
 
 	// IPs are equal, compare by mask length (more specific is "greater", so reverse comparison)
 	return w.Masklen() > w2.Masklen()
+}
+
+func (basenet *IPNetWrapper) IsSingleIP() bool {
+	if basenet == nil {
+		return false
+	}
+	masklen, bits := basenet.BaseNet.Mask.Size()
+	if masklen < 0 || bits < 0 {
+		return false
+	}
+	return masklen == bits
 }
 
 func IPLess(po1, po2 *net.IP) bool {

@@ -25,11 +25,12 @@ class ApiService {
     if (!response.ok) {
       // Try to parse error response
       let errorMessage = `HTTP error! status: ${response.status}`;
+      let errorData = null;
       
       try {
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json();
+          errorData = await response.json();
           // Check for msg.error format or direct error field
           if (errorData.error) {
             errorMessage = errorData.error;
@@ -49,7 +50,12 @@ class ApiService {
         console.error('Failed to parse error response:', parseError);
       }
       
-      throw new Error(errorMessage);
+      const error = new Error(errorMessage);
+      // Attach the full error data if available for structured error handling
+      if (errorData) {
+        error.errorData = errorData;
+      }
+      throw error;
     }
 
     const contentType = response.headers.get('content-type');
@@ -202,6 +208,15 @@ class ApiService {
     return this.request('/service/logout', {
       method: 'POST',
     });
+  }
+
+  async validateSNATRoamingOffset(ifname, offset, addressFamily) {
+    const params = new URLSearchParams({
+      af: addressFamily,
+      ifname: ifname,
+      offset: offset
+    });
+    return this.request(`/service/snatroamingoffsetvalid?${params}`);
   }
 }
 

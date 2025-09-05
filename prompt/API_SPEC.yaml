@@ -104,6 +104,72 @@ paths:
           description: Unauthorized.
       security:
         - cookieAuth: []
+  /service/snatroamingoffsetvalid:
+    get:
+      tags:
+        - Service
+      summary: Check SNAT Roaming Offset Validity
+      description: |
+        Validates if a SNAT roaming offset is valid for a given master interface and address family.
+        Returns the type of NAT mapping (SNAT or NETMAP) and the mapped network.
+      operationId: checkSNATRoamingOffsetValid
+      parameters:
+        - name: af
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: ["4", "6"]
+          description: Address family - "4" for IPv4, "6" for IPv6
+        - name: ifname
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The master network interface name to use for roaming SNAT
+        - name: offset
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The IP or network offset in CIDR notation
+      responses:
+        '200':
+          description: Offset validation successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum: ["SNAT", "NETMAP"]
+                    description: The type of NAT mapping
+                  mapped network:
+                    type: string
+                    description: The resulting mapped network in CIDR notation
+                example:
+                  type: "SNAT"
+                  mapped network: "192.168.1.0/24"
+        '400':
+          description: Invalid parameters or validation failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Error message
+                  error_params:
+                    type: string
+                    enum: ["ifname", "offset", "addressfamily"]
+                    description: Which parameter caused the error
+                example:
+                  error: "Invalid offset: network mask too large"
+                  error_params: "offset"
+      security:
+        - cookieAuth: []
   /interfaces:
     get:
       tags:

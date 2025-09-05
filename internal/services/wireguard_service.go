@@ -146,7 +146,6 @@ func (s *WireGuardService) calculateAllowedIPs(client *models.Client, server *mo
 }
 
 func (s *WireGuardService) SyncToInterface(ifname string, enabled bool, checkWgKey string) (err error) {
-	interfaceName := fmt.Sprintf("%s", ifname)
 	configFile := filepath.Join(s.configPath, fmt.Sprintf("%s.conf", ifname))
 	wgPubkey := ""
 	if checkWgKey != "" {
@@ -157,22 +156,22 @@ func (s *WireGuardService) SyncToInterface(ifname string, enabled bool, checkWgK
 	}
 
 	// Check if interface exists
-	interfaceExists := utils.RunCommand("ip", "link", "show", interfaceName) == nil
+	interfaceExists := utils.RunCommand("ip", "link", "show", ifname) == nil
 
 	if enabled {
 		if !interfaceExists {
 			// Situation 1: Interface not found and enable=true, wg-quick up normally
-			logging.LogInfo("Bringing up WireGuard interface %s", interfaceName)
+			logging.LogInfo("Bringing up WireGuard interface %s", ifname)
 			if err := utils.RunCommand("wg-quick", "up", configFile); err != nil {
 				return fmt.Errorf("failed to bring up interface with wg-quick:-> %v", err)
 			}
 		} else {
 			// Situation 2: Interface exists, check if it's a WireGuard interface and public key
-			if !s.isTargetWgInterface(interfaceName, wgPubkey) {
+			if !s.isTargetWgInterface(ifname, wgPubkey) {
 				if wgPubkey != "" {
-					return fmt.Errorf("interface %s is not the target WireGuard interface (public key mismatch)", interfaceName)
+					return fmt.Errorf("interface %s is not the target WireGuard interface (public key mismatch)", ifname)
 				} else {
-					return fmt.Errorf("interface %s exists but is not a WireGuard interface", interfaceName)
+					return fmt.Errorf("interface %s exists but is not a WireGuard interface", ifname)
 				}
 			}
 
@@ -182,8 +181,8 @@ func (s *WireGuardService) SyncToInterface(ifname string, enabled bool, checkWgK
 				return fmt.Errorf("failed to strip config:-> %v", err)
 			}
 
-			logging.LogInfo("Syncing configuration to WireGuard interface %s", interfaceName)
-			if err := s.syncConfToInterface(interfaceName, strippedConfig); err != nil {
+			logging.LogInfo("Syncing configuration to WireGuard interface %s", ifname)
+			if err := s.syncConfToInterface(ifname, strippedConfig); err != nil {
 				return fmt.Errorf("failed to sync interface configuration:-> %v", err)
 			}
 		}
@@ -194,16 +193,16 @@ func (s *WireGuardService) SyncToInterface(ifname string, enabled bool, checkWgK
 			return nil
 		} else {
 			// Situation 4: Interface exists, check if it's WireGuard and public key
-			if !s.isTargetWgInterface(interfaceName, wgPubkey) {
+			if !s.isTargetWgInterface(ifname, wgPubkey) {
 				if wgPubkey != "" {
-					return fmt.Errorf("interface %s is not the target WireGuard interface (public key mismatch)", interfaceName)
+					return fmt.Errorf("interface %s is not the target WireGuard interface (public key mismatch)", ifname)
 				} else {
-					return fmt.Errorf("interface %s exists but is not a WireGuard interface", interfaceName)
+					return fmt.Errorf("interface %s exists but is not a WireGuard interface", ifname)
 				}
 			}
 
 			// Use wg-quick down to properly disable the interface
-			logging.LogInfo("Bringing down WireGuard interface %s", interfaceName)
+			logging.LogInfo("Bringing down WireGuard interface %s", ifname)
 			if err := utils.RunCommand("wg-quick", "down", configFile); err != nil {
 				return fmt.Errorf("failed to disable interface:-> %v", err)
 			}
@@ -240,7 +239,7 @@ func (s *WireGuardService) SetInterfaceMTU(ifname string, mtu int) error {
 }
 
 func (s *WireGuardService) GetPeerStats(interfaceName string) (map[string]*models.WGState, error) {
-	output, err := utils.RunCommandWithOutput("wg", "show", fmt.Sprintf("%s", interfaceName), "dump")
+	output, err := utils.RunCommandWithOutput("wg", "show", interfaceName, "dump")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get peer stats:-> %v", err)
 	}

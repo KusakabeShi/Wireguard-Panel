@@ -16,12 +16,12 @@ import (
 func GetInterfaceIP(ifname string) (*models.IPNetWrapper, *models.IPNetWrapper, error) {
 	link, err := netlink.LinkByName(ifname)
 	if err != nil {
-		return nil, nil, fmt.Errorf("get link %s:-> %w", ifname, err)
+		return nil, nil, fmt.Errorf("failed to get interface %s:-> %w", ifname, err)
 	}
 
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
 	if err != nil {
-		return nil, nil, fmt.Errorf("list addrs:-> %w", err)
+		return nil, nil, fmt.Errorf("failed to get addrs from interface %s:-> %w", ifname, err)
 	}
 
 	var v4s, v6s []netlink.Addr

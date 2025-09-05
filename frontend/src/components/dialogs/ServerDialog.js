@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -14,6 +14,7 @@ import {
   Divider
 } from '@mui/material';
 import ErrorDialog from './ErrorDialog';
+import apiService from '../../services/apiService';
 
 const ServerDialog = ({ 
   open, 
@@ -61,6 +62,18 @@ const ServerDialog = ({
   const [warnings, setWarnings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorDialog, setErrorDialog] = useState({ open: false, error: null, title: 'Error' });
+  const [validationErrors, setValidationErrors] = useState({
+    ipv4: { snatRoamingInterface: '', snatIpNet: '' },
+    ipv6: { snatRoamingInterface: '', snatIpNet: '' }
+  });
+  const [validationSuccess, setValidationSuccess] = useState({
+    ipv4: { snatIpNet: '' },
+    ipv6: { snatIpNet: '' }
+  });
+  const validationTimeouts = useRef({
+    ipv4: null,
+    ipv6: null
+  });
 
   const isEdit = Boolean(server);
 
@@ -145,11 +158,53 @@ const ServerDialog = ({
       });
     }
     setWarnings([]);
+    setValidationErrors({
+      ipv4: { snatRoamingInterface: '', snatIpNet: '' },
+      ipv6: { snatRoamingInterface: '', snatIpNet: '' }
+    });
+    setValidationSuccess({
+      ipv4: { snatIpNet: '' },
+      ipv6: { snatIpNet: '' }
+    });
+    
+    // Clear any pending validation timeouts when dialog closes
+    Object.values(validationTimeouts.current).forEach(timeout => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    });
+    validationTimeouts.current = {
+      ipv4: null,
+      ipv6: null
+    };
   }, [server, open]);
 
   useEffect(() => {
     checkValidation();
   }, [formData]);
+
+  // Separate useEffect for initial SNAT validation when dialog opens
+  useEffect(() => {
+    if (open && server) {
+      // Trigger SNAT roaming validation for existing configurations when dialog opens
+      setTimeout(() => {
+        ['ipv4', 'ipv6'].forEach(ipVersion => {
+          const ipConfig = formData[ipVersion];
+          if (ipConfig.enabled && 
+              ipConfig.snat.enabled && 
+              ipConfig.snat.roamingMasterInterfaceEnabled &&
+              ipConfig.snat.roamingMasterInterface &&
+              ipConfig.snat.snatIpNet) {
+            validateSNATRoaming(
+              ipVersion,
+              ipConfig.snat.roamingMasterInterface,
+              ipConfig.snat.snatIpNet
+            );
+          }
+        });
+      }, 100);
+    }
+  }, [open, server]);
 
   const checkValidation = () => {
     const newWarnings = [];
@@ -160,6 +215,91 @@ const ServerDialog = ({
     }
 
     setWarnings(newWarnings);
+  };
+
+  const validateSNATRoaming = async (ipVersion, masterInterface, snatIpNet) => {
+    if (!masterInterface || !snatIpNet) {
+      return;
+    }
+
+    const addressFamily = ipVersion === 'ipv4' ? '4' : '6';
+    
+    try {
+      const result = await apiService.validateSNATRoamingOffset(masterInterface, snatIpNet, addressFamily);
+      
+      // Clear any previous errors for this IP version
+      setValidationErrors(prev => ({
+        ...prev,
+        [ipVersion]: {
+          snatRoamingInterface: '',
+          snatIpNet: ''
+        }
+      }));
+      
+      // Store success information with mapped network hint
+      setValidationSuccess(prev => ({
+        ...prev,
+        [ipVersion]: {
+          snatIpNet: result?.['mapped network'] 
+            ? `Will ${result.type} to ${result['mapped network']} on interface ${masterInterface}`
+            : 'Valid'
+        }
+      }));
+    } catch (error) {
+      // Use structured error data if available, otherwise fallback to parsing
+      let errorData = error.errorData || {};
+      
+      if (!errorData.error_params) {
+        // Fallback error parsing if structured data isn't available
+        const errorMessage = error.message;
+        errorData.error = errorMessage;
+        
+        // Determine error_params based on error content
+        if (errorMessage.includes('interface') || errorMessage.includes('ifname')) {
+          errorData.error_params = 'ifname';
+        } else if (errorMessage.includes('offset') || errorMessage.includes('network') || errorMessage.includes('CIDR')) {
+          errorData.error_params = 'offset';
+        } else {
+          errorData.error_params = 'offset'; // Default to offset for unknown errors
+        }
+      }
+      
+      setValidationErrors(prev => ({
+        ...prev,
+        [ipVersion]: {
+          ...prev[ipVersion],
+          snatRoamingInterface: errorData.error_params === 'ifname' ? (errorData.error || error.message) : '',
+          snatIpNet: errorData.error_params === 'offset' ? (errorData.error || error.message) : ''
+        }
+      }));
+      
+      // Clear success messages on error
+      setValidationSuccess(prev => ({
+        ...prev,
+        [ipVersion]: {
+          snatIpNet: ''
+        }
+      }));
+    }
+  };
+
+  const debouncedValidateSNATRoaming = (ipVersion, masterInterface, snatIpNet) => {
+    // Clear any existing timeout for this IP version
+    const currentTimeout = validationTimeouts.current[ipVersion];
+    if (currentTimeout) {
+      clearTimeout(currentTimeout);
+    }
+
+    // Set a new timeout
+    const newTimeout = setTimeout(() => {
+      validateSNATRoaming(ipVersion, masterInterface, snatIpNet);
+      
+      // Clear the timeout from ref
+      validationTimeouts.current[ipVersion] = null;
+    }, 500);
+
+    // Store the timeout
+    validationTimeouts.current[ipVersion] = newTimeout;
   };
 
   const handleChange = (path, value) => {
@@ -174,6 +314,47 @@ const ServerDialog = ({
       }
       
       current[pathArray[pathArray.length - 1]] = value;
+      
+      // Trigger SNAT roaming validation when relevant fields change
+      if (path.includes('snat.roamingMasterInterface') || path.includes('snat.snatIpNet')) {
+        const ipVersion = path.startsWith('ipv4') ? 'ipv4' : 'ipv6';
+        const ipConfig = newData[ipVersion];
+        
+        
+        if (ipConfig.snat.enabled && 
+            ipConfig.snat.roamingMasterInterfaceEnabled &&
+            ipConfig.snat.roamingMasterInterface &&
+            ipConfig.snat.snatIpNet) {
+          debouncedValidateSNATRoaming(
+            ipVersion,
+            ipConfig.snat.roamingMasterInterface,
+            ipConfig.snat.snatIpNet
+          );
+        } else {
+          // Clear any pending validation timeout
+          const currentTimeout = validationTimeouts.current[ipVersion];
+          if (currentTimeout) {
+            clearTimeout(currentTimeout);
+            validationTimeouts.current[ipVersion] = null;
+          }
+          
+          // Clear validation errors and success messages if SNAT roaming is disabled
+          setValidationErrors(prev => ({
+            ...prev,
+            [ipVersion]: {
+              snatRoamingInterface: '',
+              snatIpNet: ''
+            }
+          }));
+          setValidationSuccess(prev => ({
+            ...prev,
+            [ipVersion]: {
+              snatIpNet: ''
+            }
+          }));
+        }
+      }
+      
       return newData;
     });
   };
@@ -367,6 +548,19 @@ const ServerDialog = ({
               fullWidth
               sx={{ mb: 2 }}
               variant="outlined"
+              error={Boolean(validationErrors[ipVersion]?.snatIpNet)}
+              helperText={
+                validationErrors[ipVersion]?.snatIpNet || 
+                validationSuccess[ipVersion]?.snatIpNet ||
+                ''
+              }
+              FormHelperTextProps={{
+                sx: {
+                  color: validationSuccess[ipVersion]?.snatIpNet && !validationErrors[ipVersion]?.snatIpNet 
+                    ? 'success.main' 
+                    : undefined
+                }
+              }}
             />
 
             <TextField
@@ -397,6 +591,8 @@ const ServerDialog = ({
                 disabled={!isEnabled || !ip.snat.enabled || !ip.snat.roamingMasterInterfaceEnabled}
                 fullWidth
                 variant="outlined"
+                error={Boolean(validationErrors[ipVersion]?.snatRoamingInterface)}
+                helperText={validationErrors[ipVersion]?.snatRoamingInterface}
               />
             </Box>
 

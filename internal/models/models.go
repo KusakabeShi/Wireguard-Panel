@@ -155,7 +155,7 @@ func (c *Client) GetIPv6(serverNet *IPNetWrapper) (*IPNetWrapper, error) {
 	return serverNet.GetByOffset(c.IPv6Offset)
 }
 
-func (c *Client) SetIP(af int, serverNet *IPNetWrapper, ip net.IP, otherclients []*Client) error {
+func (c *Client) SetIP(af int, serverNet *IPNetWrapper, ip net.IP, otherclients []*Client) (changed bool, err error) {
 	if serverNet == nil {
 		switch af {
 		case 4:
@@ -163,10 +163,10 @@ func (c *Client) SetIP(af int, serverNet *IPNetWrapper, ip net.IP, otherclients 
 		case 6:
 			c.IPv6Offset = nil
 		}
-		return nil
+		return false, nil
 	}
 	if af != serverNet.Version {
-		return fmt.Errorf("address family %d not match server network %s", af, serverNet.String())
+		return false, fmt.Errorf("address family %d not match server network %s", af, serverNet.String())
 	}
 	if ip == nil {
 		switch af {
@@ -175,17 +175,17 @@ func (c *Client) SetIP(af int, serverNet *IPNetWrapper, ip net.IP, otherclients 
 		case 6:
 			c.IPv6Offset = nil
 		}
-		return nil
+		return false, nil
 	}
 	if af == 4 {
 		ip4 := ip.To4()
 		if ip4 == nil {
-			return fmt.Errorf("%s is not a valid IPv4", ip)
+			return false, fmt.Errorf("%s is not a valid IPv4", ip)
 		}
 		ip = ip4
 	}
 	if !serverNet.Contains(ip) {
-		return fmt.Errorf("ip %s out if server network %s", ip, serverNet.BaseNet.String())
+		return false, fmt.Errorf("ip %s out if server network %s", ip, serverNet.BaseNet.String())
 	}
 	// Create temporary wrapper to calculate offset
 	tempWrapper := &IPNetWrapper{
@@ -195,10 +195,10 @@ func (c *Client) SetIP(af int, serverNet *IPNetWrapper, ip net.IP, otherclients 
 	}
 	offset, err := tempWrapper.GetOffset()
 	if err != nil {
-		return err
+		return false, err
 	}
 	if serverNet.IP.Equal(ip) {
-		return fmt.Errorf("ip %s conflic with server ip %s", ip, serverNet.String())
+		return false, fmt.Errorf("ip %s conflic with server ip %s", ip, serverNet.String())
 	}
 	for _, client := range otherclients {
 		if client.ID == c.ID {
@@ -214,17 +214,23 @@ func (c *Client) SetIP(af int, serverNet *IPNetWrapper, ip net.IP, otherclients 
 		}
 
 		if client != nil && otherclient_offset != nil && offset.Equal(otherclient_offset) {
-			return fmt.Errorf("ip %s conflic with client %s", ip, client.Name)
+			return false, fmt.Errorf("ip %s conflic with client %s", ip, client.Name)
 		}
 	}
 	switch af {
 	case 4:
+		if !c.IPv4Offset.Equal(offset) {
+			changed = true
+		}
 		c.IPv4Offset = offset
 	case 6:
+		if !c.IPv6Offset.Equal(offset) {
+			changed = true
+		}
 		c.IPv6Offset = offset
 	}
 
-	return nil
+	return changed, nil
 }
 
 func (s *Server) GetNetwork(af int) *IPNetWrapper {

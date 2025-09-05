@@ -85,14 +85,14 @@ func (s *ClientService) CreateClient(interfaceID, serverID string, req ClientCre
 	}
 
 	// Allocate IP addresses
-	if req.IP != nil && *req.IP != "" {
-		if err := s.allocateIPv4(client, server, *req.IP); err != nil {
+	if req.IP != nil && *req.IP != "" && server.IPv4 != nil && server.IPv4.Enabled {
+		if _, err := s.allocateIPv4(client, server, *req.IP); err != nil {
 			return nil, fmt.Errorf("IPv4 allocation failed:-> %v", err)
 		}
 	}
 
-	if req.IPv6 != nil && *req.IPv6 != "" {
-		if err := s.allocateIPv6(client, server, *req.IPv6); err != nil {
+	if req.IPv6 != nil && *req.IPv6 != "" && server.IPv6 != nil && server.IPv6.Enabled {
+		if _, err := s.allocateIPv6(client, server, *req.IPv6); err != nil {
 			return nil, fmt.Errorf("IPv6 allocation failed:-> %v", err)
 		}
 	}
@@ -220,26 +220,26 @@ func (s *ClientService) UpdateClient(interfaceID, serverID, clientID string, req
 	}
 
 	// Update IP addresses
-	if req.IP != nil {
-		if *req.IP == "" {
-			client.IPv4Offset = nil
-		} else {
-			if err := s.updateClientIPv4(client, server, *req.IP); err != nil {
-				return nil, fmt.Errorf("IPv4 update failed:-> %v", err)
-			}
+	if req.IP == nil || *req.IP == "" {
+		needsWGSync = client.IPv4Offset != nil || needsWGSync
+		client.IPv4Offset = nil
+	} else {
+		if changed, err := s.updateClientIPv4(client, server, *req.IP); err != nil {
+			return nil, fmt.Errorf("IPv4 update failed:-> %v", err)
+		} else if changed {
+			needsWGSync = true
 		}
-		needsWGSync = true
 	}
 
-	if req.IPv6 != nil {
-		if *req.IPv6 == "" {
-			client.IPv6Offset = nil
-		} else {
-			if err := s.updateClientIPv6(client, server, *req.IPv6); err != nil {
-				return nil, fmt.Errorf("IPv6 update failed:-> %v", err)
-			}
+	if req.IPv6 == nil || *req.IPv6 == "" {
+		needsWGSync = client.IPv6Offset != nil || needsWGSync
+		client.IPv6Offset = nil
+	} else {
+		if changed, err := s.updateClientIPv6(client, server, *req.IPv6); err != nil {
+			return nil, fmt.Errorf("IPv6 update failed:-> %v", err)
+		} else if changed {
+			needsWGSync = true
 		}
-		needsWGSync = true
 	}
 
 	s.cfg.SetInterface(interfaceID, iface)
@@ -365,9 +365,9 @@ func (s *ClientService) GetClientWGState(interfaceID, serverID, clientID string)
 	return &models.WGState{}, nil
 }
 
-func (s *ClientService) allocateIPv4(client *models.Client, server *models.Server, ipRequest string) error {
+func (s *ClientService) allocateIPv4(client *models.Client, server *models.Server, ipRequest string) (changed bool, err error) {
 	if server.IPv4 == nil || !server.IPv4.Enabled || server.IPv4.Network == nil {
-		return fmt.Errorf("server does not have IPv4 enabled")
+		return false, fmt.Errorf("server does not have IPv4 enabled")
 	}
 
 	if ipRequest == "auto" {
@@ -377,15 +377,15 @@ func (s *ClientService) allocateIPv4(client *models.Client, server *models.Serve
 	// Manual IP assignment
 	ip := net.ParseIP(ipRequest)
 	if ip == nil || ip.To4() == nil {
-		return fmt.Errorf("invalid IPv4 address")
+		return false, fmt.Errorf("invalid IPv4 address")
 	}
 
 	return client.SetIP(4, server.IPv4.Network, ip, server.Clients)
 }
 
-func (s *ClientService) allocateIPv6(client *models.Client, server *models.Server, ipRequest string) error {
+func (s *ClientService) allocateIPv6(client *models.Client, server *models.Server, ipRequest string) (changed bool, err error) {
 	if server.IPv6 == nil || !server.IPv6.Enabled || server.IPv6.Network == nil {
-		return fmt.Errorf("server does not have IPv6 enabled")
+		return false, fmt.Errorf("server does not have IPv6 enabled")
 	}
 
 	if ipRequest == "auto" {
@@ -395,19 +395,19 @@ func (s *ClientService) allocateIPv6(client *models.Client, server *models.Serve
 	// Manual IP assignment
 	ip := net.ParseIP(ipRequest)
 	if ip == nil || ip.To4() != nil {
-		return fmt.Errorf("invalid IPv6 address")
+		return false, fmt.Errorf("invalid IPv6 address")
 	}
 
 	return client.SetIP(6, server.IPv6.Network, ip, server.Clients)
 }
 
-func (s *ClientService) autoAllocateIPv4(client *models.Client, server *models.Server) error {
+func (s *ClientService) autoAllocateIPv4(client *models.Client, server *models.Server) (changed bool, err error) {
 	network := server.IPv4.Network
 	masklen := network.Masklen()
 	hostBits := 32 - masklen
 
 	if hostBits <= 2 {
-		return fmt.Errorf("network too small for client allocation")
+		return false, fmt.Errorf("network too small for client allocation")
 	}
 
 	// Collect used IPs
@@ -452,20 +452,20 @@ func (s *ClientService) autoAllocateIPv4(client *models.Client, server *models.S
 
 		if !usedOffsets[string(offset)] {
 			client.IPv4Offset = offset
-			return nil
+			return true, nil
 		}
 	}
 
-	return fmt.Errorf("no available IPv4 addresses in network")
+	return false, fmt.Errorf("no available IPv4 addresses in network")
 }
 
-func (s *ClientService) autoAllocateIPv6(client *models.Client, server *models.Server) error {
+func (s *ClientService) autoAllocateIPv6(client *models.Client, server *models.Server) (changed bool, err error) {
 	network := server.IPv6.Network
 	masklen := network.Masklen()
 	hostBits := 128 - masklen
 
 	if hostBits <= 1 {
-		return fmt.Errorf("network too small for client allocation")
+		return false, fmt.Errorf("network too small for client allocation")
 	}
 
 	// Collect used IPs
@@ -491,26 +491,26 @@ func (s *ClientService) autoAllocateIPv6(client *models.Client, server *models.S
 
 		if !usedOffsets[string(offset)] {
 			client.IPv6Offset = offset
-			return nil
+			return true, nil
 		}
 	}
 
-	return fmt.Errorf("no available IPv6 addresses in network")
+	return false, fmt.Errorf("no available IPv6 addresses in network")
 }
 
-func (s *ClientService) updateClientIPv4(client *models.Client, server *models.Server, ipStr string) error {
+func (s *ClientService) updateClientIPv4(client *models.Client, server *models.Server, ipStr string) (changed bool, err error) {
 	ip := net.ParseIP(ipStr)
 	if ip == nil || ip.To4() == nil {
-		return fmt.Errorf("invalid IPv4 address")
+		return false, fmt.Errorf("invalid IPv4 address")
 	}
 	ip = ip.To4()
 	return client.SetIP(4, server.IPv4.Network, ip, server.Clients)
 }
 
-func (s *ClientService) updateClientIPv6(client *models.Client, server *models.Server, ipStr string) error {
+func (s *ClientService) updateClientIPv6(client *models.Client, server *models.Server, ipStr string) (changed bool, err error) {
 	ip := net.ParseIP(ipStr)
 	if ip == nil || ip.To4() != nil {
-		return fmt.Errorf("invalid IPv6 address")
+		return false, fmt.Errorf("invalid IPv6 address")
 	}
 
 	return client.SetIP(6, server.IPv6.Network, ip, server.Clients)
