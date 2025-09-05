@@ -103,7 +103,7 @@ func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, e
 			ListenPort:          5000,
 			BasePath:            "/",
 			APIPrefix:           "/api",
-			ServerId:            serverId,
+			WGPanelId:           serverId,
 			Interfaces:          make(map[string]*models.Interface),
 			Sessions:            make(map[string]*config.Session),
 		}

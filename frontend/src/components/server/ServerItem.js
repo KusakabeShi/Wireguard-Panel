@@ -9,8 +9,7 @@ import {
 import { 
   Edit as EditIcon, 
   ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Add as AddIcon
+  ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 import ClientList from '../client/ClientList';
 
@@ -33,7 +32,8 @@ const ServerItem = ({
   onEditClient,
   onDeleteClient,
   onToggleClient,
-  interfaceId
+  interfaceId,
+  interfaceInfo
 }) => {
   const getNetworkDisplay = (server) => {
     const networks = [];
@@ -113,23 +113,10 @@ const ServerItem = ({
             onToggle={(client, enabled) => onToggleClient(server, client, enabled)}
             interfaceId={interfaceId}
             serverId={server.id}
+            onAddClient={() => onAddClient(server)}
+            interfaceInfo={interfaceInfo}
+            serverInfo={server}
           />
-          
-          {/* Add Client Button */}
-          <Box sx={{ p: 2, textAlign: 'center', borderTop: '1px solid #e0e0e0' }}>
-            <IconButton 
-              onClick={() => onAddClient(server)}
-              sx={{ 
-                backgroundColor: '#1976d2',
-                color: 'white',
-                '&:hover': {
-                  backgroundColor: '#1565c0',
-                }
-              }}
-            >
-              <AddIcon />
-            </IconButton>
-          </Box>
         </Box>
       </Collapse>
     </Box>

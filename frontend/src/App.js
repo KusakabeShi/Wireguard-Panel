@@ -16,6 +16,7 @@ import ErrorDialog from './components/dialogs/ErrorDialog';
 import SettingsDialog from './components/dialogs/SettingsDialog';
 
 import apiService from './services/apiService';
+import stateManager from './utils/stateManager';
 
 const theme = createTheme({
   palette: {
@@ -48,6 +49,26 @@ function AppContent() {
     }
   }, [isAuthenticated]);
 
+  // Sync interface selection once stateManager is initialized
+  useEffect(() => {
+    const syncInterfaceSelection = () => {
+      if (interfaces.length > 0 && stateManager.initialized) {
+        const savedInterfaceId = stateManager.getSelectedInterfaceId();
+        const savedInterface = interfaces.find(i => i.id === savedInterfaceId);
+        
+        if (savedInterface && (!selectedInterface || selectedInterface.id !== savedInterface.id)) {
+          setSelectedInterface(savedInterface);
+        } else if (selectedInterface && !savedInterfaceId) {
+          // Save current selection if none was saved
+          stateManager.setSelectedInterfaceId(selectedInterface.id);
+        }
+      }
+    };
+
+    // Use the event system
+    stateManager.onInitialized(syncInterfaceSelection);
+  }, [interfaces, selectedInterface]);
+
   useEffect(() => {
     if (!isAuthenticated && !isLoading) {
       setLoginDialogOpen(true);
@@ -65,9 +86,21 @@ function AppContent() {
       const interfaces = await apiService.getInterfaces();
       setInterfaces(interfaces);
       
-      // Select first interface if none selected
-      if (!selectedInterface && interfaces.length > 0) {
+      // Try to restore selected interface from state manager
+      let savedInterface = null;
+      if (stateManager.initialized) {
+        const savedInterfaceId = stateManager.getSelectedInterfaceId();
+        savedInterface = interfaces.find(i => i.id === savedInterfaceId);
+      }
+      
+      if (savedInterface) {
+        setSelectedInterface(savedInterface);
+      } else if (!selectedInterface && interfaces.length > 0) {
+        // Select first interface if none selected and save to state if possible
         setSelectedInterface(interfaces[0]);
+        if (stateManager.initialized) {
+          stateManager.setSelectedInterfaceId(interfaces[0].id);
+        }
       }
     } catch (error) {
       if (error.message === 'Authentication required') {
@@ -261,6 +294,13 @@ function AppContent() {
     setSettingsDialogOpen(true);
   };
 
+  const handleInterfaceSelect = (interface_) => {
+    setSelectedInterface(interface_);
+    if (stateManager.initialized) {
+      stateManager.setSelectedInterfaceId(interface_.id);
+    }
+  };
+
   const handleLogoutClick = async () => {
     try {
       await apiService.logout();
@@ -288,7 +328,7 @@ function AppContent() {
         <Sidebar
           interfaces={interfaces}
           selectedInterface={selectedInterface}
-          onInterfaceSelect={setSelectedInterface}
+          onInterfaceSelect={handleInterfaceSelect}
           onAddInterface={handleAddInterface}
           isOpen={sidebarOpen}
           onToggle={() => setSidebarOpen(!sidebarOpen)}

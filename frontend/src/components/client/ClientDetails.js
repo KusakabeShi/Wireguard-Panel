@@ -12,37 +12,111 @@ import {
   Snackbar,
   Alert
 } from '@mui/material';
-import { ContentCopy as CopyIcon, QrCode as QrCodeIcon } from '@mui/icons-material';
+import { ContentCopy as CopyIcon, QrCode as QrCodeIcon, Download as DownloadIcon } from '@mui/icons-material';
 import { formatBytes, formatLastHandshake } from '../../utils/formatUtils';
 import apiService from '../../services/apiService';
 import QRCodeDialog from '../dialogs/QRCodeDialog';
 
-const ClientDetails = ({ client, clientState,lastUpdateTime, interfaceId, serverId }) => {
+const ClientDetails = ({ client, clientState, lastUpdateTime, interfaceId, serverId, interfaceInfo, serverInfo, visible = true }) => {
   const [config, setConfig] = useState('');
   const [loadingConfig, setLoadingConfig] = useState(false);
+  const [configLoaded, setConfigLoaded] = useState(false);
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [error, setError] = useState(null);
+  const [copySuccess, setCopySuccess] = useState(false);
 
+  // Only load config when component becomes visible
   useEffect(() => {
-    loadConfig();
-  }, [client.id]);
+    if (visible && !configLoaded) {
+      loadConfig();
+    }
+  }, [visible, client.id, configLoaded]);
+
 
   const loadConfig = async () => {
     setLoadingConfig(true);
     try {
       const configText = await apiService.getClientConfig(interfaceId, serverId, client.id);
       setConfig(configText);
+      setConfigLoaded(true);
     } catch (error) {
       console.error('Failed to load client config:', error);
       setConfig('Failed to load configuration');
+      setConfigLoaded(true); // Mark as loaded even on error to prevent retry
       setError(error.message || 'Failed to load configuration');
     } finally {
       setLoadingConfig(false);
     }
   };
 
-  const handleCopyConfig = () => {
-    navigator.clipboard.writeText(config);
+  const handleCopyConfig = async () => {
+    try {
+      // Check if clipboard API is available
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(config);
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      } else {
+        // Fallback for browsers without clipboard API
+        const textArea = document.createElement('textarea');
+        textArea.value = config;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+          document.execCommand('copy');
+          setCopySuccess(true);
+          setTimeout(() => setCopySuccess(false), 2000);
+        } catch (err) {
+          console.error('Fallback copy failed:', err);
+          setError('Failed to copy to clipboard. Please copy manually.');
+        } finally {
+          document.body.removeChild(textArea);
+        }
+      }
+    } catch (err) {
+      console.error('Copy to clipboard failed:', err);
+      setError('Failed to copy to clipboard. Please copy manually.');
+    }
+  };
+
+  const handleDownloadConfig = () => {
+    if (!config || !interfaceInfo || !serverInfo) return;
+
+    console.log('Download - interfaceInfo:', interfaceInfo);
+    console.log('Download - serverInfo:', serverInfo);
+    console.log('Download - client:', client);
+
+    // Strip wgIfPrefix from interface name
+    let interfaceName = interfaceInfo.ifname || 'interface';
+    console.log('Download - original ifname:', interfaceName);
+    console.log('Download - wgIfPrefix:', interfaceInfo.wgIfPrefix);
+    
+    if (interfaceInfo.wgIfPrefix && interfaceName.startsWith(interfaceInfo.wgIfPrefix)) {
+      interfaceName = interfaceName.substring(interfaceInfo.wgIfPrefix.length);
+      console.log('Download - stripped interfaceName:', interfaceName);
+    } else {
+      console.log('Download - no prefix stripping needed');
+    }
+
+    // Generate filename: ifname-servername-clientname.conf
+    const fileName = `${interfaceName}-${serverInfo.name || 'server'}-${client.name || 'client'}.conf`;
+    console.log('Download - final fileName:', fileName);
+    
+    // Create blob and download
+    const blob = new Blob([config], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleShowQRCode = () => {
@@ -92,6 +166,14 @@ const ClientDetails = ({ client, clientState,lastUpdateTime, interfaceId, server
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
           <Box sx={{ fontWeight: 'bold', mr: 1 }}>WireGuard config:</Box>
           <IconButton 
+            onClick={handleDownloadConfig}
+            size="small"
+            disabled={loadingConfig || !config || !interfaceInfo || !serverInfo}
+            title="Download config file"
+          >
+            <DownloadIcon fontSize="small" />
+          </IconButton>
+          <IconButton 
             onClick={handleCopyConfig}
             size="small"
             disabled={loadingConfig || !config}
@@ -140,6 +222,17 @@ const ClientDetails = ({ client, clientState,lastUpdateTime, interfaceId, server
       >
         <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
           {error}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={copySuccess}
+        autoHideDuration={2000}
+        onClose={() => setCopySuccess(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setCopySuccess(false)} severity="success" sx={{ width: '100%' }}>
+          Configuration copied to clipboard!
         </Alert>
       </Snackbar>
     </Box>

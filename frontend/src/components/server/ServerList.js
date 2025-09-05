@@ -5,13 +5,14 @@ import ServerItem from './ServerItem';
 
 const ServerList = ({ 
   servers,
+  serverClients,
   clientsState,
   previousClientsState,
   lastUpdateTime,
   previousUpdateTime,
   trafficDisplayMode,
   onTrafficModeToggle,
-  expandedServers,
+  collapsedServers,
   expandedClients,
   loading,
   onToggleServerExpanded,
@@ -24,7 +25,8 @@ const ServerList = ({
   onEditClient,
   onDeleteClient,
   onToggleClient,
-  interfaceId
+  interfaceId,
+  interfaceInfo
 }) => {
   if (loading) {
     return (
@@ -39,14 +41,14 @@ const ServerList = ({
       {servers.map((server) => (
         <ServerItem
           key={server.id}
-          server={server}
+          server={{...server, clients: serverClients[server.id] || []}}
           clientsState={clientsState}
           previousClientsState={previousClientsState}
           lastUpdateTime={lastUpdateTime}
           previousUpdateTime={previousUpdateTime}
           trafficDisplayMode={trafficDisplayMode}
           onTrafficModeToggle={onTrafficModeToggle}
-          expanded={expandedServers.has(server.id)}
+          expanded={!collapsedServers.has(server.id)}
           expandedClients={expandedClients}
           onToggleExpanded={onToggleServerExpanded}
           onToggleClientExpanded={onToggleClientExpanded}
@@ -58,6 +60,7 @@ const ServerList = ({
           onDeleteClient={onDeleteClient}
           onToggleClient={onToggleClient}
           interfaceId={interfaceId}
+          interfaceInfo={interfaceInfo}
         />
       ))}
       

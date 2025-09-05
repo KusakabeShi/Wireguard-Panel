@@ -8,8 +8,6 @@ import (
 	"wg-panel/internal/logging"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
-
-	"github.com/google/uuid"
 )
 
 type ServerService struct {
@@ -249,6 +247,8 @@ func (s *ServerService) MoveServer(interfaceID, serverID, newInterfaceID string)
 		}
 	}
 
+	newserverID := s.cfg.GetAvailableServerID(destIface.ID)
+	server.ID = newserverID
 	// Add to destination interface
 	destIface.Servers = append(destIface.Servers, server)
 
@@ -330,7 +330,7 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 	}
 
 	var server *models.Server
-	prefix := s.cfg.ServerId + "-"
+	prefix := s.cfg.WGPanelId + "-"
 	CommentString, _ := utils.GenerateRandomString(prefix, 12)
 	ipv4CommentString := prefix + "-v4-" + CommentString
 	ipv6CommentString := prefix + "-v6-" + CommentString
@@ -338,7 +338,7 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 	if oldServer == nil {
 		// Generate comment strings for firewall rules with server ID prefix
 		server = &models.Server{
-			ID:      uuid.New().String(),
+			ID:      s.cfg.GetAvailableServerID(iface.ID),
 			Name:    req.Name,
 			Enabled: false, // Always start disabled
 			DNS:     req.DNS,

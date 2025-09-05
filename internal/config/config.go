@@ -12,6 +12,8 @@ import (
 	"wg-panel/internal/logging"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
+
+	"github.com/google/uuid"
 )
 
 type Session struct {
@@ -31,7 +33,7 @@ type Config struct {
 	ListenPort          int                          `json:"listenPort"`
 	BasePath            string                       `json:"basePath"`
 	APIPrefix           string                       `json:"apiPrefix"`
-	ServerId            string                       `json:"serverId"`
+	WGPanelId           string                       `json:"serverId"`
 	Interfaces          map[string]*models.Interface `json:"interfaces"`
 	Sessions            map[string]*Session          `json:"sessions"`
 
@@ -66,14 +68,14 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	// Generate ServerId if not present
-	if cfg.ServerId == "" {
+	if cfg.WGPanelId == "" {
 		logging.LogInfo("Generating new server ID")
 		serverId, err := utils.GenerateRandomString("", 6)
 		if err != nil {
 			logging.LogError("Failed to generate server ID: %v", err)
 			return nil, fmt.Errorf("failed to generate server ID:-> %v", err)
 		}
-		cfg.ServerId = serverId
+		cfg.WGPanelId = serverId
 		logging.LogInfo("Generated server ID: %s", serverId)
 		// Save the config with the new ServerId
 		if err := cfg.Save(); err != nil {
@@ -159,6 +161,17 @@ func (c *Config) GetAllServers(ifaceID string) ([]*models.Server, error) {
 	}
 
 	return iface.Servers, nil
+}
+
+func (c *Config) GetAllClients(ifaceID, serverID string) ([]*models.Client, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	server, err := c.getServerUnsafe(ifaceID, serverID)
+	if err != nil {
+		return nil, err
+	}
+	return server.Clients, nil
 }
 
 func (c *Config) GetClient(ifaceID, serverID, clientID string) (*models.Client, error) {
@@ -499,4 +512,61 @@ func addPbsSkipIP(pbsConfig map[string]internalservice.ResponderNetworks, target
 	}
 
 	pbsConfig[ifname] = oldrn
+}
+
+func (c *Config) GetAvailableInterfaceID() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	pfx := "i"
+	ids := map[string]bool{}
+	for _, insts := range c.GetAllInterfaces() {
+		ids[insts.ID] = true
+	}
+	for i := 0; i <= 99999; i++ {
+		id := fmt.Sprintf("%s%d", pfx, i)
+		if _, ok := ids[id]; !ok {
+			return id
+		}
+	}
+	return uuid.New().String()
+}
+func (c *Config) GetAvailableServerID(ifaceID string) string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	pfx := "s"
+	ids := map[string]bool{}
+	instances, err := c.GetAllServers(ifaceID)
+	if err != nil {
+		return uuid.New().String()
+	}
+	for _, instance := range instances {
+		ids[instance.ID] = true
+	}
+	for i := 0; i <= 99999; i++ {
+		id := fmt.Sprintf("%s%s%d", ifaceID, pfx, i)
+		if _, ok := ids[id]; !ok {
+			return id
+		}
+	}
+	return uuid.New().String()
+}
+func (c *Config) GetAvailableClientID(ifaceID, serverID string) string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	pfx := "s"
+	ids := map[string]bool{}
+	instances, err := c.GetAllClients(ifaceID, serverID)
+	if err != nil {
+		return uuid.New().String()
+	}
+	for _, instance := range instances {
+		ids[instance.ID] = true
+	}
+	for i := 0; i <= 99999; i++ {
+		id := fmt.Sprintf("%s%s%s%d", ifaceID, serverID, pfx, i)
+		if _, ok := ids[id]; !ok {
+			return id
+		}
+	}
+	return uuid.New().String()
 }

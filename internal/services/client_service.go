@@ -8,8 +8,6 @@ import (
 	"wg-panel/internal/config"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
-
-	"github.com/google/uuid"
 )
 
 type ClientService struct {
@@ -71,7 +69,7 @@ func (s *ClientService) CreateClient(interfaceID, serverID string, req ClientCre
 	}
 
 	client := &models.Client{
-		ID:           uuid.New().String(),
+		ID:           s.cfg.GetAvailableClientID(iface.ID, serverID),
 		Name:         req.Name,
 		Enabled:      false, // Always start disabled
 		DNS:          req.DNS,

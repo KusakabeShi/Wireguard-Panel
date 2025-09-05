@@ -4,6 +4,7 @@ import InterfaceHeader from './InterfaceHeader';
 import ServerList from '../server/ServerList';
 import apiService from '../../services/apiService';
 import { getTrafficDisplayMode, TRAFFIC_DISPLAY_MODES } from '../../utils/formatUtils';
+import stateManager from '../../utils/stateManager';
 
 const InterfaceView = ({ 
   interface_, 
@@ -18,22 +19,73 @@ const InterfaceView = ({
   onToggleClient
 }) => {
   const [servers, setServers] = useState([]);
+  const [serverClients, setServerClients] = useState({}); // Store clients per server
+  const [clientsLoaded, setClientsLoaded] = useState(new Set()); // Track which servers have loaded clients
   const [clientsState, setClientsState] = useState({});
   const [previousClientsState, setPreviousClientsState] = useState({});
   const [lastUpdateTime, setLastUpdateTime] = useState(null);
   const [previousUpdateTime, setPreviousUpdateTime] = useState(null);
   const [trafficDisplayMode, setTrafficDisplayMode] = useState(getTrafficDisplayMode());
-  const [expandedServers, setExpandedServers] = useState(new Set());
+  const [collapsedServers, setCollapsedServers] = useState(new Set());
   const [expandedClients, setExpandedClients] = useState(new Set());
+  const [stateInitialized, setStateInitialized] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [interfaceInfo, setInterfaceInfo] = useState(null);
+
+  // Listen for stateManager initialization
+  useEffect(() => {
+    const syncState = () => {
+      if (!stateInitialized) {
+        setCollapsedServers(stateManager.getCollapsedServers());
+        setExpandedClients(stateManager.getExpandedClients());
+        setStateInitialized(true);
+      }
+    };
+
+    // Use the event system instead of polling
+    stateManager.onInitialized(syncState);
+  }, [stateInitialized]);
 
   useEffect(() => {
     if (interface_) {
       loadServers();
       loadClientsState();
+      loadInterfaceInfo();
     }
   }, [interface_, interface_?.lastModified]);
+
+  const loadInterfaceInfo = async () => {
+    if (!interface_) return;
+    
+    try {
+      const serviceConfig = await apiService.getServiceConfig();
+      console.log('ServiceConfig response:', serviceConfig);
+      console.log('wgIfPrefix from API:', serviceConfig.wgIfPrefix);
+      setInterfaceInfo({ 
+        ...interface_, 
+        wgIfPrefix: serviceConfig.wgIfPrefix 
+      });
+    } catch (error) {
+      console.error('Failed to load service config:', error);
+      // Fallback to interface without wgIfPrefix
+      setInterfaceInfo(interface_);
+    }
+  };
+
+  // Load clients for expanded servers when servers are loaded
+  useEffect(() => {
+    if (servers.length > 0 && stateInitialized) {
+      console.log('Loading clients for expanded servers:', servers.map(s => s.id), 'collapsed:', Array.from(collapsedServers));
+      servers.forEach(server => {
+        if (!collapsedServers.has(server.id)) {
+          console.log('Loading clients for server:', server.id);
+          loadServerClients(server.id);
+        }
+      });
+    }
+  }, [servers, collapsedServers, stateInitialized]);
+
 
   useEffect(() => {
     if (!interface_) return;
@@ -55,30 +107,40 @@ const InterfaceView = ({
     setLoading(true);
     try {
       const servers = await apiService.getServers(interface_.id);
-      
-      const serversWithClients = await Promise.all(
-        servers.map(async (server) => {
-          try {
-            const clients = await apiService.getServerClients(interface_.id, server.id);
-            return { ...server, clients };
-          } catch (error) {
-            console.error(`Failed to load clients for server ${server.id}:`, error);
-            return { ...server, clients: [] };
-          }
-        })
-      );
-      
-      setServers(serversWithClients);
-      
-      // Expand all servers by default
-      const serverIds = new Set(serversWithClients.map(server => server.id));
-      setExpandedServers(serverIds);
+      setServers(servers);
     } catch (error) {
       console.error('Failed to load servers:', error);
       setError(error.message || 'Failed to load servers');
       setServers([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load clients for a specific server when needed
+  const loadServerClients = async (serverId) => {
+    if (!interface_ || clientsLoaded.has(serverId)) {
+      console.log('Skipping client load for server:', serverId, 'interface:', !!interface_, 'already loaded:', clientsLoaded.has(serverId));
+      return;
+    }
+    
+    console.log('Loading clients for server:', serverId);
+    
+    try {
+      const clients = await apiService.getServerClients(interface_.id, serverId);
+      console.log('Loaded', clients.length, 'clients for server:', serverId);
+      setServerClients(prev => ({
+        ...prev,
+        [serverId]: clients
+      }));
+      setClientsLoaded(prev => new Set(prev).add(serverId));
+    } catch (error) {
+      console.error(`Failed to load clients for server ${serverId}:`, error);
+      setServerClients(prev => ({
+        ...prev,
+        [serverId]: []
+      }));
+      setClientsLoaded(prev => new Set(prev).add(serverId));
     }
   };
 
@@ -123,33 +185,60 @@ const InterfaceView = ({
   };
 
   const handleToggleServerExpanded = (serverId) => {
-    setExpandedServers(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(serverId)) {
-        newSet.delete(serverId);
-      } else {
-        newSet.add(serverId);
+    setCollapsedServers(prevCollapsed => {
+      const isCurrentlyExpanded = !prevCollapsed.has(serverId);
+      const newCollapsed = isCurrentlyExpanded; // If expanded, we want to collapse it
+      
+      // Remove the direct loadServerClients call - let useEffect handle it
+      
+      if (stateManager.initialized) {
+        stateManager.setServerCollapsed(serverId, newCollapsed);
       }
-      return newSet;
+      
+      const newCollapsedSet = new Set(prevCollapsed);
+      if (newCollapsed) {
+        newCollapsedSet.add(serverId);
+      } else {
+        newCollapsedSet.delete(serverId);
+      }
+      return newCollapsedSet;
     });
   };
 
-  const handleToggleClientExpanded = (clientId) => {
-    setExpandedClients(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(clientId)) {
-        newSet.delete(clientId);
-      } else {
-        newSet.add(clientId);
-      }
-      return newSet;
-    });
+  const handleToggleClientExpanded = (interfaceId, serverId, clientId) => {
+    const compositeKey = `${interfaceId}_${serverId}_${clientId}`;
+    const isCurrentlyExpanded = expandedClients.has(compositeKey);
+    
+    if (stateManager.initialized) {
+      stateManager.setClientExpanded(interfaceId, serverId, clientId, !isCurrentlyExpanded);
+      setExpandedClients(new Set(stateManager.getExpandedClients()));
+    } else {
+      // Local fallback when not initialized
+      setExpandedClients(prev => {
+        const newSet = new Set(prev);
+        if (isCurrentlyExpanded) {
+          newSet.delete(compositeKey);
+        } else {
+          newSet.add(compositeKey);
+        }
+        return newSet;
+      });
+    }
   };
 
   const handleServerToggle = async (server, enabled) => {
     try {
       await onToggleServer(server, enabled);
       await loadServers(); // Reload to get updated state
+      // If server is expanded, reload its clients too
+      if (!collapsedServers.has(server.id)) {
+        setClientsLoaded(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(server.id);
+          return newSet;
+        });
+        loadServerClients(server.id);
+      }
     } catch (error) {
       console.error('Failed to toggle server:', error);
       setError(error.message || 'Failed to toggle server');
@@ -160,6 +249,15 @@ const InterfaceView = ({
     try {
       await onToggleClient(server, client, enabled);
       await loadServers(); // Reload to get updated state
+      // If server is expanded, reload its clients too
+      if (!collapsedServers.has(server.id)) {
+        setClientsLoaded(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(server.id);
+          return newSet;
+        });
+        loadServerClients(server.id);
+      }
     } catch (error) {
       console.error('Failed to toggle client:', error);
       setError(error.message || 'Failed to toggle client');
@@ -179,13 +277,14 @@ const InterfaceView = ({
       <Divider />
       <ServerList
         servers={servers}
+        serverClients={serverClients}
         clientsState={clientsState}
         previousClientsState={previousClientsState}
         lastUpdateTime={lastUpdateTime}
         previousUpdateTime={previousUpdateTime}
         trafficDisplayMode={trafficDisplayMode}
         onTrafficModeToggle={handleTrafficModeToggle}
-        expandedServers={expandedServers}
+        collapsedServers={collapsedServers}
         expandedClients={expandedClients}
         loading={loading}
         onToggleServerExpanded={handleToggleServerExpanded}
@@ -199,6 +298,7 @@ const InterfaceView = ({
         onDeleteClient={onDeleteClient}
         onToggleClient={handleClientToggle}
         interfaceId={interface_.id}
+        interfaceInfo={interfaceInfo}
       />
       
       <Snackbar

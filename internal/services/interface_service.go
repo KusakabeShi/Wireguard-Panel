@@ -13,8 +13,6 @@ import (
 	"wg-panel/internal/logging"
 	"wg-panel/internal/models"
 	"wg-panel/internal/utils"
-
-	"github.com/google/uuid"
 )
 
 type InterfaceService struct {
@@ -80,7 +78,7 @@ func (s *InterfaceService) CreateInterface(req InterfaceCreateRequest) (*models.
 	}
 
 	iface := &models.Interface{
-		ID:         uuid.New().String(),
+		ID:         s.cfg.GetAvailableInterfaceID(),
 		Ifname:     req.Ifname,
 		Enabled:    false,
 		VRFName:    req.VRFName,

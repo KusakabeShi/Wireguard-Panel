@@ -66,20 +66,6 @@ export const calculateTransferRate = (currentBytes, previousBytes, currentTime, 
   return bytesDiff / timeDiff;
 };
 
-// Cookie utilities for storing display mode preferences
-export const getCookie = (name) => {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-  return null;
-};
-
-export const setCookie = (name, value, days = 365) => {
-  const expires = new Date();
-  expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
-};
-
 // Traffic display mode constants and utilities
 export const TRAFFIC_DISPLAY_MODES = {
   TOTAL: 'total',
@@ -87,7 +73,9 @@ export const TRAFFIC_DISPLAY_MODES = {
 };
 
 export const getTrafficDisplayMode = () => {
-  const mode = getCookie('trafficDisplayMode');
+  // Import stateManager locally to avoid circular dependency
+  const stateManager = require('./stateManager').default;
+  const mode = stateManager.getTrafficDisplayMode();
   return mode && Object.values(TRAFFIC_DISPLAY_MODES).includes(mode) 
     ? mode 
     : TRAFFIC_DISPLAY_MODES.TOTAL;
@@ -95,6 +83,8 @@ export const getTrafficDisplayMode = () => {
 
 export const setTrafficDisplayMode = (mode) => {
   if (Object.values(TRAFFIC_DISPLAY_MODES).includes(mode)) {
-    setCookie('trafficDisplayMode', mode);
+    // Import stateManager locally to avoid circular dependency
+    const stateManager = require('./stateManager').default;
+    stateManager.setTrafficDisplayMode(mode);
   }
 };

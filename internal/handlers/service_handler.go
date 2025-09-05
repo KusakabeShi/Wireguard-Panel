@@ -31,6 +31,7 @@ func (h *ServiceHandler) GetServiceConfig(c *gin.Context) {
 		"listenPort":          h.cfg.ListenPort,
 		"siteUrlPrefix":       h.cfg.BasePath,
 		"apiPrefix":           h.cfg.APIPrefix,
+		"panelID":             h.cfg.WGPanelId,
 		"wgIfPrefix":          h.cfg.WgIfPrefix,
 	}
 

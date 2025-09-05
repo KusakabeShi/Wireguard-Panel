@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../services/authService';
+import stateManager from '../utils/stateManager';
 
 const AuthContext = createContext();
 
@@ -23,6 +24,12 @@ export const AuthProvider = ({ children }) => {
   const checkAuthStatus = async () => {
     try {
       const config = await authService.getServiceConfig();
+      
+      // Initialize state manager with panelID
+      if (config.panelID) {
+        stateManager.init(config.panelID);
+      }
+      
       setIsAuthenticated(true);
       setUser({ username: config.user });
     } catch (error) {
@@ -36,8 +43,15 @@ export const AuthProvider = ({ children }) => {
   const login = async (username, password) => {
     try {
       await authService.login(username, password);
+      
+      // After successful login, get service config and reinitialize state manager
+      const config = await authService.getServiceConfig();
+      if (config.panelID) {
+        stateManager.init(config.panelID);
+      }
+      
       setIsAuthenticated(true);
-      setUser({ username });
+      setUser({ username: config.user || username });
       return true;
     } catch (error) {
       setIsAuthenticated(false);

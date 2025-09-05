@@ -37,7 +37,9 @@ const ClientItem = ({
   onDelete,
   onToggle,
   interfaceId,
-  serverId
+  serverId,
+  interfaceInfo,
+  serverInfo
 }) => {
 
   const getTrafficText = () => {
@@ -179,6 +181,9 @@ const ClientItem = ({
             lastUpdateTime={lastUpdateTime}
             interfaceId={interfaceId}
             serverId={serverId}
+            interfaceInfo={interfaceInfo}
+            serverInfo={serverInfo}
+            visible={expanded}
           />
         </Box>
       </Collapse>
