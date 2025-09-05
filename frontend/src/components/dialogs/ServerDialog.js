@@ -16,6 +16,29 @@ import {
 import ErrorDialog from './ErrorDialog';
 import apiService from '../../services/apiService';
 
+// Helper functions to generate random networks
+const generateRandomIPv4Network = () => {
+  // Generate random 192.168.XXX.1/24 network
+  const thirdOctet = Math.floor(Math.random() * 256);
+  return `192.168.${thirdOctet}.1/24`;
+};
+
+const generateRandomIPv6ULA = () => {
+  // Generate IPv6 ULA in format fdaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aa01/120
+  // where all 'a' characters are replaced with random hex digits, host bits are always '01'
+  const hexChars = '0123456789abcdef';
+  
+  // Generate the pattern: fdaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aa01/120
+  const template = 'fdaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aa01/120';
+  
+  // Replace all 'a' characters with random hex digits
+  const result = template.replace(/a/g, () => {
+    return hexChars[Math.floor(Math.random() * 16)];
+  });
+  
+  return result;
+};
+
 const ServerDialog = ({ 
   open, 
   onClose, 
@@ -124,16 +147,16 @@ const ServerDialog = ({
     } else {
       setFormData({
         name: '',
-        dns: '',
+        dns: '1.1.1.2, 8.8.8.8',
         ipv4: {
           enabled: true,
-          network: '',
+          network: generateRandomIPv4Network(),
           pseudoBridgeMasterInterface: '',
           pseudoBridgeMasterInterfaceEnabled: false,
-          routedNetworks: '',
+          routedNetworks: '0.0.0.0/0',
           routedNetworksFirewall: false,
           snat: {
-            enabled: false,
+            enabled: true,
             snatIpNet: '',
             snatExcludedNetwork: '',
             roamingMasterInterface: '',
@@ -141,14 +164,14 @@ const ServerDialog = ({
           }
         },
         ipv6: {
-          enabled: false,
-          network: '',
+          enabled: true,
+          network: generateRandomIPv6ULA(),
           pseudoBridgeMasterInterface: '',
           pseudoBridgeMasterInterfaceEnabled: false,
-          routedNetworks: '',
+          routedNetworks: '::/0',
           routedNetworksFirewall: false,
           snat: {
-            enabled: false,
+            enabled: true,
             snatIpNet: '',
             snatExcludedNetwork: '',
             roamingMasterInterface: '',

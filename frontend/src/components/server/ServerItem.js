@@ -53,7 +53,7 @@ const ServerItem = ({
         sx={{ 
           display: 'flex',
           alignItems: 'center',
-          p: 2,
+          p: 1,
           backgroundColor: '#4db6ac',
           color: 'white',
           borderRadius: '4px 4px 0 0'

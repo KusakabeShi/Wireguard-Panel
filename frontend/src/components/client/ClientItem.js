@@ -91,7 +91,7 @@ const ClientItem = ({
           sx={{ 
             display: 'flex',
             alignItems: 'center',
-            p: 2,
+            p: 1,
             backgroundColor: 'rgb(51, 109, 43)',
             color: 'white',
             borderRadius: '4px 4px 0 0'

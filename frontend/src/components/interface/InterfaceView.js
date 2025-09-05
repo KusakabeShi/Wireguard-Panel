@@ -108,6 +108,8 @@ const InterfaceView = ({
     try {
       const servers = await apiService.getServers(interface_.id);
       setServers(servers);
+      // Clear clientsLoaded state so that client lists will be reloaded for expanded servers
+      setClientsLoaded(new Set());
     } catch (error) {
       console.error('Failed to load servers:', error);
       setError(error.message || 'Failed to load servers');
@@ -178,9 +180,9 @@ const InterfaceView = ({
       : TRAFFIC_DISPLAY_MODES.TOTAL;
     
     setTrafficDisplayMode(newMode);
-    // Clear previous states when switching modes to avoid incorrect calculations
+    // Clear previous states when switching modes to avoid incorrect rate calculations
+    // Note: Keep lastUpdateTime for proper handshake time display
     setPreviousClientsState({});
-    setLastUpdateTime(null);
     setPreviousUpdateTime(null);
   };
 

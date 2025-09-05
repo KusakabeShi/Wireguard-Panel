@@ -134,6 +134,8 @@ function AppContent() {
       // Create new
       const newInterface = await apiService.createInterface(interfaceData);
       interfaceId = newInterface.id;
+      // Enable the newly created interface
+      await apiService.setInterfaceEnabled(interfaceId, true);
     }
     
     // Load updated interfaces
@@ -208,7 +210,9 @@ function AppContent() {
       await apiService.updateServer(interface_.id, serverDialog.server.id, serverData);
     } else {
       // Create new
-      await apiService.createServer(interface_.id, serverData);
+      const newServer = await apiService.createServer(interface_.id, serverData);
+      // Enable the newly created server
+      await apiService.setServerEnabled(interface_.id, newServer.id, true);
     }
     // Trigger refresh of interface view data
     
@@ -263,7 +267,9 @@ function AppContent() {
       await apiService.updateClient(interface_.id, server.id, clientDialog.client.id, clientData);
     } else {
       // Create new
-      await apiService.createClient(interface_.id, server.id, clientData);
+      const newClient = await apiService.createClient(interface_.id, server.id, clientData);
+      // Enable the newly created client
+      await apiService.setClientEnabled(interface_.id, server.id, newClient.id, true);
     }
     // Trigger refresh of interface view data
     setSelectedInterface(prev => ({ ...prev, lastModified: Date.now() }));

@@ -172,18 +172,18 @@ const ClientList = ({
     setCurrentPage(newPage);
   };
 
-  if (!clients || clients.length === 0) {
+  if (!clients) {
     return null;
   }
 
   return (
     <Box>
-            {/* Footer with Sort, Pagination, and Add Button */}
+            {/* Header with Sort, Pagination, and Add Button */}
       <Box sx={{ 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'space-between',
-        p: 2, 
+        p: 1, 
         borderTop: '1px solid #e0e0e0' 
       }}>
         {/* Sort Controls */}
@@ -266,27 +266,38 @@ const ClientList = ({
       </Box>
       {/* Client Items */}
       <Box sx={{ p: 2 }}>
-        {currentClients.map((client) => (
-          <ClientItem
-            key={client.id}
-            client={client}
-            clientState={clientsState[client.id] || null}
-            previousClientState={previousClientsState[client.id] || null}
-            lastUpdateTime={lastUpdateTime}
-            previousUpdateTime={previousUpdateTime}
-            trafficDisplayMode={trafficDisplayMode}
-            onTrafficModeToggle={onTrafficModeToggle}
-            expanded={expandedClients.has(`${interfaceId}_${serverId}_${client.id}`)}
-            onToggleExpanded={() => onToggleExpanded(interfaceId, serverId, client.id)}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onToggle={onToggle}
-            interfaceId={interfaceId}
-            serverId={serverId}
-            interfaceInfo={interfaceInfo}
-            serverInfo={serverInfo}
-          />
-        ))}
+        {clients.length === 0 ? (
+          <Box sx={{ 
+            textAlign: 'center', 
+            py: 0, 
+            color: 'text.secondary',
+            fontStyle: 'italic' 
+          }}>
+            No clients yet. Click the + button above to add your first client.
+          </Box>
+        ) : (
+          currentClients.map((client) => (
+            <ClientItem
+              key={client.id}
+              client={client}
+              clientState={clientsState[client.id] || null}
+              previousClientState={previousClientsState[client.id] || null}
+              lastUpdateTime={lastUpdateTime}
+              previousUpdateTime={previousUpdateTime}
+              trafficDisplayMode={trafficDisplayMode}
+              onTrafficModeToggle={onTrafficModeToggle}
+              expanded={expandedClients.has(`${interfaceId}_${serverId}_${client.id}`)}
+              onToggleExpanded={() => onToggleExpanded(interfaceId, serverId, client.id)}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onToggle={onToggle}
+              interfaceId={interfaceId}
+              serverId={serverId}
+              interfaceInfo={interfaceInfo}
+              serverInfo={serverInfo}
+            />
+          ))
+        )}
       </Box>
     </Box>
   );

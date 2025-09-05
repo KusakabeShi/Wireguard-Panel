@@ -541,6 +541,7 @@ func (s *ClientService) generateClientConfig(iface *models.Interface, server *mo
 	if len(addresses) > 0 {
 		config.WriteString(fmt.Sprintf("Address = %s\n", strings.Join(addresses, ", ")))
 	}
+	config.WriteString(fmt.Sprintf("MTU = %d\n", iface.MTU))
 
 	// DNS
 	dns := client.DNS

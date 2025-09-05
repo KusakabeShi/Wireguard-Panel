@@ -275,12 +275,12 @@ func (s *InterfaceService) DeleteInterface(id string) error {
 		return fmt.Errorf("interface not found")
 	}
 
+	if err := s.wg.SyncToInterface(iface.Ifname, false, iface.PrivateKey); err != nil {
+		return fmt.Errorf("failed to delete WireGuard interface:-> %v", err)
+	}
 	// Remove WireGuard interface
 	if err := s.wg.RemoveConfig(iface.Ifname); err != nil {
 		return fmt.Errorf("failed to remove WireGuard config:-> %v", err)
-	}
-	if err := s.wg.SyncToInterface(iface.Ifname, false, iface.PrivateKey); err != nil {
-		return fmt.Errorf("failed to delete WireGuard interface:-> %v", err)
 	}
 
 	s.cfg.DeleteInterface(id)

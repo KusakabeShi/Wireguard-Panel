@@ -44,7 +44,7 @@ export const isClientActive = (now,lastHandshake) => {
 export const formatTransferRate = (bytesPerSecond) => {
   if (!bytesPerSecond || bytesPerSecond === 0) return '0 Bps';
   let bitsPerSecond = bytesPerSecond * 8;
-  const k = 1024; // Using decimal (not binary) for network rates
+  const k = 1024;
   const sizes = ['Bps', 'Kbps', 'Mbps', 'Gbps', 'Tbps',"Pbps", "Ebps", "Zbps", "Ybps"];
   const i = Math.floor(Math.log(Math.abs(bitsPerSecond)) / Math.log(k));
   
