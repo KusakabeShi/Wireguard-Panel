@@ -101,9 +101,13 @@ if [[ ! -f "/etc/wireguard-panel/config.json" ]]; then
         
         # Try to extract password from logs
         if [[ -f "/tmp/wg-panel-init.log" ]]; then
-            PASSWORD=$(grep -oP '(?<=password: )[^\s]+' /tmp/wg-panel-init.log 2>/dev/null || true)
+            PASSWORD=$(grep -oP '(?<=Generated random password: )[^\s]+' /tmp/wg-panel-init.log 2>/dev/null || true)
             if [[ -n "$PASSWORD" ]]; then
                 print_info "Generated admin password: $PASSWORD"
+            else
+                # Fallback: show the log content to help debug
+                print_info "Configuration generated. Check the log for password:"
+                cat /tmp/wg-panel-init.log
             fi
             rm -f /tmp/wg-panel-init.log
         fi
@@ -134,3 +138,4 @@ print_info "  - Restart service: systemctl restart wireguard-panel"
 # Show final status
 sleep 2
 systemctl status wireguard-panel --no-pager --lines=10 || true
+print_info "Generated admin password: $PASSWORD"

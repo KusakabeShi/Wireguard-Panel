@@ -4,9 +4,34 @@
 
 WG-Panel is a user-friendly, web-based management panel for WireGuard, designed to simplify the setup and administration of your VPN server. It features a clear hierarchical structure (Interfaces > Servers > Clients) and powerful networking capabilities, including dynamic IP support and advanced NAT configurations.
 
+## Installation
+
+### Quick Install (Recommended)
+
+Run the automated installation script as root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/KusakabeShi/Wireguard-Panel/refs/heads/main/install.sh | bash
+```
+
+This script will:
+- Download the latest WG-Panel binary for your architecture
+- Install it to `/usr/local/sbin/wg-panel`
+- Create systemd service configuration
+- Generate initial configuration and show the admin password
+- Start and enable the WG-Panel service
+
+After installation, access the web panel at `http://your-server:5000`
+
+### Manual Installation
+
+1. Download the appropriate binary for your platform from the [releases page](https://github.com/KusakabeShi/Wireguard-Panel/releases)
+2. Make it executable: `chmod +x wg-panel-linux-*`
+3. Run it once to generate initial configuration: `./wg-panel-linux-*`
+
 ## Getting Started
 
-Follow these steps to get your WG-Panel server up and running.
+Follow these steps to get your WG-Panel server up and running (manual installation).
 
 ### 1. Initial Setup
 

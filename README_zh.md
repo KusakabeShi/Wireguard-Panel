@@ -4,9 +4,34 @@
 
 WG-Panel 是一個使用者友好的 WireGuard 網頁管理面板，旨在簡化您的 VPN 伺服器的設定和管理。它具有清晰的層級結構（Interfaces > Servers > Clients）和強大的網路功能，包括動態 IP 支援和進階 NAT 設定。
 
+## 安裝
+
+### 快速安裝（建議）
+
+以 root 身份執行自動安裝腳本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/KusakabeShi/Wireguard-Panel/refs/heads/main/install.sh | bash
+```
+
+此腳本將會：
+- 為您的架構下載最新的 WG-Panel 執行檔
+- 將其安裝到 `/usr/local/sbin/wg-panel`
+- 建立 systemd 服務設定
+- 產生初始設定並顯示管理員密碼
+- 啟動並啟用 WG-Panel 服務
+
+安裝完成後，可透過 `http://your-server:5000` 存取網頁面板
+
+### 手動安裝
+
+1. 從[發佈頁面](https://github.com/KusakabeShi/Wireguard-Panel/releases)下載適合您平台的執行檔
+2. 使其可執行：`chmod +x wg-panel-linux-*`
+3. 執行一次以產生初始設定：`./wg-panel-linux-*`
+
 ## 快速入門
 
-請依照以下步驟啟動並執行您的 WG-Panel 伺服器。
+請依照以下步驟啟動並執行您的 WG-Panel 伺服器（手動安裝）。
 
 ### 1. 初始設定
 
