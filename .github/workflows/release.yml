@@ -77,7 +77,7 @@ jobs:
       env:
         CGO_ENABLED: 1
       run: |
-        BINARY_NAME="wg-panel-${{ steps.version.outputs.VERSION }}-${{ matrix.os }}-${{ matrix.arch }}"
+        BINARY_NAME="wg-panel-${{ matrix.os }}-${{ matrix.arch }}"
         
         LDFLAGS="-X wg-panel/internal/version.Version=${{ steps.version.outputs.VERSION }} \
         -X wg-panel/internal/version.GitCommit=${{ steps.build_vars.outputs.COMMIT }} \
@@ -144,14 +144,14 @@ jobs:
           
           ### Downloads
           **Linux-only**: This application requires Linux due to netlink and libpcap dependencies.
-          - **Linux AMD64**: `wg-panel-${{ steps.version.outputs.VERSION }}-linux-amd64`
-          - **Linux ARM64**: `wg-panel-${{ steps.version.outputs.VERSION }}-linux-arm64`
+          - **Linux AMD64**: `wg-panel-linux-amd64`
+          - **Linux ARM64**: `wg-panel-linux-arm64`
           
           ### Installation
           1. Download the appropriate binary for your platform
-          2. Make it executable: `chmod +x wg-panel-${{ steps.version.outputs.VERSION }}-linux-*`
-          3. Run `./wg-panel-${{ steps.version.outputs.VERSION }}-linux-* -v` to verify the installation
-          4. Run `./wg-panel-${{ steps.version.outputs.VERSION }}-linux-*` to start the application
+          2. Make it executable: `chmod +x wg-panel-linux-*`
+          3. Run `./wg-panel-linux-* -v` to verify the installation
+          4. Run `./wg-panel-linux-*` to start the application
           
           ### Changes in this release
           - Built from commit: ${{ github.sha }}
