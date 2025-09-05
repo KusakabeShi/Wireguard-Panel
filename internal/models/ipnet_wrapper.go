@@ -264,6 +264,9 @@ func (basenet *IPNetWrapper) GetSubnetByOffset(offset *IPNetWrapper) (*IPNetWrap
 	if basenet.Version != offset.Version {
 		return nil, fmt.Errorf("basenet and offset in different address family")
 	}
+	if !offset.IsHostbitAllZero() {
+		return nil, fmt.Errorf("offset: %s has non-zero host bits, do you mean %v ?", offset.String(), offset.NetworkStr())
+	}
 	if offset.Masklen() < basenet.Masklen() {
 		return nil, fmt.Errorf("cannot get subnet from %v by offset: %v, offset larger than basenet", basenet.NetworkStr(), offset)
 	}
@@ -278,9 +281,6 @@ func (basenet *IPNetWrapper) GetSubnetByOffset(offset *IPNetWrapper) (*IPNetWrap
 	// for ipv4: if base is /16 and offset is /24, offset.IP must be in 0.0.0.0~0.0.255.0
 	// for ipv6: if base is /64 and offset is /96, offset.IP must be in ::~::ffff:ffff:0
 	// Verify that the offset network's base IP is properly aligned for its mask
-	if !offset.IsHostbitAllZero() {
-		return nil, fmt.Errorf("offset: %s has non-zero host bits, it is not aligned for its mask", offset.String())
-	}
 
 	// Create a mask for the allowed offset bits
 	if offset.IpExceed2PowerN(basenet.Masklen()) {

@@ -86,7 +86,7 @@ func (h *ServiceHandler) CheckSNATRoamingOffsetValid(c *gin.Context) {
 			} else if af == 6 {
 				zerostr = "::"
 			}
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid offset: must be " + zerostr + "for SNAT Mode", "error_params": "offset"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid offset: must be " + zerostr + " for SNAT Mode", "error_params": "offset"})
 		}
 		return
 	}

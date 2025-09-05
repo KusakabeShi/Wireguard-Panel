@@ -16,12 +16,12 @@ import (
 func GetInterfaceIP(ifname string) (*models.IPNetWrapper, *models.IPNetWrapper, error) {
 	link, err := netlink.LinkByName(ifname)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get interface %s:-> %w", ifname, err)
+		return nil, nil, fmt.Errorf("failed to get %s:-> %w", ifname, err)
 	}
 
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get addrs from interface %s:-> %w", ifname, err)
+		return nil, nil, fmt.Errorf("failed to get addrs from %s:-> %w", ifname, err)
 	}
 
 	var v4s, v6s []netlink.Addr
@@ -81,12 +81,12 @@ func GetInterfaceIP(ifname string) (*models.IPNetWrapper, *models.IPNetWrapper, 
 func GetInterfaceIPs(ifname string) ([]net.IP, []net.IP, error) {
 	link, err := netlink.LinkByName(ifname)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get link by name %v:-> %w", ifname, err)
+		return nil, nil, fmt.Errorf("failed to get %v:-> %w", ifname, err)
 	}
 
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list addresses:-> %w", err)
+		return nil, nil, fmt.Errorf("failed to list addrs from %v :-> %w", ifname, err)
 	}
 
 	var ipv4s, ipv6s []net.IP

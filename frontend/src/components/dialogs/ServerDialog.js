@@ -74,6 +74,7 @@ const ServerDialog = ({
     ipv4: null,
     ipv6: null
   });
+  const hasTriggeredInitialValidation = useRef(false);
 
   const isEdit = Boolean(server);
 
@@ -177,6 +178,9 @@ const ServerDialog = ({
       ipv4: null,
       ipv6: null
     };
+    
+    // Reset the initial validation flag when dialog opens
+    hasTriggeredInitialValidation.current = false;
   }, [server, open]);
 
   useEffect(() => {
@@ -185,9 +189,10 @@ const ServerDialog = ({
 
   // Separate useEffect for initial SNAT validation when dialog opens
   useEffect(() => {
-    if (open && server) {
+    if (open && server && !hasTriggeredInitialValidation.current) {
       // Trigger SNAT roaming validation for existing configurations when dialog opens
       setTimeout(() => {
+        let hasValidation = false;
         ['ipv4', 'ipv6'].forEach(ipVersion => {
           const ipConfig = formData[ipVersion];
           if (ipConfig.enabled && 
@@ -200,11 +205,17 @@ const ServerDialog = ({
               ipConfig.snat.roamingMasterInterface,
               ipConfig.snat.snatIpNet
             );
+            hasValidation = true;
           }
         });
+        
+        // Mark as triggered if we actually ran any validation
+        if (hasValidation) {
+          hasTriggeredInitialValidation.current = true;
+        }
       }, 100);
     }
-  }, [open, server]);
+  }, [formData, open, server]);
 
   const checkValidation = () => {
     const newWarnings = [];
@@ -222,6 +233,39 @@ const ServerDialog = ({
       return;
     }
 
+    // Client-side validation: check prefix length consistency for NETMAP mode
+    if (snatIpNet.includes('/')) {
+      const offsetPrefixLen = snatIpNet.split('/')[1];
+      const isSNATMode = (ipVersion === 'ipv4' && offsetPrefixLen === '32') || 
+                         (ipVersion === 'ipv6' && offsetPrefixLen === '128');
+      
+      // Only check prefix length for NETMAP mode (not SNAT mode)
+      if (!isSNATMode) {
+        const serverNetwork = formData[ipVersion].network;
+        if (serverNetwork && serverNetwork.includes('/')) {
+          const serverPrefixLen = serverNetwork.split('/')[1];
+          
+          if (serverPrefixLen && offsetPrefixLen && serverPrefixLen !== offsetPrefixLen) {
+            setValidationErrors(prev => ({
+              ...prev,
+              [ipVersion]: {
+                ...prev[ipVersion],
+                snatIpNet: `Prefix length must match server network (/${serverPrefixLen}) for NETMAP mode`
+              }
+            }));
+            
+            setValidationSuccess(prev => ({
+              ...prev,
+              [ipVersion]: {
+                snatIpNet: ''
+              }
+            }));
+            return;
+          }
+        }
+      }
+    }
+
     const addressFamily = ipVersion === 'ipv4' ? '4' : '6';
     
     try {
@@ -237,11 +281,12 @@ const ServerDialog = ({
       }));
       
       // Store success information with mapped network hint
+      const serverNetwork = formData[ipVersion].network;
       setValidationSuccess(prev => ({
         ...prev,
         [ipVersion]: {
-          snatIpNet: result?.['mapped network'] 
-            ? `Will ${result.type} to ${result['mapped network']} on interface ${masterInterface}`
+          snatIpNet: result?.['mapped network'] && serverNetwork
+            ? `Will ${result.type} ${serverNetwork} to ${result['mapped network']} on interface ${masterInterface}`
             : 'Valid'
         }
       }));
