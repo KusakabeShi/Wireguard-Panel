@@ -18,7 +18,7 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/etc/wireguard-panel
+ReadWritePaths=/etc/wireguard /etc/wireguard-panel
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
 
 # Network namespace requirements for WireGuard
