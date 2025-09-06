@@ -311,3 +311,51 @@ func IsIfaceLayer2(ifname string) error {
 
 	return nil
 }
+
+func CheckVRFExists(vrfName string) error {
+	link, err := netlink.LinkByName(vrfName)
+	if err != nil {
+		if _, ok := err.(netlink.LinkNotFoundError); ok {
+			return fmt.Errorf("VRF %q does not exist", vrfName)
+		}
+		return fmt.Errorf("failed to check VRF %q:-> %w", vrfName, err)
+	}
+
+	// Check if it's actually a VRF
+	if link.Type() != "vrf" {
+		return fmt.Errorf("interface %q is not a VRF", vrfName)
+	}
+
+	// Check if VRF is up
+	if link.Attrs().Flags&net.FlagUp == 0 {
+		return fmt.Errorf("VRF %q is not up", vrfName)
+	}
+
+	return nil
+}
+
+func SetInterfaceVRF(ifname, vrfName string) error {
+	link, err := netlink.LinkByName(ifname)
+	if err != nil {
+		return fmt.Errorf("failed to get interface %q:-> %w", ifname, err)
+	}
+
+	if vrfName == "" {
+		// Remove from VRF (set nomaster)
+		if err := netlink.LinkSetNoMaster(link); err != nil {
+			return fmt.Errorf("failed to remove interface %q from VRF:-> %w", ifname, err)
+		}
+	} else {
+		// Add to VRF
+		vrfLink, err := netlink.LinkByName(vrfName)
+		if err != nil {
+			return fmt.Errorf("failed to get VRF %q:-> %w", vrfName, err)
+		}
+		
+		if err := netlink.LinkSetMaster(link, vrfLink); err != nil {
+			return fmt.Errorf("failed to set interface %q master to VRF %q:-> %w", ifname, vrfName, err)
+		}
+	}
+
+	return nil
+}

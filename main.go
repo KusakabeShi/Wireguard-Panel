@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"wg-panel/internal/config"
 	"wg-panel/internal/internalservice"
@@ -61,6 +62,12 @@ func main() {
 	// Initialize logger with configured log level
 	logging.InitLogger(cfg.LogLevel)
 	logging.LogInfo("Starting %s with log level: %s", version.GetVersionInfo(), cfg.LogLevel.String())
+
+	// Perform system checks before starting services
+	if err := performSystemChecks(); err != nil {
+		logging.LogError("System check failed: %v", err)
+		fmt.Printf("Warning: %v\n", err)
+	}
 
 	// Initialize services
 	firewallService := internalservice.NewFirewallService()
@@ -169,4 +176,107 @@ func saveConfig(configPath string, cfg *config.Config) error {
 	}
 
 	return utils.WriteFileAtomic(configPath, data, 0600)
+}
+
+// performSystemChecks validates system configuration and required tools
+func performSystemChecks() error {
+	var warnings []string
+
+	// Check IP forwarding settings
+	if err := checkIPForwarding(&warnings); err != nil {
+		warnings = append(warnings, err.Error())
+	}
+
+	// Check required tools installation
+	if err := checkRequiredTools(&warnings); err != nil {
+		warnings = append(warnings, err.Error())
+	}
+
+	// Check iptables FORWARD policies
+	if err := checkFirewallPolicies(&warnings); err != nil {
+		warnings = append(warnings, err.Error())
+	}
+
+	if len(warnings) > 0 {
+		return fmt.Errorf("system configuration issues found:\n  - %s", strings.Join(warnings, "\n  - "))
+	}
+
+	return nil
+}
+
+// checkIPForwarding verifies IPv4 and IPv6 forwarding is enabled
+func checkIPForwarding(warnings *[]string) error {
+	// Check IPv4 forwarding
+	output, err := utils.RunCommandWithOutput("cat", "/proc/sys/net/ipv4/ip_forward")
+	if err != nil {
+		*warnings = append(*warnings, "unable to check IPv4 forwarding status")
+	} else if strings.TrimSpace(output) != "1" {
+		*warnings = append(*warnings, "IPv4 forwarding is disabled. Enable with: echo '1' > /proc/sys/net/ipv4/ip_forward or sysctl -w net.ipv4.ip_forward=1")
+	}
+
+	// Check IPv6 forwarding
+	output, err = utils.RunCommandWithOutput("cat", "/proc/sys/net/ipv6/conf/all/forwarding")
+	if err != nil {
+		*warnings = append(*warnings, "unable to check IPv6 forwarding status")
+	} else if strings.TrimSpace(output) != "1" {
+		*warnings = append(*warnings, "IPv6 forwarding is disabled. Enable with: echo '1' > /proc/sys/net/ipv6/conf/all/forwarding or sysctl -w net.ipv6.conf.all.forwarding=1")
+	}
+
+	return nil
+}
+
+// checkRequiredTools verifies all required system tools are installed
+func checkRequiredTools(warnings *[]string) error {
+	requiredTools := []string{"ip", "wg", "wg-quick", "iptables", "ip6tables", "iptables-save", "ip6tables-save"}
+
+	for _, tool := range requiredTools {
+		if err := utils.RunCommand("which", tool); err != nil {
+			switch tool {
+			case "ip":
+				*warnings = append(*warnings, fmt.Sprintf("%s not found. Install with: apt-get install iproute2 (Ubuntu/Debian) or yum install iproute (RHEL/CentOS)", tool))
+			case "wg", "wg-quick":
+				*warnings = append(*warnings, fmt.Sprintf("%s not found. Install WireGuard tools with: apt-get install wireguard-tools (Ubuntu/Debian) or yum install wireguard-tools (RHEL/CentOS)", tool))
+			case "iptables", "ip6tables", "iptables-save", "ip6tables-save":
+				*warnings = append(*warnings, fmt.Sprintf("%s not found. Install with: apt-get install iptables (Ubuntu/Debian) or yum install iptables (RHEL/CentOS)", tool))
+			default:
+				*warnings = append(*warnings, fmt.Sprintf("%s not found in PATH", tool))
+			}
+		}
+	}
+
+	return nil
+}
+
+// checkFirewallPolicies verifies iptables FORWARD chain policies
+func checkFirewallPolicies(warnings *[]string) error {
+	// Check IPv4 iptables FORWARD policy
+	output, err := utils.RunCommandWithOutput("iptables", "-L", "FORWARD", "-n")
+	if err != nil {
+		*warnings = append(*warnings, "unable to check iptables FORWARD policy")
+	} else {
+		lines := strings.Split(output, "\n")
+		if len(lines) > 0 {
+			// First line typically contains: "Chain FORWARD (policy ACCEPT)"
+			firstLine := lines[0]
+			if !strings.Contains(firstLine, "policy ACCEPT") {
+				*warnings = append(*warnings, "iptables FORWARD chain policy is not ACCEPT. This may block WireGuard traffic. Consider: iptables -P FORWARD ACCEPT")
+			}
+		}
+	}
+
+	// Check IPv6 ip6tables FORWARD policy
+	output, err = utils.RunCommandWithOutput("ip6tables", "-L", "FORWARD", "-n")
+	if err != nil {
+		*warnings = append(*warnings, "unable to check ip6tables FORWARD policy")
+	} else {
+		lines := strings.Split(output, "\n")
+		if len(lines) > 0 {
+			firstLine := lines[0]
+			if !strings.Contains(firstLine, "policy ACCEPT") {
+				*warnings = append(*warnings, "ip6tables FORWARD chain policy is not ACCEPT. This may block WireGuard IPv6 traffic. Consider: ip6tables -P FORWARD ACCEPT")
+			}
+		}
+	}
+
+	return nil
 }

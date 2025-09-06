@@ -61,6 +61,13 @@ func (s *InterfaceService) CreateInterface(req InterfaceCreateRequest) (*models.
 		return nil, fmt.Errorf("failed to generate public key:-> %v", err)
 	}
 
+	// Validate VRF if specified
+	if req.VRFName != nil && *req.VRFName != "" {
+		if err := utils.CheckVRFExists(*req.VRFName); err != nil {
+			return nil, err
+		}
+	}
+
 	// Validate endpoint
 	if newendpoint, err := s.ValidateEndpoint(req.Endpoint); err != nil {
 		return nil, err
@@ -153,6 +160,7 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 	needsWGReCreateOldName := ""
 	needsWGRegeneration := false
 	needsMTUUpdate := false
+	needsVRFUpdate := false
 
 	// Update fields
 	if req.Ifname != "" && req.Ifname != iface.Ifname {
@@ -174,7 +182,14 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 		needsWGRegeneration = true
 	}
 
-	if req.VRFName != iface.VRFName {
+	if req.VRFName != nil && *req.VRFName != *iface.VRFName {
+		// Validate VRF if specified
+		if *req.VRFName != "" {
+			if err := utils.CheckVRFExists(*req.VRFName); err != nil {
+				return nil, err
+			}
+		}
+
 		// Check for network overlaps when changing VRF
 		for _, server := range iface.Servers {
 			if err := s.cfg.CheckNetworkOverlapsInVRF(req.VRFName, nil, nil, server.GetNetwork(4)); err != nil {
@@ -187,6 +202,7 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 
 		iface.VRFName = req.VRFName
 		needsWGRegeneration = true
+		needsVRFUpdate = true
 	}
 
 	if req.FwMark != nil && (iface.FwMark == nil || *req.FwMark != *iface.FwMark) {
@@ -258,6 +274,17 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 	if iface.Enabled {
 		if err := s.wg.SyncToInterface(iface.Ifname, true, iface.PrivateKey); err != nil {
 			return nil, fmt.Errorf("failed to bring up new WireGuard interface:-> %v", err)
+		}
+
+		// Update VRF binding if needed and interface is up
+		if needsVRFUpdate {
+			vrfName := ""
+			if iface.VRFName != nil {
+				vrfName = *iface.VRFName
+			}
+			if err := utils.SetInterfaceVRF(iface.Ifname, vrfName); err != nil {
+				return nil, fmt.Errorf("failed to update VRF binding:-> %v", err)
+			}
 		}
 	}
 

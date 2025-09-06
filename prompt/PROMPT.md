@@ -22,7 +22,7 @@ I'm going to implement a WireGuard server panel:
 *   **BasePath:** The prefix to serve frontend static files. Default: `/`.
 
 ### Interface:
-*   **ifname:** The interface's short name, matching `^[A-Za-z0-9_-]{1,12}$`. Must be unique. The actual system interface name will be `wg-[ifname]`.
+*   **ifname:** The interface's short name, matching `^[A-Za-z0-9_-]{1,15}$`. Must be unique and starts with WgIfPrefix.
 *   **ID:** The unique ID of the interface, allocated when added. It is not changeable.
 *   **Enabled:** A boolean indicating if this interface is enabled. This value cannot be edited via the standard 'edit' API; it can only be modified using the dedicated 'SetEnable' API. When created, it will always be disabled.
 *   **VRF name:** The VRF (Virtual Routing and Forwarding) of the device. If null, no VRF is applied. Otherwise, `ip link set dev $IFNAME master $VRF_NAME` is added to the WireGuard configuration. Default value: null.
