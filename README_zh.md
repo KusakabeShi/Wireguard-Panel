@@ -121,11 +121,11 @@ Server 定義了 Interface 內用戶端的邏輯群組及其相關的網路設�
         * **Pseudo-bridge master interface**: 若勾選，並在 master interface 填入目標 physical interface ，必須是 L2 interface  
             * 後端會開始在此設備上監聽 ARP Request(ipv4) 和 Neighbor Solicitation(IPv6)
             * 如果監聽到的封包符合 server 自己的內網 IP ，就回應 ARP Reply(IPv4) 或 Neighbor Advertisement(IPv6)
-            * [Pseudo-bridge 細節說明](link to Pseudo-Bridge section)
+            * [Pseudo-bridge 細節說明](#pseudo-bridge)
     * **Routed Networks**：用戶端允許透過 VPN 存取的網路列表（CIDR 格式）。用於生成 client.conf 時，填入裡面的 `AllowedIPs` 欄位
-    * **Block Non-Routed Network**：若勾選，此選項會在伺服器中使用 iptables 新增防火牆規則，以確保用戶端*僅*能存取 **Routed Networks** 中指定的網路。來自用戶端的所有其他流量將被拒絕。
+    * **Allow Routed Network Only**：若勾選，此選項會在伺服器中使用 iptables 新增防火牆規則，以確保用戶端*僅*能存取 **Routed Networks** 中指定的網路。來自用戶端的所有其他流量將被拒絕。
     * **SNAT Checkbox**: 是否啟用 `IPv4 SNAT`。若勾選，將會在此選項會在伺服器中使用 iptables 新增 `MASQUERADE`, `SNAT`, `NETMAP` 其中一種防火牆規則
-        * [SNAT 細節說明]( wait complete, link to SNAT (Source Network Address Translation) section)
+        * [SNAT 細節說明](#snat-source-network-address-translation)
 
 ### 3. Advanced Server Features
 
@@ -182,8 +182,10 @@ SNAT 功能對客戶端的 Source IP 進行轉換，允許用戶端使用伺服�
                 * wg-panel 會從 `2a0d:3a87::/64` 網段，根據 offset 切割出一段子網段 `2a0d:3a87::980d:0/112` 
                 * Server 網路為 `fd28:f50:55c2::/112`
                 * 新增 NETMAP 防火牆規則，將 `fd28:f50:55c2::/112` 做 1:1 NAT 映射到公網地址 `2a0d:3a87::980d:0/112` 
-    * SNAT Roaming master interface: SNAT Roaming Service 選定的 master interface
-    * SNAT NETMAP pseudo-bridge: 
+    * **SNAT Roaming master interface**:  上述 SNAT Roaming Service 所選定的 master interface ，讀取其 IP 並更新 SNAT/NETMAP 映射範圍
+    * **SNAT NETMAP pseudo-bridge**: 監聽 `SNAT Roaming master interface` ，針對 SNAT Roaming 的 NETMAP 模式，將映射後的子網段的 Neighbor Solicitation 請求，回應 Neighbor Advertisement。
+        * 因為 linux 的 NETMAP 單純做 IP 轉換，不會對映射 IP 回應 ARP/Neighbor Solicitation 請求，因此同一個二層網路的其他主機不知道這個子網段被映射到 Wireguard client 了，導致連不上
+        * 開啟此選項，SNAT Roaming Service 會將映射的子網段通知給 Pseudo-bridge Service ，進行 ARP/NS 的回應，讓外部主機能透過映射後的 IP 連上客戶端
 
 
 ![serveredit](screenshots/serveredit.png)

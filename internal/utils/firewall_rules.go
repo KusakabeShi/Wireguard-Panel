@@ -117,13 +117,12 @@ func GenerateRoutedNetworksRules(iptablesCmd string, ifname string, config *mode
 		}
 	}
 
+	// Add specific allow rules for each routed network
+	for _, routedNet := range config.RoutedNetworks {
+		rules = append(rules, fmt.Sprintf("%s -A FORWARD -i %s -s %s -d %s -j ACCEPT -m comment --comment %s",
+			iptablesCmd, ifname, sourceNet, routedNet.NetworkStr(), comment))
+	}
 	if !hasAllowAll {
-		// Add specific allow rules for each routed network
-		for _, routedNet := range config.RoutedNetworks {
-			rules = append(rules, fmt.Sprintf("%s -A FORWARD -i %s -s %s -d %s -j ACCEPT -m comment --comment %s",
-				iptablesCmd, ifname, sourceNet, routedNet.NetworkStr(), comment))
-		}
-
 		// Add deny rule for other destinations
 		rules = append(rules, fmt.Sprintf("%s -A FORWARD -i %s -s %s -j REJECT -m comment --comment %s",
 			iptablesCmd, ifname, sourceNet, comment))

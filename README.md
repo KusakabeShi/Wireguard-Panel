@@ -124,7 +124,7 @@ Each server has the following settings:
             * If a received packet matches the server's own internal IP, it will respond with an ARP Reply (IPv4) or Neighbor Advertisement (IPv6).
             * [Pseudo-bridge details](#pseudo-bridge)
     * **Routed Networks**: A list of networks (in CIDR format) that clients are allowed to access through the VPN. This is used to fill in the `AllowedIPs` field when generating client.conf.
-    * **Block Non-Routed Network**: If checked, this option will add firewall rules on the server using iptables to ensure that clients can *only* access the networks specified in **Routed Networks**. All other traffic from the client will be dropped.
+    * **Allow Routed Network Only**: If checked, this option will add firewall rules on the server using iptables to ensure that clients can *only* access the networks specified in **Routed Networks**. All other traffic from the client will be rejected.
     * **Enable SNAT**: Check to enable SNAT. If checked, this option will add one of `MASQUERADE`, `SNAT`, or `NETMAP` firewall rules on the server using iptables.
         * [SNAT details](#snat-source-network-address-translation)
 
@@ -183,8 +183,10 @@ The mode used is determined by the **SNAT IP/Net** field:
                 * wg-panel will carve out a subnet `2a0d:3a87::980d:0/112` from the `2a0d:3a87::/64` network based on the offset.
                 * The Server network is `fd28:f50:55c2::/112`.
                 * A NETMAP firewall rule is added to perform a 1:1 NAT mapping from `fd28:f50:55c2::/112` to the public address `2a0d:3a87::980d:0/112`.
-    * **SNAT Roaming master interface**: The master interface selected by the SNAT Roaming Service.
-    * **SNAT NETMAP pseudo-bridge**: To be completed.
+    * **SNAT Roaming master interface**: The master interface selected by the SNAT Roaming Service, from which IP addresses are read and used to update SNAT/NETMAP mapping ranges.
+    * **SNAT NETMAP pseudo-bridge**: Monitors the `SNAT Roaming master interface` and, for NETMAP mode in SNAT Roaming, responds to Neighbor Solicitation requests for the mapped subnet with Neighbor Advertisement responses.
+        * Because Linux NETMAP only performs IP translation and does not respond to ARP/Neighbor Solicitation requests for mapped IPs, other hosts on the same Layer 2 network are unaware that the subnet has been mapped to WireGuard clients, preventing connections.
+        * When this option is enabled, the SNAT Roaming Service notifies the Pseudo-bridge Service of the mapped subnet to handle ARP/NS responses, allowing external hosts to connect to clients through the mapped IPs.
 
 
 ![serveredit](screenshots/serveredit.png)

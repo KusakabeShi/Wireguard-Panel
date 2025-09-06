@@ -591,7 +591,7 @@ const ServerDialog = ({
                 disabled={!isEnabled}
               />
             }
-            label="Block Non-Routed Network Packets"
+            label="Allow Routed Network Only"
             sx={{
               mt:-0.5,
               mb:-0.5,
