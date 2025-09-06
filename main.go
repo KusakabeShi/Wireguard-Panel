@@ -122,6 +122,13 @@ func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, e
 		return nil, false, err
 	}
 
+	if cfg.BasePath == "" {
+		cfg.BasePath = "/"
+	}
+	if cfg.APIPrefix == "" {
+		cfg.APIPrefix = "/"
+	}
+
 	// Update password if requested
 	if newPassword != "" {
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)

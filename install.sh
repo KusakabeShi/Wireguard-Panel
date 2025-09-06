@@ -48,6 +48,14 @@ print_info "Detected architecture: $ARCH"
 print_info "Creating /etc/wireguard-panel directory..."
 mkdir -p /etc/wireguard-panel
 
+# Stop existing service if it's running to allow binary overwrite
+if systemctl cat wireguard-panel.service &>/dev/null; then
+    if systemctl is-active --quiet wireguard-panel; then
+        print_info "WireGuard Panel service is running. Stopping it for the upgrade..."
+        systemctl stop wireguard-panel
+    fi
+fi
+
 # Download the binary
 BINARY_URL="https://github.com/KusakabeShi/Wireguard-Panel/releases/latest/download/wg-panel-linux-$ARCH"
 print_info "Downloading WireGuard Panel binary from $BINARY_URL..."

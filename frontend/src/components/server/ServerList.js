@@ -38,10 +38,10 @@ const ServerList = ({
 
   return (
     <Box sx={{ p: 2 }}>
-      {servers.map((server) => (
+      {servers?.map((server) => (
         <ServerItem
           key={server.id}
-          server={{...server, clients: serverClients[server.id] || []}}
+          server={{...server, clients: serverClients?.[server.id] || []}}
           clientsState={clientsState}
           previousClientsState={previousClientsState}
           lastUpdateTime={lastUpdateTime}

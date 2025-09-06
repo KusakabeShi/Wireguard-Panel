@@ -146,8 +146,15 @@ func (s *Server) setupRoutes(
 	s.engine.NoRoute(func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 
+		if !strings.HasSuffix(sitePrefix, "/") {
+			sitePrefix = sitePrefix + "/"
+		}
+
 		// If request starts with API prefix, return 404
 		apiPrefix := apiPath[:len(apiPath)-1] // Remove trailing slash for comparison
+		if strings.HasPrefix(apiPrefix, "//") {
+			apiPrefix = apiPrefix[1:]
+		}
 		if len(requestPath) >= len(apiPrefix) && requestPath[:len(apiPrefix)] == apiPrefix {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 			return
@@ -157,12 +164,9 @@ func (s *Server) setupRoutes(
 		if len(requestPath) >= len(sitePrefix) && requestPath[:len(sitePrefix)] == sitePrefix {
 			// Remove site prefix to get relative path
 			relativePath := requestPath[len(sitePrefix):]
-			if relativePath == "" {
-				relativePath = "/"
-			}
 
 			// Try to serve static file from embedded filesystem
-			embedPath := "frontend/build" + relativePath
+			embedPath := "frontend/build/" + relativePath
 			if data, err := s.frontendFS.ReadFile(embedPath); err == nil {
 				// Determine content type based on file extension
 				contentType := "text/plain"
@@ -210,11 +214,18 @@ func (s *Server) injectRuntimeConfig(html string) string {
 		basePath += "/"
 	}
 
+	apiprefix := s.cfg.APIPrefix
+	if !strings.HasSuffix(basePath, "/") {
+		apiprefix = basePath + apiprefix
+	} else {
+		apiprefix = basePath[:len(basePath)-1] + apiprefix
+	}
+
 	// Inject the API path configuration for JavaScript
 	runtimeScript := fmt.Sprintf(`
 <script>
   window.RUNTIME_API_PATH = "%s";
-</script>`, s.cfg.BasePath+s.cfg.APIPrefix)
+</script>`, apiprefix)
 
 	// Add base tag for static assets
 	baseTag := fmt.Sprintf(`<base href="%s">`, basePath)

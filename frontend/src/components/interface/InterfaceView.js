@@ -75,7 +75,7 @@ const InterfaceView = ({
 
   // Load clients for expanded servers when servers are loaded
   useEffect(() => {
-    if (servers.length > 0 && stateInitialized) {
+    if (servers?.length > 0 && stateInitialized) {
       console.log('Loading clients for expanded servers:', servers.map(s => s.id), 'collapsed:', Array.from(collapsedServers));
       servers.forEach(server => {
         if (!collapsedServers.has(server.id)) {
