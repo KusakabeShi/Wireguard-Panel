@@ -85,19 +85,19 @@ const ClientItem = ({
   const isActive = isClientActive(lastUpdateTime,clientState?.latestHandshake);
 
   return (
-    <Box sx={{ mb: 1 }}>
+    <Box sx={{ mb: 0.3 }}>
       {/* Client Row */}
         <Box 
           sx={{ 
             display: 'flex',
             alignItems: 'center',
-            p: 1,
+            p: 0.5,
             backgroundColor: 'rgb(51, 109, 43)',
             color: 'white',
             borderRadius: '4px 4px 0 0'
           }}
         >
-          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+          <Box sx={{ ml: 1,flexGrow: 1, display: 'flex', alignItems: 'center' }}>
             <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
           {client.name}
             </Typography>

@@ -528,7 +528,7 @@ const ServerDialog = ({
     const isEnabled = ip.enabled;
 
     return (
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mt: -1, mb: -1 }}>
         <FormControlLabel
           control={
             <Checkbox
@@ -546,11 +546,11 @@ const ServerDialog = ({
             onChange={(e) => handleChange(`${ipVersion}.network`, e.target.value)}
             disabled={!isEnabled}
             fullWidth
-            sx={{ mb: 2 }}
-            variant="outlined"
+            sx={{ mb: 1 }}
+            variant="outlined" size="small"
           />
 
-          <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 0 }}>
             <FormControlLabel
               control={
                 <Checkbox
@@ -567,7 +567,7 @@ const ServerDialog = ({
               onChange={(e) => handleChange(`${ipVersion}.pseudoBridgeMasterInterface`, e.target.value)}
               disabled={!isEnabled || !ip.pseudoBridgeMasterInterfaceEnabled}
               fullWidth
-              variant="outlined"
+              variant="outlined" size="small"
             />
           </Box>
 
@@ -578,9 +578,9 @@ const ServerDialog = ({
             disabled={!isEnabled}
             fullWidth
             multiline
-            rows={3}
-            sx={{ mb: 2 }}
-            variant="outlined"
+            rows={2}
+            sx={{ mb: 1 }}
+            variant="outlined" size="small"
           />
 
           <FormControlLabel
@@ -592,6 +592,10 @@ const ServerDialog = ({
               />
             }
             label="Block Non-Routed Network Packets"
+            sx={{
+              mt:-0.5,
+              mb:-0.5,
+            }}
           />
 
           <Box sx={{ mb: 1 }}>
@@ -604,6 +608,10 @@ const ServerDialog = ({
                 />
               }
               label="SNAT"
+              sx={{
+              mt:-0.5,
+              mb:-0.5,
+            }}
             />
           </Box>
 
@@ -614,8 +622,8 @@ const ServerDialog = ({
               onChange={(e) => handleChange(`${ipVersion}.snat.snatIpNet`, e.target.value)}
               disabled={!isEnabled || !ip.snat.enabled}
               fullWidth
-              sx={{ mb: 2 }}
-              variant="outlined"
+              sx={{ mb: 1 }}
+              variant="outlined" size="small"
               error={Boolean(validationErrors[ipVersion]?.snatIpNet)}
               helperText={
                 validationErrors[ipVersion]?.snatIpNet || 
@@ -637,11 +645,11 @@ const ServerDialog = ({
               onChange={(e) => handleChange(`${ipVersion}.snat.snatExcludedNetwork`, e.target.value)}
               disabled={!isEnabled || !ip.snat.enabled}
               fullWidth
-              sx={{ mb: 2 }}
-              variant="outlined"
+              sx={{ mb: 1 }}
+              variant="outlined" size="small"
             />
 
-            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 0 }}>
               <FormControlLabel
                 control={
                   <Checkbox
@@ -658,7 +666,7 @@ const ServerDialog = ({
                 onChange={(e) => handleChange(`${ipVersion}.snat.roamingMasterInterface`, e.target.value)}
                 disabled={!isEnabled || !ip.snat.enabled || !ip.snat.roamingMasterInterfaceEnabled}
                 fullWidth
-                variant="outlined"
+                variant="outlined" size="small"
                 error={Boolean(validationErrors[ipVersion]?.snatRoamingInterface)}
                 helperText={validationErrors[ipVersion]?.snatRoamingInterface}
               />

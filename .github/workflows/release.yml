@@ -9,7 +9,7 @@ on:
       version:
         description: 'Release version (e.g., v1.0.0)'
         required: true
-        default: 'v1.0.3'
+        default: 'v1.0.4'
 
 jobs:
   build:
@@ -121,15 +121,15 @@ jobs:
       run: ls -la artifacts/
 
     - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ env.VERSION }}
-        release_name: WG-Panel ${{ env.VERSION }}
+        name: WG-Panel ${{ env.VERSION }}
         draft: false
         prerelease: ${{ contains(env.VERSION, 'alpha') || contains(env.VERSION, 'beta') || contains(env.VERSION, 'rc') }}
+        files: artifacts/*/*
         body: |
           ## WG-Panel ${{ env.VERSION }}
           
@@ -153,20 +153,3 @@ jobs:
           ### Changes in this release
           - Built from commit: ${{ github.sha }}
           - Build date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-
-    - name: Upload Release Assets
-      run: |
-        for dir in artifacts/*/; do
-          if [ -d "$dir" ]; then
-            for file in "$dir"*; do
-              if [ -f "$file" ]; then
-                echo "Uploading $file"
-                filename=$(basename "$file")
-                curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                     -H "Content-Type: application/octet-stream" \
-                     --data-binary @"$file" \
-                     "https://uploads.github.com/repos/${{ github.repository }}/releases/${{ steps.create_release.outputs.id }}/assets?name=$filename"
-              fi
-            done
-          fi
-        done

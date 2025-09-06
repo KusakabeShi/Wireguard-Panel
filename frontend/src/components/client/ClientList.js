@@ -183,7 +183,7 @@ const ClientList = ({
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'space-between',
-        p: 1, 
+        p: 0.6, 
         borderTop: '1px solid #e0e0e0' 
       }}>
         {/* Sort Controls */}
@@ -265,7 +265,7 @@ const ClientList = ({
         </IconButton>
       </Box>
       {/* Client Items */}
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ p: 0.5 }}>
         {clients.length === 0 ? (
           <Box sx={{ 
             textAlign: 'center', 
