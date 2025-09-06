@@ -146,4 +146,5 @@ print_info "  - Restart service: systemctl restart wireguard-panel"
 # Show final status
 sleep 2
 systemctl status wireguard-panel --no-pager --lines=10 || true
+print_info "Access the panel via http://[your-server-ip]:5000"
 print_info "Generated admin password: $PASSWORD"

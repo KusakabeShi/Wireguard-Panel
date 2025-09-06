@@ -73,12 +73,12 @@ func (s *PseudoBridgeService) UpdateConfiguration(waitInterface map[string]Respo
 		runningIF, ok := s.runningInterface[newIF]
 		if ok {
 			runningIF.ExistsInNewConfig = true
-			if !(models.NetworksEqual(runningIF.IPNet.V4Networks, newNets.V4Networks) &&
+			if !((models.NetworksEqual(runningIF.IPNet.V4Networks, newNets.V4Networks) &&
 				models.NetworksEqual(runningIF.IPNet.V6Networks, newNets.V6Networks) &&
 				models.NetworksEqual(runningIF.IPNet.V4Offsets, newNets.V4Offsets) &&
 				models.NetworksEqual(runningIF.IPNet.V6Offsets, newNets.V6Offsets)) &&
 				models.IPsEqual(runningIF.IPNet.V4Skipped, newNets.V4Skipped) &&
-				models.IPsEqual(runningIF.IPNet.V6Skipped, newNets.V6Skipped) {
+				models.IPsEqual(runningIF.IPNet.V6Skipped, newNets.V6Skipped)) {
 				// Need update
 				runningIF.IPNet = newNets
 				updateIF[newIF] = newNets
