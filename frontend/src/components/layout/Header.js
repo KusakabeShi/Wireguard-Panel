@@ -1,15 +1,19 @@
 import React from 'react';
-import { AppBar, Toolbar, Typography, IconButton, Box } from '@mui/material';
+import { AppBar, Toolbar, Typography, IconButton, Box, useTheme } from '@mui/material';
 import { Settings as SettingsIcon, Logout as LogoutIcon } from '@mui/icons-material';
+import ThemeModeToggle from './ThemeModeToggle';
 
 const Header = ({ onSettingsClick, onLogoutClick }) => {
+  const theme = useTheme();
+  
   return (
-    <AppBar position="static" sx={{ backgroundColor: '#1976d2', height: 64 }}>
+    <AppBar position="static" sx={{ backgroundColor: theme.palette.primary.main, height: 64 }}>
       <Toolbar sx={{ minHeight: 64 }}>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
           WG-Panel
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
+          <ThemeModeToggle />
           <IconButton 
             color="inherit" 
             onClick={onSettingsClick}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Box, CssBaseline, ThemeProvider, createTheme, CircularProgress } from '@mui/material';
+import { Box, CssBaseline, CircularProgress } from '@mui/material';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import './App.css';
 
 import Header from './components/layout/Header';
@@ -18,16 +19,6 @@ import SettingsDialog from './components/dialogs/SettingsDialog';
 import apiService from './services/apiService';
 import stateManager from './utils/stateManager';
 
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#d32f2f',
-    },
-  },
-});
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -428,7 +419,7 @@ function AppContent() {
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider>
       <CssBaseline />
       <AuthProvider>
         <AppContent />

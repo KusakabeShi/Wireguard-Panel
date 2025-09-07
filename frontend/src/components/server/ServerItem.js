@@ -4,7 +4,8 @@ import {
   Typography, 
   IconButton, 
   Switch,
-  Collapse
+  Collapse,
+  useTheme
 } from '@mui/material';
 import { 
   Edit as EditIcon, 
@@ -35,6 +36,8 @@ const ServerItem = ({
   interfaceId,
   interfaceInfo
 }) => {
+  const theme = useTheme();
+  
   const getNetworkDisplay = (server) => {
     const networks = [];
     if (server.ipv4?.enabled && server.ipv4?.network) {
@@ -54,7 +57,7 @@ const ServerItem = ({
           display: 'flex',
           alignItems: 'center',
           p: 1,
-          backgroundColor: '#4db6ac',
+          backgroundColor: theme.palette.custom.server.background,
           color: 'white',
           borderRadius: '4px 4px 0 0'
         }}
@@ -97,7 +100,7 @@ const ServerItem = ({
 
       {/* Clients Section */}
       <Collapse in={expanded}>
-        <Box sx={{ backgroundColor: '#f5f5f5', borderRadius: '0 0 4px 4px' }}>
+        <Box sx={{ backgroundColor: theme.palette.custom.expanded.background, borderRadius: '0 0 4px 4px' }}>
           <ClientList
             clients={server.clients || []}
             clientsState={clientsState[server.id] || {}}

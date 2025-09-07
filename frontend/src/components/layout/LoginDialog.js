@@ -41,7 +41,8 @@ const LoginDialog = ({ open, onClose }) => {
   return (
     <Dialog 
       open={open} 
-      onClose={onClose}
+      onClose={() => {}} // Prevent closing by clicking outside
+      disableEscapeKeyDown // Prevent closing with escape key
       maxWidth="sm"
       fullWidth
       PaperProps={{
@@ -88,22 +89,13 @@ const LoginDialog = ({ open, onClose }) => {
               <GitHub />
             </IconButton>
           </Tooltip>
-          <Box>
-            <Button 
-              onClick={onClose} 
-              disabled={loading}
-              sx={{ mr: 1 }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              variant="contained"
-              disabled={loading}
-            >
-              {loading ? 'Logging in...' : 'Login'}
-            </Button>
-          </Box>
+          <Button 
+            type="submit" 
+            variant="contained"
+            disabled={loading}
+          >
+            {loading ? 'Logging in...' : 'Login'}
+          </Button>
         </DialogActions>
       </form>
     </Dialog>

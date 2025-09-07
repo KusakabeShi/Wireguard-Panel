@@ -70,6 +70,7 @@ const ErrorDialog = ({ open, onClose, error, title = "Error" }) => {
       onClose={handleClose}
       maxWidth="sm"
       fullWidth
+      sx={{ zIndex: 2000 }}
     >
       <DialogTitle sx={{ 
         display: 'flex', 

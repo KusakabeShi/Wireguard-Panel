@@ -16,7 +16,8 @@ class StateManager {
         collapsedServers: {},
         expandedClients: {},
         serverPages: {}
-      }
+      },
+      themeMode: 'auto' // auto, light, dark
     };
   }
 
@@ -54,8 +55,9 @@ class StateManager {
       const existingTrafficDisplayMode = this.getCookieInternal('trafficDisplayMode', null);
       const existingClientsPerPage = this.getCookieInternal('clientsPerPage', null);
       const existingUIState = this.getCookieInternal('uiState', null);
+      const existingThemeMode = this.getCookieInternal('themeMode', null);
       
-      if (existingSortOrder || existingTrafficDisplayMode || existingClientsPerPage || existingUIState) {
+      if (existingSortOrder || existingTrafficDisplayMode || existingClientsPerPage || existingUIState || existingThemeMode) {
         console.log('StateManager: Found existing cookies, using them');
         if (existingSortOrder) {
           this.localState.sortOrder = existingSortOrder;
@@ -68,6 +70,9 @@ class StateManager {
         }
         if (existingUIState) {
           this.localState.uiState = existingUIState;
+        }
+        if (existingThemeMode) {
+          this.localState.themeMode = existingThemeMode;
         }
         // Mark as partially initialized so components can use the state
         this.initialized = true;
@@ -100,18 +105,20 @@ class StateManager {
     const cookieTrafficDisplayMode = this.getCookieInternal('trafficDisplayMode', null);
     const cookieClientsPerPage = this.getCookieInternal('clientsPerPage', null);
     const cookieUIState = this.getCookieInternal('uiState', null);
+    const cookieThemeMode = this.getCookieInternal('themeMode', null);
     
-    console.log('StateManager: Found cookies - sortOrder:', cookieSortOrder, 'trafficDisplayMode:', cookieTrafficDisplayMode, 'clientsPerPage:', cookieClientsPerPage, 'uiState:', cookieUIState);
+    console.log('StateManager: Found cookies - sortOrder:', cookieSortOrder, 'trafficDisplayMode:', cookieTrafficDisplayMode, 'clientsPerPage:', cookieClientsPerPage, 'uiState:', cookieUIState, 'themeMode:', cookieThemeMode);
     
     // Also try reading with the panelID prefix
     const prefixedSortOrder = this.getCookieDirectly(`${panelID}_sortOrder`, null);
     const prefixedTrafficDisplayMode = this.getCookieDirectly(`${panelID}_trafficDisplayMode`, null);
     const prefixedClientsPerPage = this.getCookieDirectly(`${panelID}_clientsPerPage`, null);
     const prefixedUIState = this.getCookieDirectly(`${panelID}_uiState`, null);
+    const prefixedThemeMode = this.getCookieDirectly(`${panelID}_themeMode`, null);
     
-    console.log('StateManager: Found prefixed cookies - sortOrder:', prefixedSortOrder, 'trafficDisplayMode:', prefixedTrafficDisplayMode, 'clientsPerPage:', prefixedClientsPerPage, 'uiState:', prefixedUIState);
+    console.log('StateManager: Found prefixed cookies - sortOrder:', prefixedSortOrder, 'trafficDisplayMode:', prefixedTrafficDisplayMode, 'clientsPerPage:', prefixedClientsPerPage, 'uiState:', prefixedUIState, 'themeMode:', prefixedThemeMode);
     
-    if (prefixedSortOrder || prefixedTrafficDisplayMode || prefixedClientsPerPage || prefixedUIState) {
+    if (prefixedSortOrder || prefixedTrafficDisplayMode || prefixedClientsPerPage || prefixedUIState || prefixedThemeMode) {
       console.log('StateManager: Using prefixed cookies');
       if (prefixedSortOrder) {
         this.localState.sortOrder = prefixedSortOrder;
@@ -125,7 +132,10 @@ class StateManager {
       if (prefixedUIState) {
         this.localState.uiState = prefixedUIState;
       }
-    } else if (cookieSortOrder || cookieTrafficDisplayMode || cookieClientsPerPage || cookieUIState) {
+      if (prefixedThemeMode) {
+        this.localState.themeMode = prefixedThemeMode;
+      }
+    } else if (cookieSortOrder || cookieTrafficDisplayMode || cookieClientsPerPage || cookieUIState || cookieThemeMode) {
       console.log('StateManager: Using non-prefixed cookies');
       if (cookieSortOrder) {
         this.localState.sortOrder = cookieSortOrder;
@@ -139,6 +149,9 @@ class StateManager {
       if (cookieUIState) {
         this.localState.uiState = cookieUIState;
       }
+      if (cookieThemeMode) {
+        this.localState.themeMode = cookieThemeMode;
+      }
     }
     
     this.initialized = true;
@@ -148,6 +161,7 @@ class StateManager {
     this.setCookieInternal('trafficDisplayMode', this.localState.trafficDisplayMode);
     this.setCookieInternal('clientsPerPage', this.localState.clientsPerPage);
     this.setCookieInternal('uiState', this.localState.uiState);
+    this.setCookieInternal('themeMode', this.localState.themeMode);
     
     console.log('StateManager: Initialized with state:', this.localState);
     
@@ -239,6 +253,8 @@ class StateManager {
         this.localState.clientsPerPage = value;
       } else if (key === 'uiState') {
         this.localState.uiState = value;
+      } else if (key === 'themeMode') {
+        this.localState.themeMode = value;
       }
       return;
     }
@@ -256,6 +272,8 @@ class StateManager {
         return this.localState.clientsPerPage;
       } else if (key === 'uiState') {
         return this.localState.uiState;
+      } else if (key === 'themeMode') {
+        return this.localState.themeMode;
       }
       return defaultValue;
     }
@@ -405,6 +423,15 @@ class StateManager {
 
   setSelectedInterfaceId(interfaceId) {
     return this.updateUIState({ selectedInterfaceId: interfaceId });
+  }
+
+  // Theme mode management
+  getThemeMode() {
+    return this.getCookie('themeMode', 'auto');
+  }
+
+  setThemeMode(mode) {
+    this.setCookie('themeMode', mode);
   }
 }
 

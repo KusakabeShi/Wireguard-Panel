@@ -4,7 +4,8 @@ import {
   Typography, 
   IconButton, 
   Switch,
-  Collapse
+  Collapse,
+  useTheme
 } from '@mui/material';
 import { 
   Edit as EditIcon, 
@@ -41,6 +42,7 @@ const ClientItem = ({
   interfaceInfo,
   serverInfo
 }) => {
+  const theme = useTheme();
 
   const getTrafficText = () => {
     if (trafficDisplayMode === TRAFFIC_DISPLAY_MODES.RATE) {
@@ -92,7 +94,7 @@ const ClientItem = ({
             display: 'flex',
             alignItems: 'center',
             p: 0.5,
-            backgroundColor: 'rgb(51, 109, 43)',
+            backgroundColor: theme.palette.custom.client.background,
             color: 'white',
             borderRadius: '4px 4px 0 0'
           }}
@@ -174,7 +176,7 @@ const ClientItem = ({
 
         {/* Client Details */}
       <Collapse in={expanded}>
-        <Box sx={{ backgroundColor: '#f9f9f9', p: 2, borderLeft: '4px solid #4caf50' }}>
+        <Box sx={{ backgroundColor: theme.palette.custom.clientDetails.background, p: 2, borderLeft: '4px solid #4caf50' }}>
           <ClientDetails 
             client={client}
             clientState={clientState}

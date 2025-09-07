@@ -7,7 +7,8 @@ import {
   ListItemText, 
   Typography, 
   IconButton,
-  Divider
+  Divider,
+  useTheme
 } from '@mui/material';
 import { Menu as MenuIcon, Add as AddIcon, Circle as CircleIcon } from '@mui/icons-material';
 
@@ -19,13 +20,15 @@ const Sidebar = ({
   isOpen,
   onToggle
 }) => {
+  const theme = useTheme();
+  
   return (
     <Box 
       sx={{ 
         width: isOpen ? 200 : 60, 
         height: 'calc(100vh - 64px)',
-        borderRight: '2px solid #e0e0e0',
-        backgroundColor: '#fafafa',
+        borderRight: `2px solid ${theme.palette.divider}`,
+        backgroundColor: theme.palette.background.sidebar,
         display: 'flex',
         flexDirection: 'column',
         transition: 'width 0.3s ease',
@@ -35,7 +38,7 @@ const Sidebar = ({
       <Box 
         sx={{ 
           p: 2, 
-          borderBottom: '1px solid #e0e0e0',
+          borderBottom: `1px solid ${theme.palette.divider}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: isOpen ? 'space-between' : 'center',
@@ -62,11 +65,11 @@ const Sidebar = ({
                 justifyContent: isOpen ? 'initial' : 'center',
                 px: isOpen ? 2 : 1,
                 '&.Mui-selected': {
-                  backgroundColor: '#e3f2fd',
-                  borderRight: '3px solid #1976d2',
+                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(25, 118, 210, 0.2)' : '#e3f2fd',
+                  borderRight: `3px solid ${theme.palette.primary.main}`,
                 },
                 '&:hover': {
-                  backgroundColor: '#f5f5f5',
+                  backgroundColor: theme.palette.action.hover,
                 }
               }}
               title={!isOpen ? interface_.ifname : ''}
@@ -109,10 +112,10 @@ const Sidebar = ({
         <IconButton 
           onClick={onAddInterface}
           sx={{ 
-            backgroundColor: '#1976d2',
+            backgroundColor: theme.palette.primary.main,
             color: 'white',
             '&:hover': {
-              backgroundColor: '#1565c0',
+              backgroundColor: theme.palette.primary.dark,
             }
           }}
           title={!isOpen ? 'Add Interface' : ''}

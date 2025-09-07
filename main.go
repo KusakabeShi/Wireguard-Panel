@@ -215,7 +215,7 @@ func checkIPForwarding(warnings *[]string) error {
 	if err != nil {
 		*warnings = append(*warnings, "unable to check IPv4 forwarding status")
 	} else if strings.TrimSpace(output) != "1" {
-		*warnings = append(*warnings, "IPv4 forwarding is disabled. Enable with: echo '1' > /proc/sys/net/ipv4/ip_forward or sysctl -w net.ipv4.ip_forward=1")
+		*warnings = append(*warnings, "IPv4 forwarding is disabled. Enable with: sysctl -w net.ipv4.ip_forward=1")
 	}
 
 	// Check IPv6 forwarding
@@ -223,7 +223,7 @@ func checkIPForwarding(warnings *[]string) error {
 	if err != nil {
 		*warnings = append(*warnings, "unable to check IPv6 forwarding status")
 	} else if strings.TrimSpace(output) != "1" {
-		*warnings = append(*warnings, "IPv6 forwarding is disabled. Enable with: echo '1' > /proc/sys/net/ipv6/conf/all/forwarding or sysctl -w net.ipv6.conf.all.forwarding=1")
+		*warnings = append(*warnings, "IPv6 forwarding is disabled. Enable with: sysctl -w net.ipv6.conf.all.forwarding=1")
 	}
 
 	return nil

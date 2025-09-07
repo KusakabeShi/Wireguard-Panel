@@ -1,16 +1,18 @@
 import React from 'react';
-import { Box, Typography, IconButton } from '@mui/material';
+import { Box, Typography, IconButton, useTheme } from '@mui/material';
 import { Settings as SettingsIcon } from '@mui/icons-material';
 
 const InterfaceHeader = ({ interface_, onEdit }) => {
+  const theme = useTheme();
+  
   if (!interface_) return null;
 
   return (
     <Box 
       sx={{ 
         p: 2, 
-        backgroundColor: '#f5f5f5',
-        borderBottom: '1px solid #e0e0e0',
+        backgroundColor: theme.palette.background.paper,
+        borderBottom: `1px solid ${theme.palette.divider}`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between'
