@@ -42,6 +42,7 @@ function AppContent() {
   const [clientDialog, setClientDialog] = useState({ open: false, client: null, server: null, interface: null });
   const [errorDialog, setErrorDialog] = useState({ open: false, error: null, title: 'Error' });
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [warningShown, setWarningShown] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -76,6 +77,21 @@ function AppContent() {
       setLoginDialogOpen(false);
     }
   }, [isAuthenticated, isLoading]);
+
+  // Show warning message from server at startup (show only once until refresh)
+  useEffect(() => {
+    if ( !warningShown && window.INIT_WARNING_MESSAGE) {
+      const warningMessage = window.INIT_WARNING_MESSAGE.trim();
+      if (warningMessage) {
+        setErrorDialog({ 
+          open: true, 
+          error: warningMessage, 
+          title: 'System Configuration Warning' 
+        });
+        setWarningShown(true);
+      }
+    }
+  }, [isAuthenticated, warningShown]);
 
   const showError = (error, title = 'Error') => {
     setErrorDialog({ open: true, error, title });
