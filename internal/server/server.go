@@ -2,6 +2,7 @@ package server
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -221,11 +222,16 @@ func (s *Server) injectRuntimeConfig(html string) string {
 		apiprefix = basePath[:len(basePath)-1] + apiprefix
 	}
 
+	warnmsg_escaped, _ := json.Marshal(s.cfg.FendMsg.InitWarningMsg)
+
 	// Inject the API path configuration for JavaScript
 	runtimeScript := fmt.Sprintf(`
 <script>
   window.RUNTIME_API_PATH = "%s";
-</script>`, apiprefix)
+  window.FIREWALL_DEFAULT_VALUE = %v;
+  window.WG_PANEL_ID = "%v";
+  window.INIT_WARNING_MESSAGE = %v;
+</script>`, apiprefix, s.cfg.FendMsg.Firewalldefault, s.cfg.WGPanelId, string(warnmsg_escaped))
 
 	// Add base tag for static assets
 	baseTag := fmt.Sprintf(`<base href="%s">`, basePath)

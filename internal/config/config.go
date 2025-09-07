@@ -22,6 +22,11 @@ type Session struct {
 	LastSeen  time.Time `json:"lastSeen"`
 }
 
+type ToFrontendMessage struct {
+	Firewalldefault bool
+	InitWarningMsg  string
+}
+
 type Config struct {
 	ConfigPath          string                       `json:"-"`
 	WireGuardConfigPath string                       `json:"wireguardConfigPath"`
@@ -38,9 +43,10 @@ type Config struct {
 	Sessions            map[string]*Session          `json:"sessions"`
 
 	// For thread safety
-	mu  sync.RWMutex                         `json:"-"`
-	pbs *internalservice.PseudoBridgeService `json:"-"`
-	srs *internalservice.SNATRoamingService  `json:"-"`
+	mu      sync.RWMutex                         `json:"-"`
+	FendMsg ToFrontendMessage                    `json:"-"`
+	pbs     *internalservice.PseudoBridgeService `json:"-"`
+	srs     *internalservice.SNATRoamingService  `json:"-"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -88,9 +94,10 @@ func LoadConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-func (c *Config) LoadInternalServices(pbs *internalservice.PseudoBridgeService, srs *internalservice.SNATRoamingService) {
+func (c *Config) LoadInternalServices(pbs *internalservice.PseudoBridgeService, srs *internalservice.SNATRoamingService, fendMsg ToFrontendMessage) {
 	c.pbs = pbs
 	c.srs = srs
+	c.FendMsg = fendMsg
 }
 
 func (c *Config) Save() error {

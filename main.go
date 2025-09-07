@@ -64,16 +64,20 @@ func main() {
 	logging.LogInfo("Starting %s with log level: %s", version.GetVersionInfo(), cfg.LogLevel.String())
 
 	// Perform system checks before starting services
-	if err := performSystemChecks(); err != nil {
+	fnedmsg := config.ToFrontendMessage{}
+	forward_accept := false
+	if forward_accept, err = performSystemChecks(); err != nil {
 		logging.LogError("System check failed: %v", err)
 		fmt.Printf("Warning: %v\n", err)
+		fnedmsg.InitWarningMsg = err.Error()
 	}
+	fnedmsg.Firewalldefault = !forward_accept
 
 	// Initialize services
 	firewallService := internalservice.NewFirewallService()
 	pseudoBridgeService := internalservice.NewPseudoBridgeService()
 	snatRoamingService := internalservice.NewSNATRoamingService(pseudoBridgeService, firewallService)
-	cfg.LoadInternalServices(pseudoBridgeService, snatRoamingService)
+	cfg.LoadInternalServices(pseudoBridgeService, snatRoamingService, fnedmsg)
 	// Start HTTP server
 	srv := server.NewServer(cfg, frontendFS)
 	logging.LogInfo("Starting WireGuard Panel on %s:%d", cfg.ListenIP, cfg.ListenPort)
@@ -179,7 +183,7 @@ func saveConfig(configPath string, cfg *config.Config) error {
 }
 
 // performSystemChecks validates system configuration and required tools
-func performSystemChecks() error {
+func performSystemChecks() (forward_accept bool, err error) {
 	var warnings []string
 
 	// Check IP forwarding settings
@@ -193,15 +197,15 @@ func performSystemChecks() error {
 	}
 
 	// Check iptables FORWARD policies
-	if err := checkFirewallPolicies(&warnings); err != nil {
+	if forward_accept, err = checkFirewallPolicies(&warnings); err != nil {
 		warnings = append(warnings, err.Error())
 	}
 
 	if len(warnings) > 0 {
-		return fmt.Errorf("system configuration issues found:\n  - %s", strings.Join(warnings, "\n  - "))
+		return forward_accept, fmt.Errorf("system configuration issues found:\n  - %s", strings.Join(warnings, "\n  - "))
 	}
 
-	return nil
+	return forward_accept, nil
 }
 
 // checkIPForwarding verifies IPv4 and IPv6 forwarding is enabled
@@ -248,35 +252,23 @@ func checkRequiredTools(warnings *[]string) error {
 }
 
 // checkFirewallPolicies verifies iptables FORWARD chain policies
-func checkFirewallPolicies(warnings *[]string) error {
+func checkFirewallPolicies(warnings *[]string) (forward_accept bool, err error) {
+	forward_accept = true
 	// Check IPv4 iptables FORWARD policy
 	output, err := utils.RunCommandWithOutput("iptables", "-L", "FORWARD", "-n")
 	if err != nil {
-		*warnings = append(*warnings, "unable to check iptables FORWARD policy")
-	} else {
-		lines := strings.Split(output, "\n")
-		if len(lines) > 0 {
-			// First line typically contains: "Chain FORWARD (policy ACCEPT)"
-			firstLine := lines[0]
-			if !strings.Contains(firstLine, "policy ACCEPT") {
-				*warnings = append(*warnings, "iptables FORWARD chain policy is not ACCEPT. This may block WireGuard traffic. Consider: iptables -P FORWARD ACCEPT")
-			}
-		}
+		forward_accept = false
+	} else if len(output) > 0 && !strings.Contains(strings.Split(output, "\n")[0], "policy ACCEPT") {
+		forward_accept = false
 	}
 
 	// Check IPv6 ip6tables FORWARD policy
 	output, err = utils.RunCommandWithOutput("ip6tables", "-L", "FORWARD", "-n")
 	if err != nil {
-		*warnings = append(*warnings, "unable to check ip6tables FORWARD policy")
-	} else {
-		lines := strings.Split(output, "\n")
-		if len(lines) > 0 {
-			firstLine := lines[0]
-			if !strings.Contains(firstLine, "policy ACCEPT") {
-				*warnings = append(*warnings, "ip6tables FORWARD chain policy is not ACCEPT. This may block WireGuard IPv6 traffic. Consider: ip6tables -P FORWARD ACCEPT")
-			}
-		}
+		forward_accept = false
+	} else if len(output) > 0 && !strings.Contains(strings.Split(output, "\n")[0], "policy ACCEPT") {
+		forward_accept = false
 	}
 
-	return nil
+	return forward_accept, nil
 }

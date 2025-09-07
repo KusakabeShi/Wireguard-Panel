@@ -45,22 +45,6 @@ echo 'net.ipv6.conf.all.forwarding = 1' >> /etc/sysctl.conf
 sysctl -p
 ```
 
-**Firewall Configuration** - Ensure the FORWARD chain allows traffic:
-
-```bash
-# Set iptables FORWARD policy to ACCEPT
-iptables -P FORWARD ACCEPT
-
-# Set ip6tables FORWARD policy to ACCEPT  
-ip6tables -P FORWARD ACCEPT
-
-# Make persistent (Ubuntu/Debian)
-iptables-save > /etc/iptables/rules.v4
-ip6tables-save > /etc/iptables/rules.v6
-```
-
-> **Note:** WG-Panel will check these requirements on startup and display warnings if any are missing or misconfigured.
-
 ## Installation
 
 ### Quick Install (Recommended)

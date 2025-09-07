@@ -154,7 +154,7 @@ const ServerDialog = ({
           pseudoBridgeMasterInterface: '',
           pseudoBridgeMasterInterfaceEnabled: false,
           routedNetworks: '0.0.0.0/0',
-          routedNetworksFirewall: false,
+          routedNetworksFirewall: window.FIREWALL_DEFAULT_VALUE===true,
           snat: {
             enabled: true,
             snatIpNet: '',
@@ -169,7 +169,7 @@ const ServerDialog = ({
           pseudoBridgeMasterInterface: '',
           pseudoBridgeMasterInterfaceEnabled: false,
           routedNetworks: '::/0',
-          routedNetworksFirewall: false,
+          routedNetworksFirewall: window.FIREWALL_DEFAULT_VALUE===true,
           snat: {
             enabled: true,
             snatIpNet: '',

@@ -44,22 +44,6 @@ echo 'net.ipv6.conf.all.forwarding = 1' >> /etc/sysctl.conf
 sysctl -p
 ```
 
-**防火牆設定** - 確保 FORWARD 鏈允許流量通過：
-
-```bash
-# 設定 iptables FORWARD 策略為 ACCEPT
-iptables -P FORWARD ACCEPT
-
-# 設定 ip6tables FORWARD 策略為 ACCEPT
-ip6tables -P FORWARD ACCEPT
-
-# 使設定永久生效 (Ubuntu/Debian)
-iptables-save > /etc/iptables/rules.v4
-ip6tables-save > /etc/iptables/rules.v6
-```
-
-> **注意：** WG-Panel 啟動時會檢查這些需求，如有遺失或設定錯誤會顯示警告訊息。
-
 ## 安裝
 
 ### 快速安裝（建議）
