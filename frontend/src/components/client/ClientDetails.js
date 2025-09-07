@@ -87,25 +87,16 @@ const ClientDetails = ({ client, clientState, lastUpdateTime, interfaceId, serve
   const handleDownloadConfig = () => {
     if (!config || !interfaceInfo || !serverInfo) return;
 
-    console.log('Download - interfaceInfo:', interfaceInfo);
-    console.log('Download - serverInfo:', serverInfo);
-    console.log('Download - client:', client);
 
     // Strip wgIfPrefix from interface name
     let interfaceName = interfaceInfo.ifname || 'interface';
-    console.log('Download - original ifname:', interfaceName);
-    console.log('Download - wgIfPrefix:', interfaceInfo.wgIfPrefix);
     
     if (interfaceInfo.wgIfPrefix && interfaceName.startsWith(interfaceInfo.wgIfPrefix)) {
       interfaceName = interfaceName.substring(interfaceInfo.wgIfPrefix.length);
-      console.log('Download - stripped interfaceName:', interfaceName);
-    } else {
-      console.log('Download - no prefix stripping needed');
-    }
+    } 
 
     // Generate filename: ifname-servername-clientname.conf
     const fileName = `${interfaceName}-${serverInfo.name || 'server'}-${client.name || 'client'}.conf`;
-    console.log('Download - final fileName:', fileName);
     
     // Create blob and download
     const blob = new Blob([config], { type: 'text/plain' });

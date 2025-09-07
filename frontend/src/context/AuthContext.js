@@ -26,9 +26,9 @@ export const AuthProvider = ({ children }) => {
       const config = await authService.getServiceConfig();
       
       // Initialize state manager with panelID
-      if (config.panelID) {
-        stateManager.init(config.panelID);
-      }
+      //if (config.panelID) {
+      //  stateManager.init(config.panelID);
+      //}
       
       setIsAuthenticated(true);
       setUser({ username: config.user });
@@ -46,9 +46,9 @@ export const AuthProvider = ({ children }) => {
       
       // After successful login, get service config and reinitialize state manager
       const config = await authService.getServiceConfig();
-      if (config.panelID) {
-        stateManager.init(config.panelID);
-      }
+      //if (config.panelID) {
+      //  stateManager.init(config.panelID);
+      //}
       
       setIsAuthenticated(true);
       setUser({ username: config.user || username });

@@ -550,7 +550,7 @@ func (c *Config) GetAvailableServerID(ifaceID string) string {
 		ids[instance.ID] = true
 	}
 	for i := 0; i <= 99999; i++ {
-		id := fmt.Sprintf("%s%s%d", ifaceID, pfx, i)
+		id := fmt.Sprintf("%s%d", pfx, i)
 		if _, ok := ids[id]; !ok {
 			return id
 		}
@@ -570,7 +570,7 @@ func (c *Config) GetAvailableClientID(ifaceID, serverID string) string {
 		ids[instance.ID] = true
 	}
 	for i := 0; i <= 99999; i++ {
-		id := fmt.Sprintf("%s%s%s%d", ifaceID, serverID, pfx, i)
+		id := fmt.Sprintf("%s%d", pfx, i)
 		if _, ok := ids[id]; !ok {
 			return id
 		}

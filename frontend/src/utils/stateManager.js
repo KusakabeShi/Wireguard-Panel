@@ -21,24 +21,20 @@ class StateManager {
     };
   }
 
-  // Proactively initialize by fetching service config
-  async initializeFromAPI() {
+  // Initialize immediately using window.WG_PANEL_ID
+  initializeFromWindow() {
     if (this.initialized || this.initializationInProgress) return;
     
     this.initializationInProgress = true;
-    console.log('StateManager: Attempting to initialize from API...');
+    console.log('StateManager: Attempting to initialize from window.WG_PANEL_ID...');
     
     try {
-      const config = await apiService.getServiceConfig();
-      console.log('StateManager: Got service config:', config);
-      if (config.panelID) {
-        console.log('StateManager: Initializing with panelID:', config.panelID);
-        this.init(config.panelID);
-      } else {
-        console.warn('StateManager: No panelID in service config');
-      }
+      // Get panelID from injected window variable (fallback to ReactDBG for development)
+      const panelID = window.WG_PANEL_ID || 'ReactDBG';
+      console.log('StateManager: Found panelID from window:', panelID);
+      this.init(panelID);
     } catch (error) {
-      console.warn('StateManager: Failed to fetch service config for initialization:', error);
+      console.warn('StateManager: Failed to get panelID from window, trying existing cookies:', error);
       // Try to initialize with existing cookies without panelID prefix
       this.initializeFromExistingCookies();
     } finally {
@@ -69,7 +65,7 @@ class StateManager {
           this.localState.clientsPerPage = existingClientsPerPage;
         }
         if (existingUIState) {
-          this.localState.uiState = existingUIState;
+          this.localState.uiState = this.mergeUIState(this.localState.uiState, existingUIState);
         }
         if (existingThemeMode) {
           this.localState.themeMode = existingThemeMode;
@@ -130,7 +126,8 @@ class StateManager {
         this.localState.clientsPerPage = prefixedClientsPerPage;
       }
       if (prefixedUIState) {
-        this.localState.uiState = prefixedUIState;
+        // Protect UI state from being overwritten with empty values before login
+        this.localState.uiState = this.mergeUIState(this.localState.uiState, prefixedUIState);
       }
       if (prefixedThemeMode) {
         this.localState.themeMode = prefixedThemeMode;
@@ -147,7 +144,8 @@ class StateManager {
         this.localState.clientsPerPage = cookieClientsPerPage;
       }
       if (cookieUIState) {
-        this.localState.uiState = cookieUIState;
+        // Protect UI state from being overwritten with empty values before login
+        this.localState.uiState = this.mergeUIState(this.localState.uiState, cookieUIState);
       }
       if (cookieThemeMode) {
         this.localState.themeMode = cookieThemeMode;
@@ -167,6 +165,38 @@ class StateManager {
     
     // Notify any listeners that we're now initialized
     this.notifyInitialized();
+  }
+
+  // Helper method to merge UI state while protecting from empty overwrites
+  mergeUIState(currentState, newState) {
+    if (!newState) return currentState;
+    if (!currentState) return newState;
+    
+    // Merge states, but preserve non-empty collections
+    const merged = { ...currentState, ...newState };
+    
+    // Protect collapsedServers from being overwritten with empty object
+    if (currentState.collapsedServers && Object.keys(currentState.collapsedServers).length > 0) {
+      if (!newState.collapsedServers || Object.keys(newState.collapsedServers).length === 0) {
+        merged.collapsedServers = currentState.collapsedServers;
+      }
+    }
+    
+    // Protect expandedClients from being overwritten with empty object
+    if (currentState.expandedClients && Object.keys(currentState.expandedClients).length > 0) {
+      if (!newState.expandedClients || Object.keys(newState.expandedClients).length === 0) {
+        merged.expandedClients = currentState.expandedClients;
+      }
+    }
+    
+    // Protect serverPages from being overwritten with empty object
+    if (currentState.serverPages && Object.keys(currentState.serverPages).length > 0) {
+      if (!newState.serverPages || Object.keys(newState.serverPages).length === 0) {
+        merged.serverPages = currentState.serverPages;
+      }
+    }
+    
+    return merged;
   }
 
   // Helper method to read cookies directly by name
@@ -438,7 +468,7 @@ class StateManager {
 // Create singleton instance
 const stateManager = new StateManager();
 
-// Initialize immediately when module loads
-stateManager.initializeFromAPI();
+// Initialize immediately when module loads using window.WG_PANEL_ID
+stateManager.initializeFromWindow();
 
 export default stateManager;

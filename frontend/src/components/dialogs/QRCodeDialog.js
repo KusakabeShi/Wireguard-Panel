@@ -62,7 +62,7 @@ const QRCodeDialog = ({ open, onClose, config, clientName }) => {
       <DialogTitle>
         WireGuard QR Code
         {clientName && (
-          <Typography variant="subtitle2" color="text.secondary">
+          <Typography variant="subtitle2" color="text.secondary" component="div">
             {clientName}
           </Typography>
         )}

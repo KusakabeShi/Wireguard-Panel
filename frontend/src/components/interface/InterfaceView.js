@@ -60,8 +60,8 @@ const InterfaceView = ({
     
     try {
       const serviceConfig = await apiService.getServiceConfig();
-      console.log('ServiceConfig response:', serviceConfig);
-      console.log('wgIfPrefix from API:', serviceConfig.wgIfPrefix);
+      //console.log('ServiceConfig response:', serviceConfig);
+      //console.log('wgIfPrefix from API:', serviceConfig.wgIfPrefix);
       setInterfaceInfo({ 
         ...interface_, 
         wgIfPrefix: serviceConfig.wgIfPrefix 
@@ -76,10 +76,10 @@ const InterfaceView = ({
   // Load clients for expanded servers when servers are loaded
   useEffect(() => {
     if (servers?.length > 0 && stateInitialized) {
-      console.log('Loading clients for expanded servers:', servers.map(s => s.id), 'collapsed:', Array.from(collapsedServers));
+      //console.log('Loading clients for expanded servers:', servers.map(s => s.id), 'collapsed:', Array.from(collapsedServers));
       servers.forEach(server => {
         if (!collapsedServers.has(server.id)) {
-          console.log('Loading clients for server:', server.id);
+          //console.log('Loading clients for server:', server.id);
           loadServerClients(server.id);
         }
       });
@@ -122,15 +122,15 @@ const InterfaceView = ({
   // Load clients for a specific server when needed
   const loadServerClients = async (serverId) => {
     if (!interface_ || clientsLoaded.has(serverId)) {
-      console.log('Skipping client load for server:', serverId, 'interface:', !!interface_, 'already loaded:', clientsLoaded.has(serverId));
+      //console.log('Skipping client load for server:', serverId, 'interface:', !!interface_, 'already loaded:', clientsLoaded.has(serverId));
       return;
     }
     
-    console.log('Loading clients for server:', serverId);
+    //console.log('Loading clients for server:', serverId);
     
     try {
       const clients = await apiService.getServerClients(interface_.id, serverId);
-      console.log('Loaded', clients.length, 'clients for server:', serverId);
+      //console.log('Loaded', clients.length, 'clients for server:', serverId);
       setServerClients(prev => ({
         ...prev,
         [serverId]: clients
