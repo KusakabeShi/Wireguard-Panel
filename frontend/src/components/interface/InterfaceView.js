@@ -27,7 +27,7 @@ const InterfaceView = ({
   const [previousUpdateTime, setPreviousUpdateTime] = useState(null);
   const [trafficDisplayMode, setTrafficDisplayMode] = useState(getTrafficDisplayMode());
   const [collapsedServers, setCollapsedServers] = useState(new Set());
-  const [expandedClients, setExpandedClients] = useState(new Set());
+  const [expandedClients, setExpandedClients] = useState({});
   const [stateInitialized, setStateInitialized] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -37,7 +37,9 @@ const InterfaceView = ({
   useEffect(() => {
     const syncState = () => {
       if (!stateInitialized) {
-        setCollapsedServers(stateManager.getCollapsedServers());
+        if (interface_) {
+          setCollapsedServers(stateManager.getCollapsedServers(interface_.id));
+        }
         setExpandedClients(stateManager.getExpandedClients());
         setStateInitialized(true);
       }
@@ -52,6 +54,11 @@ const InterfaceView = ({
       loadServers();
       loadClientsState();
       loadInterfaceInfo();
+      
+      // Sync collapsed servers for the new interface
+      if (stateManager.initialized) {
+        setCollapsedServers(stateManager.getCollapsedServers(interface_.id));
+      }
     }
   }, [interface_, interface_?.lastModified]);
 
@@ -83,8 +90,16 @@ const InterfaceView = ({
           loadServerClients(server.id);
         }
       });
+      
+      // Clean up state for non-existent servers
+      // Only cleanup after we have actual server data loaded (not empty before login)
+      if (stateManager.initialized && servers.length > 0) {
+        stateManager.cleanupExpandedClients(interface_.id, servers, serverClients);
+        stateManager.cleanupCollapsedServers(interface_.id, servers);
+        stateManager.cleanupServerPages(interface_.id, servers);
+      }
     }
-  }, [servers, collapsedServers, stateInitialized]);
+  }, [servers, collapsedServers, stateInitialized, serverClients]);
 
 
   useEffect(() => {
@@ -131,10 +146,22 @@ const InterfaceView = ({
     try {
       const clients = await apiService.getServerClients(interface_.id, serverId);
       //console.log('Loaded', clients.length, 'clients for server:', serverId);
-      setServerClients(prev => ({
-        ...prev,
-        [serverId]: clients
-      }));
+      setServerClients(prev => {
+        const newServerClients = {
+          ...prev,
+          [serverId]: clients
+        };
+        
+        // Clean up state when clients are loaded
+        // Only cleanup when we have meaningful server data (not empty before login)
+        if (stateManager.initialized && servers.length > 0) {
+          stateManager.cleanupExpandedClients(interface_.id, servers, newServerClients);
+          stateManager.cleanupCollapsedServers(interface_.id, servers);
+          stateManager.cleanupServerPages(interface_.id, servers);
+        }
+        
+        return newServerClients;
+      });
       setClientsLoaded(prev => new Set(prev).add(serverId));
     } catch (error) {
       console.error(`Failed to load clients for server ${serverId}:`, error);
@@ -193,8 +220,8 @@ const InterfaceView = ({
       
       // Remove the direct loadServerClients call - let useEffect handle it
       
-      if (stateManager.initialized) {
-        stateManager.setServerCollapsed(serverId, newCollapsed);
+      if (stateManager.initialized && interface_) {
+        stateManager.setServerCollapsed(interface_.id, serverId, newCollapsed);
       }
       
       const newCollapsedSet = new Set(prevCollapsed);
@@ -208,22 +235,41 @@ const InterfaceView = ({
   };
 
   const handleToggleClientExpanded = (interfaceId, serverId, clientId) => {
-    const compositeKey = `${interfaceId}_${serverId}_${clientId}`;
-    const isCurrentlyExpanded = expandedClients.has(compositeKey);
+    const isCurrentlyExpanded = expandedClients[interfaceId]?.[serverId]?.[clientId];
     
     if (stateManager.initialized) {
       stateManager.setClientExpanded(interfaceId, serverId, clientId, !isCurrentlyExpanded);
-      setExpandedClients(new Set(stateManager.getExpandedClients()));
+      setExpandedClients(stateManager.getExpandedClients());
     } else {
       // Local fallback when not initialized
       setExpandedClients(prev => {
-        const newSet = new Set(prev);
-        if (isCurrentlyExpanded) {
-          newSet.delete(compositeKey);
-        } else {
-          newSet.add(compositeKey);
+        const newExpandedClients = { ...prev };
+        
+        if (!newExpandedClients[interfaceId]) {
+          newExpandedClients[interfaceId] = {};
         }
-        return newSet;
+        
+        if (!newExpandedClients[interfaceId][serverId]) {
+          newExpandedClients[interfaceId][serverId] = {};
+        }
+        
+        if (isCurrentlyExpanded) {
+          const serverClients = { ...newExpandedClients[interfaceId][serverId] };
+          delete serverClients[clientId];
+          if (Object.keys(serverClients).length === 0) {
+            delete newExpandedClients[interfaceId][serverId];
+            // If interface has no more servers, remove it too
+            if (Object.keys(newExpandedClients[interfaceId]).length === 0) {
+              delete newExpandedClients[interfaceId];
+            }
+          } else {
+            newExpandedClients[interfaceId][serverId] = serverClients;
+          }
+        } else {
+          newExpandedClients[interfaceId][serverId] = { ...newExpandedClients[interfaceId][serverId], [clientId]: true };
+        }
+        
+        return newExpandedClients;
       });
     }
   };

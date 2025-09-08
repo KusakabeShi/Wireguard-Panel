@@ -49,7 +49,7 @@ const ClientList = ({
     const syncState = () => {
       if (!stateInitialized) {
         setSortOrder(stateManager.getSortOrder());
-        setCurrentPage(stateManager.getServerPage(serverId));
+        setCurrentPage(stateManager.getServerPage(interfaceId, serverId));
         setClientsPerPage(stateManager.getClientsPerPage());
         setStateInitialized(true);
       }
@@ -63,7 +63,7 @@ const ClientList = ({
   useEffect(() => {
     if (stateInitialized) {
       setSortOrder(stateManager.getSortOrder());
-      setCurrentPage(stateManager.getServerPage(serverId));
+      setCurrentPage(stateManager.getServerPage(interfaceId, serverId));
       setClientsPerPage(stateManager.getClientsPerPage());
     }
   }, [serverId, stateInitialized]);
@@ -71,7 +71,7 @@ const ClientList = ({
   // Save page changes to state manager
   useEffect(() => {
     if (stateInitialized) {
-      stateManager.setServerPage(serverId, currentPage);
+      stateManager.setServerPage(interfaceId, serverId, currentPage);
     }
   }, [serverId, currentPage, stateInitialized]);
 
@@ -286,7 +286,7 @@ const ClientList = ({
               previousUpdateTime={previousUpdateTime}
               trafficDisplayMode={trafficDisplayMode}
               onTrafficModeToggle={onTrafficModeToggle}
-              expanded={expandedClients.has(`${interfaceId}_${serverId}_${client.id}`)}
+              expanded={expandedClients?.[interfaceId]?.[serverId]?.[client.id]}
               onToggleExpanded={() => onToggleExpanded(interfaceId, serverId, client.id)}
               onEdit={onEdit}
               onDelete={onDelete}

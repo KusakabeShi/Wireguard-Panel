@@ -93,6 +93,16 @@ function AppContent() {
       const interfaces = await apiService.getInterfaces();
       setInterfaces(interfaces);
       
+      // Clean up all UI state for interfaces that no longer exist
+      if (stateManager.initialized && interfaces.length > 0) {
+        try {
+          // Use comprehensive cleanup that validates interface IDs
+          stateManager.cleanupAllUIStateForDeletedInterfaces(interfaces);
+        } catch (error) {
+          console.warn('Failed to cleanup UI state for deleted interfaces:', error);
+        }
+      }
+      
       // Try to restore selected interface from state manager
       let savedInterface = null;
       if (stateManager.initialized) {

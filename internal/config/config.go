@@ -560,7 +560,7 @@ func (c *Config) GetAvailableServerID(ifaceID string) string {
 func (c *Config) GetAvailableClientID(ifaceID, serverID string) string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	pfx := "s"
+	pfx := "c"
 	ids := map[string]bool{}
 	instances, err := c.GetAllClients(ifaceID, serverID)
 	if err != nil {

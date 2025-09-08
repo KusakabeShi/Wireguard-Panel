@@ -31,6 +31,7 @@ Thumbs.db
 
 # Configuration files (keep examples, ignore actual config)
 config.json
+config.json.*
 cookies.txt
 
 # Optional REPL history
