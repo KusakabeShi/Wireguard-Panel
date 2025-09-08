@@ -15,6 +15,7 @@ jobs:
   build:
     name: Build and Release
     runs-on: ${{ matrix.goarch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    container: ubuntu:20.04
     
     strategy:
       matrix:
@@ -34,26 +35,23 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
-
-    - name: Install system dependencies
+    - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y libpcap-dev
-
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+        apt-get update
+        apt-get install -y wget curl libpcap-dev gcc libc6-dev git
+        
+        # Install Go 1.25.1
+        wget https://go.dev/dl/go1.25.1.linux-${{ matrix.goarch }}.tar.gz
+        tar -C /usr/local -xzf go1.25.1.linux-${{ matrix.goarch }}.tar.gz
+        echo "/usr/local/go/bin" >> $GITHUB_PATH
+        
+        # Install latest Node.js
+        curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+        apt-get install -y nodejs
 
     - name: Get version from tag or input
       run: |
-        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
         else
           echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
@@ -67,7 +65,7 @@ jobs:
 
     - name: Set build variables
       run: |
-        echo "COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+        echo "COMMIT=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
         echo "BUILD_DATE=$(date -u '+%Y-%m-%d_%H:%M:%S')" >> $GITHUB_ENV
         echo "BUILD_USER=github-actions" >> $GITHUB_ENV
 
@@ -77,12 +75,20 @@ jobs:
       run: |
         BINARY_NAME="wg-panel-${{ matrix.os }}-${{ matrix.arch }}"
         
+        # Debug: Print environment variables
+        echo "VERSION: ${{ env.VERSION }}"
+        echo "COMMIT: ${{ env.COMMIT }}"
+        echo "BUILD_DATE: ${{ env.BUILD_DATE }}"
+        echo "BUILD_USER: ${{ env.BUILD_USER }}"
+        
         LDFLAGS="-X wg-panel/internal/version.Version=${{ env.VERSION }} \
         -X wg-panel/internal/version.GitCommit=${{ env.COMMIT }} \
         -X wg-panel/internal/version.BuildDate=${{ env.BUILD_DATE }} \
         -X wg-panel/internal/version.BuildUser=${{ env.BUILD_USER }} \
         -w -s"
         
+        export PATH="/usr/local/go/bin:$PATH"
+        echo "LDFLAGS: ${LDFLAGS}"
         go build -ldflags "${LDFLAGS}" -o ${BINARY_NAME} .
         
         echo "ASSET_PATH=${BINARY_NAME}" >> $GITHUB_ENV
@@ -106,7 +112,7 @@ jobs:
 
     - name: Get version from tag or input
       run: |
-        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
         else
           echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
