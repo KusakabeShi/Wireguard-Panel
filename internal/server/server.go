@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -35,6 +36,19 @@ func NewServer(cfg *config.Config, frontendFS embed.FS) *Server {
 }
 
 func (s *Server) Start(fw *internalservice.FirewallService, logLevel logging.LogLevel) error {
+	var listenAddr string
+	if strings.Contains(s.cfg.ListenIP, ":") {
+		listenAddr = fmt.Sprintf("[%s]:%d", s.cfg.ListenIP, s.cfg.ListenPort)
+	} else {
+		listenAddr = fmt.Sprintf("%s:%d", s.cfg.ListenIP, s.cfg.ListenPort)
+	}
+
+	// Check if the address is already in use
+	listener, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		return fmt.Errorf("address %s already in use or unavailable: %v", listenAddr, err)
+	}
+	listener.Close()
 	// Set Gin mode
 	gin.SetMode(gin.ReleaseMode)
 	s.engine = gin.New()
@@ -68,14 +82,7 @@ func (s *Server) Start(fw *internalservice.FirewallService, logLevel logging.Log
 
 	// Setup routes
 	s.setupRoutes(serviceHandler, interfaceHandler, serverHandler, clientHandler, authMiddleware)
-
 	// Start server
-	var listenAddr string
-	if strings.Contains(s.cfg.ListenIP, ":") {
-		listenAddr = fmt.Sprintf("[%s]:%d", s.cfg.ListenIP, s.cfg.ListenPort)
-	} else {
-		listenAddr = fmt.Sprintf("%s:%d", s.cfg.ListenIP, s.cfg.ListenPort)
-	}
 	return http.ListenAndServe(listenAddr, s.engine)
 }
 

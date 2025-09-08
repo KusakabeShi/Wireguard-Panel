@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"wg-panel/internal/config"
 	"wg-panel/internal/internalservice"
@@ -29,6 +31,7 @@ func main() {
 	var configPath = flag.String("c", "./config.json", "Path to configuration file")
 	var newPassword = flag.String("p", "", "Set new password in configuration file")
 	var showVersion = flag.Bool("v", false, "Show version information")
+	var cleanupOnly = flag.Bool("cleanup", false, "Clean up all interfaces and firewall rules created by this app, then exit")
 	flag.Parse()
 
 	if *showVersion {
@@ -59,6 +62,12 @@ func main() {
 		return
 	}
 
+	// Handle cleanup-only mode
+	if *cleanupOnly {
+		performCleanupAndExit(cfg)
+		return
+	}
+
 	// Initialize logger with configured log level
 	logging.InitLogger(cfg.LogLevel)
 	logging.LogInfo("Starting %s with log level: %s", version.GetVersionInfo(), cfg.LogLevel.String())
@@ -78,10 +87,30 @@ func main() {
 	pseudoBridgeService := internalservice.NewPseudoBridgeService()
 	snatRoamingService := internalservice.NewSNATRoamingService(pseudoBridgeService, firewallService)
 	cfg.LoadInternalServices(pseudoBridgeService, snatRoamingService, fnedmsg)
-	// Start HTTP server
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Start HTTP server in a goroutine
 	srv := server.NewServer(cfg, frontendFS)
 	logging.LogInfo("Starting WireGuard Panel on %s:%d", cfg.ListenIP, cfg.ListenPort)
-	log.Fatal(srv.Start(firewallService, cfg.LogLevel))
+
+	go func() {
+		if err := srv.Start(firewallService, cfg.LogLevel); err != nil {
+			logging.LogError("Server failed to start: %v", err)
+			// Exit without cleanup since server never started properly
+			os.Exit(1)
+		}
+	}()
+
+	// Wait for shutdown signal
+	sig := <-sigChan
+	logging.LogInfo("Received signal %v, starting graceful shutdown...", sig)
+
+	// Perform cleanup
+	pseudoBridgeService.Stop()
+	snatRoamingService.Stop()
+	performCleanup(cfg)
 }
 
 func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, error) {
@@ -271,4 +300,35 @@ func checkFirewallPolicies(warnings *[]string) (forward_accept bool, err error) 
 	}
 
 	return forward_accept, nil
+}
+
+// performCleanup performs cleanup during normal shutdown
+func performCleanup(cfg *config.Config) {
+	if cfg == nil {
+		logging.LogError("Cannot perform cleanup: configuration is nil")
+		return
+	}
+
+	logging.LogInfo("Performing cleanup before shutdown...")
+	cfg.CleanUp()
+}
+
+// performCleanupAndExit performs cleanup and exits (for --cleanup flag)
+func performCleanupAndExit(cfg *config.Config) {
+	// Initialize logger for cleanup output
+	if cfg != nil {
+		logging.InitLogger(cfg.LogLevel)
+	}
+
+	fmt.Printf("Performing cleanup of all WireGuard Panel resources...\n")
+
+	if cfg == nil {
+		fmt.Printf("Error: Cannot load configuration for cleanup\n")
+		os.Exit(1)
+	}
+
+	performCleanup(cfg)
+
+	fmt.Printf("Cleanup completed successfully. All interfaces and firewall rules removed.\n")
+	os.Exit(0)
 }

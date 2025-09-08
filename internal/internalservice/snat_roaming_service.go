@@ -19,6 +19,7 @@ type SNATRoamingService struct {
 	pseudoBridgeService *PseudoBridgeService
 	fw                  *FirewallService
 	stopCh              chan struct{}
+	netlinkstopCh       chan struct{}
 }
 
 type SNATRoamingSynced struct {
@@ -42,6 +43,8 @@ func NewSNATRoamingService(pseudoBridgeService *PseudoBridgeService, firewallSer
 		listeners:           make(map[string]*InterfaceIPNetListener),
 		pseudoBridgeService: pseudoBridgeService,
 		fw:                  firewallService,
+		stopCh:              make(chan struct{}),
+		netlinkstopCh:       make(chan struct{}),
 	}
 	go s.mainLoop()
 	return s
@@ -108,7 +111,7 @@ func (s *SNATRoamingService) mainLoop() {
 		// Try to open pcap handle for the interface
 		if !linkUpdatesSubscribed {
 			// Subscribe to link updates for interface up/down events
-			if err := netlink.LinkSubscribe(linkUpdates, s.stopCh); err != nil {
+			if err := netlink.LinkSubscribe(linkUpdates, s.netlinkstopCh); err != nil {
 				logging.LogError("Failed to subscribe to link updates: %v, retrying in 5 seconds", err)
 				time.Sleep(5 * time.Second)
 				continue
@@ -117,7 +120,7 @@ func (s *SNATRoamingService) mainLoop() {
 		}
 		if !addrUpdatesSubscribed {
 			// Subscribe to address updates for IP address changes
-			if err := netlink.AddrSubscribe(addrUpdates, s.stopCh); err != nil {
+			if err := netlink.AddrSubscribe(addrUpdates, s.netlinkstopCh); err != nil {
 				logging.LogError("Failed to subscribe to address updates: %v, retrying in 5 seconds", err)
 				time.Sleep(5 * time.Second)
 				continue
@@ -127,11 +130,13 @@ func (s *SNATRoamingService) mainLoop() {
 		if linkUpdatesSubscribed && addrUpdatesSubscribed {
 			select {
 			case <-s.stopCh:
+				logging.LogInfo("SNAT Roaming Service channel stop")
 				return
 			case linkUpdate, ok := <-linkUpdates:
 				if !ok {
 					logging.LogError("Link updates channel closed, attempting to resubscribe in 5 seconds")
 					linkUpdatesSubscribed = false
+					time.Sleep(5 * time.Second)
 					continue
 				}
 				ifname, err := getNetlinkIfName(linkUpdate)
@@ -157,6 +162,7 @@ func (s *SNATRoamingService) mainLoop() {
 				if !ok {
 					logging.LogError("Address updates channel closed, attempting to resubscribe in 5 seconds")
 					addrUpdatesSubscribed = false
+					time.Sleep(5 * time.Second)
 					continue
 				}
 				ifname, err := getAddrUpdateIfName(addrUpdate)
@@ -200,6 +206,8 @@ func (l *InterfaceIPNetListener) mainLoop() {
 
 func (s *SNATRoamingService) Stop() {
 	// Stop all listeners
+	s.stopCh <- struct{}{}
+	s.netlinkstopCh <- struct{}{}
 	for _, listener := range s.listeners {
 		listener.Stop()
 	}

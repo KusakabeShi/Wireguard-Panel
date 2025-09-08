@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"net"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -351,10 +352,54 @@ func SetInterfaceVRF(ifname, vrfName string) error {
 		if err != nil {
 			return fmt.Errorf("failed to get VRF %q:-> %w", vrfName, err)
 		}
-		
+
 		if err := netlink.LinkSetMaster(link, vrfLink); err != nil {
 			return fmt.Errorf("failed to set interface %q master to VRF %q:-> %w", ifname, vrfName, err)
 		}
+	}
+
+	return nil
+}
+
+// CleanupWireGuardInterface removes a WireGuard interface if it exists
+func CleanupWireGuardInterface(ifname string) error {
+	// Check if interface exists
+	if err := RunCommand("ip", "link", "show", ifname); err != nil {
+		// Interface doesn't exist, nothing to clean up
+		return nil
+	}
+
+	// Check if it's a WireGuard interface
+	if err := RunCommand("wg", "show", ifname); err != nil {
+		// Not a WireGuard interface, skip
+		return nil
+	}
+
+	// Try to bring down the interface using wg-quick first (if config exists)
+	configPath := fmt.Sprintf("/etc/wireguard/%s.conf", ifname)
+	if _, err := os.Stat(configPath); err == nil {
+		// Config file exists, use wg-quick down
+		if err := RunCommand("wg-quick", "down", configPath); err != nil {
+			// If wg-quick fails, try manual cleanup
+			if err := manualInterfaceCleanup(ifname); err != nil {
+				return fmt.Errorf("failed to cleanup interface %q:-> %w", ifname, err)
+			}
+		}
+	} else {
+		// No config file, do manual cleanup
+		if err := manualInterfaceCleanup(ifname); err != nil {
+			return fmt.Errorf("failed to cleanup interface %q:-> %w", ifname, err)
+		}
+	}
+
+	return nil
+}
+
+// manualInterfaceCleanup manually removes a WireGuard interface
+func manualInterfaceCleanup(ifname string) error {
+	// Delete the interface
+	if err := RunCommand("ip", "link", "delete", "dev", ifname); err != nil {
+		return fmt.Errorf("failed to delete interface:-> %w", err)
 	}
 
 	return nil

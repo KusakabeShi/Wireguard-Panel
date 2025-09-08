@@ -129,6 +129,22 @@ func (c *Config) GetAllInterfaces() map[string]*models.Interface {
 	return result
 }
 
+func (c *Config) CleanUp() {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	for _, v := range c.Interfaces {
+		if v.Enabled {
+			if err := utils.CleanupWireGuardInterface(v.Ifname); err != nil {
+				logging.LogError("Exit cleanup: %v", err)
+			}
+		}
+	}
+	if err := utils.CleanupRules(c.WGPanelId, 46, nil, true); err != nil {
+		logging.LogError("Warning: failed to cleanup orphaned rules: %v", err)
+	}
+}
+
 func (c *Config) SetInterface(id string, iface *models.Interface) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
