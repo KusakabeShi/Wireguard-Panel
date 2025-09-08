@@ -177,16 +177,18 @@ const ClientItem = ({
         {/* Client Details */}
       <Collapse in={expanded}>
         <Box sx={{ backgroundColor: theme.palette.custom.clientDetails.background, p: 2, borderLeft: '4px solid #4caf50' }}>
-          <ClientDetails 
-            client={client}
-            clientState={clientState}
-            lastUpdateTime={lastUpdateTime}
-            interfaceId={interfaceId}
-            serverId={serverId}
-            interfaceInfo={interfaceInfo}
-            serverInfo={serverInfo}
-            visible={expanded}
-          />
+          {expanded && (
+            <ClientDetails 
+              client={client}
+              clientState={clientState}
+              lastUpdateTime={lastUpdateTime}
+              interfaceId={interfaceId}
+              serverId={serverId}
+              interfaceInfo={interfaceInfo}
+              serverInfo={serverInfo}
+              visible={true}
+            />
+          )}
         </Box>
       </Collapse>
     </Box>

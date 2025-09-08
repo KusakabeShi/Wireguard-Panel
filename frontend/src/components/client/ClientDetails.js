@@ -32,8 +32,20 @@ const ClientDetails = ({ client, clientState, lastUpdateTime, interfaceId, serve
     }
   }, [visible, client.id, configLoaded]);
 
+  // Reset config when interface or server changes
+  useEffect(() => {
+    setConfig('');
+    setConfigLoaded(false);
+    setError(null);
+  }, [interfaceId, serverId]);
+
 
   const loadConfig = async () => {
+    if (!interfaceId || !serverId || !client.id) {
+      console.warn('ClientDetails: Missing required IDs for config loading', { interfaceId, serverId, clientId: client.id });
+      return;
+    }
+    
     setLoadingConfig(true);
     try {
       const configText = await apiService.getClientConfig(interfaceId, serverId, client.id);

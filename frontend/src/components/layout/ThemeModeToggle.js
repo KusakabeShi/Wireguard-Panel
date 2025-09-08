@@ -74,11 +74,11 @@ const ThemeModeToggle = () => {
   const getTooltip = () => {
     switch (themeMode) {
       case THEME_MODES.LIGHT:
-        return 'Theme: Light (click for System)';
+        return 'Theme: Light';
       case THEME_MODES.DARK:
-        return `Theme: Dark (click for ${systemPrefersDark ? 'System' : 'Light'})`;
+        return `Theme: Dark`;
       case THEME_MODES.AUTO:
-        return `Theme: System (${isDark ? 'Dark' : 'Light'}) (click for ${systemPrefersDark ? 'Light' : 'Dark'})`;
+        return `Theme: Follow System`;
       default:
         return 'Change theme';
     }

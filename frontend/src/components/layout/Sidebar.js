@@ -56,7 +56,7 @@ const Sidebar = ({
       </Box>
       
       <List sx={{ flexGrow: 1, p: 0 }}>
-        {interfaces.map((interface_) => (
+        {interfaces.sort((a, b) => a.ifname.localeCompare(b.ifname)).map((interface_) => (
           <ListItem key={interface_.id} disablePadding>
             <ListItemButton
               selected={selectedInterface?.id === interface_.id}

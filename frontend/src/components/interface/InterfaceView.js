@@ -51,6 +51,15 @@ const InterfaceView = ({
 
   useEffect(() => {
     if (interface_) {
+      // Clear previous interface data immediately to prevent stale data usage
+      setServers([]);
+      setServerClients({});
+      setClientsLoaded(new Set());
+      setClientsState({});
+      setPreviousClientsState({});
+      setInterfaceInfo(null);
+      
+      // Load new interface data
       loadServers();
       loadClientsState();
       loadInterfaceInfo();
