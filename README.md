@@ -36,13 +36,13 @@ dnf install iproute wireguard-tools iptables
 
 ```bash
 # Enable IPv4 forwarding
-echo 'net.ipv4.ip_forward = 1' >> /etc/sysctl.conf
+echo 'net.ipv4.ip_forward = 1' > /etc/sysctl.d/99-wireguard.conf
 
 # Enable IPv6 forwarding
-echo 'net.ipv6.conf.all.forwarding = 1' >> /etc/sysctl.conf
+echo 'net.ipv6.conf.all.forwarding = 1' >> /etc/sysctl.d/99-wireguard.conf
 
 # Apply changes
-sysctl -p
+sysctl -p /etc/sysctl.d/99-wireguard.conf
 ```
 
 ## Installation
