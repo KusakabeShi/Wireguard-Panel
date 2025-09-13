@@ -33,6 +33,7 @@ func (h *ServiceHandler) GetServiceConfig(c *gin.Context) {
 		"apiPrefix":           h.cfg.APIPrefix,
 		"panelID":             h.cfg.WGPanelId,
 		"wgIfPrefix":          h.cfg.WgIfPrefix,
+		"WGPanelTitle":        h.cfg.WGPanelTitle,
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -40,6 +41,7 @@ func (h *ServiceHandler) GetServiceConfig(c *gin.Context) {
 
 func (h *ServiceHandler) CheckSNATRoamingOffsetValid(c *gin.Context) {
 	masterInterface := c.Query("ifname")
+	netmapsrc_str := c.Query("netmapsrc")
 	offsetstr := c.Query("offset")
 	afstr := c.Query("af")
 	var baseipnet *models.IPNetWrapper
@@ -56,6 +58,7 @@ func (h *ServiceHandler) CheckSNATRoamingOffsetValid(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing required parameters", "error_params": err_param})
 		return
 	}
+
 	ipv4, ipv6, err := utils.GetInterfaceIP(masterInterface)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to get interface IP: " + err.Error(), "error_params": "ifname"})
@@ -72,6 +75,11 @@ func (h *ServiceHandler) CheckSNATRoamingOffsetValid(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid address family, must be 4 or 6", "error_params": "af"})
 		return
 	}
+	netmapsrc, err := models.ParseCIDRFromIPAf(af, netmapsrc_str)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse netmapsrc: " + err.Error(), "error_params": "ifname"})
+		return
+	}
 	offset, err := models.ParseCIDRFromIPAf(af, offsetstr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid offset: " + err.Error(), "error_params": "offset"})
@@ -79,7 +87,7 @@ func (h *ServiceHandler) CheckSNATRoamingOffsetValid(c *gin.Context) {
 	}
 	if offset.IsSingleIP() {
 		if offset.EqualZero(af) {
-			c.JSON(http.StatusOK, gin.H{"type": "SNAT", "mapped network": baseipnet.IP.String()})
+			c.JSON(http.StatusOK, gin.H{"type": "SNAT", "src network": netmapsrc.NetworkStr(), "mapped network": baseipnet.IP.String()})
 		} else {
 			zerostr := ""
 			if af == 4 {
@@ -96,7 +104,7 @@ func (h *ServiceHandler) CheckSNATRoamingOffsetValid(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to calculate mapped IP: " + err.Error(), "error_params": "offset"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"type": "NETMAP", "mapped network": mappedIPNet.String()})
+	c.JSON(http.StatusOK, gin.H{"type": "NETMAP", "src network": netmapsrc.NetworkStr(), "mapped network": mappedIPNet.String()})
 }
 
 func (h *ServiceHandler) RegisterRoutes(router *gin.RouterGroup) {

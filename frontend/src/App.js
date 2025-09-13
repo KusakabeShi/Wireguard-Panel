@@ -69,6 +69,15 @@ function AppContent() {
     }
   }, [isAuthenticated, isLoading]);
 
+  // Update document title from injected runtime config
+  useEffect(() => {
+    if (window.WG_PANEL_TITLE) {
+      document.title = window.WG_PANEL_TITLE;
+    } else {
+      document.title = 'Wireguard Server Panel (React Dev)';
+    }
+  }, []);
+
   // Show warning message from server at startup (show only once until refresh)
   useEffect(() => {
     if ( !warningShown && window.INIT_WARNING_MESSAGE) {
@@ -347,7 +356,7 @@ function AppContent() {
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <Header onSettingsClick={handleSettingsClick} onLogoutClick={handleLogoutClick} />
       
-      <Box sx={{ display: 'flex', flexGrow: 1 }}>
+      <Box sx={{ display: 'flex', flexGrow: 1, maxWidth: '1280px', width: '100%',margin: '0 auto'}}>
         <Sidebar
           interfaces={interfaces}
           selectedInterface={selectedInterface}

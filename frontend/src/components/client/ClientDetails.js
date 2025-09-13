@@ -195,7 +195,7 @@ const ClientDetails = ({ client, clientState, lastUpdateTime, interfaceId, serve
         </Box>
         <TextField
           multiline
-          rows={8}
+          rows={10}
           fullWidth
           value={loadingConfig ? 'Loading...' : config}
           variant="outlined"

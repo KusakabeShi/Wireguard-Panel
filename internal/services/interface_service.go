@@ -5,8 +5,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
 
 	"wg-panel/internal/config"
@@ -66,6 +64,15 @@ func (s *InterfaceService) CreateInterface(req InterfaceCreateRequest) (*models.
 		if err := utils.CheckVRFExists(*req.VRFName); err != nil {
 			return nil, err
 		}
+	} else if req.VRFName != nil && *req.VRFName == "" {
+		req.VRFName = nil
+	}
+	if req.FwMark != nil && *req.FwMark != "" {
+		if err := utils.IsValidFWMark(*req.FwMark); err != nil {
+			return nil, err
+		}
+	} else if req.FwMark != nil && *req.FwMark == "" {
+		req.FwMark = nil
 	}
 
 	// Validate endpoint
@@ -162,6 +169,22 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 	needsMTUUpdate := false
 	needsVRFUpdate := false
 
+	// Validate VRF if specified
+	if req.VRFName != nil && *req.VRFName != "" {
+		if err := utils.CheckVRFExists(*req.VRFName); err != nil {
+			return nil, err
+		}
+	} else if req.VRFName != nil && *req.VRFName == "" {
+		req.VRFName = nil
+	}
+	if req.FwMark != nil && *req.FwMark != "" {
+		if err := utils.IsValidFWMark(*req.FwMark); err != nil {
+			return nil, err
+		}
+	} else if req.FwMark != nil && *req.FwMark == "" {
+		req.FwMark = nil
+	}
+
 	// Update fields
 	if req.Ifname != "" && req.Ifname != iface.Ifname {
 		if err := utils.IsValidIfname(s.cfg.WgIfPrefix, req.Ifname); err != nil {
@@ -182,9 +205,9 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 		needsWGRegeneration = true
 	}
 
-	if req.VRFName != nil && *req.VRFName != *iface.VRFName {
+	if !utils.StringPointerEqual(req.VRFName, iface.VRFName, true) {
 		// Validate VRF if specified
-		if *req.VRFName != "" {
+		if req.VRFName != nil && *req.VRFName != "" {
 			if err := utils.CheckVRFExists(*req.VRFName); err != nil {
 				return nil, err
 			}
@@ -205,7 +228,7 @@ func (s *InterfaceService) UpdateInterface(id string, req InterfaceUpdateRequest
 		needsVRFUpdate = true
 	}
 
-	if req.FwMark != nil && (iface.FwMark == nil || *req.FwMark != *iface.FwMark) {
+	if !utils.StringPointerEqual(req.FwMark, iface.FwMark, true) {
 		iface.FwMark = req.FwMark
 		needsWGRegeneration = true
 	}
@@ -372,7 +395,7 @@ func (s *InterfaceService) ValidateEndpoint(endpoint string) (string, error) {
 	}
 
 	// Check if it's a valid domain name
-	if s.isValidDomain(endpoint) {
+	if utils.IsValidDomain(endpoint) {
 		return endpoint, nil
 	}
 
@@ -430,35 +453,6 @@ func (s *InterfaceService) GetInterfaceClientsState(id string) (map[string]map[s
 	}
 
 	return result, milliseconds, nil
-}
-
-func (s *InterfaceService) isValidDomain(domain string) bool {
-	// Basic domain validation
-	if len(domain) == 0 || len(domain) > 253 {
-		return false
-	}
-
-	// Domain regex pattern
-	domainRegex := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$`)
-
-	// Check basic format
-	if !domainRegex.MatchString(domain) {
-		return false
-	}
-
-	// Additional checks
-	labels := strings.Split(domain, ".")
-	for _, label := range labels {
-		if len(label) == 0 || len(label) > 63 {
-			return false
-		}
-		// Label cannot start or end with hyphen
-		if strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
-			return false
-		}
-	}
-
-	return true
 }
 
 type InterfaceCreateRequest struct {

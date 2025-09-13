@@ -46,6 +46,10 @@ func (s *ClientService) CreateClient(interfaceID, serverID string, req ClientCre
 		return nil, err
 	}
 
+	if err := utils.IsSafeName(req.Name); err != nil {
+		return nil, fmt.Errorf("request validation failed:-> %v", err)
+	}
+
 	// Validate that at least one IP is requested
 	if (req.IP == nil || *req.IP == "") && (req.IPv6 == nil || *req.IPv6 == "") {
 		return nil, fmt.Errorf("at least one of IPv4 or IPv6 must be specified")
@@ -65,6 +69,11 @@ func (s *ClientService) CreateClient(interfaceID, serverID string, req ClientCre
 		privateKey, publicKey, err = utils.GenerateWGKeyPair()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate keypair:-> %v", err)
+		}
+	}
+	for _, dns := range req.DNS {
+		if err := utils.ValidateIPorDomain(dns); err != nil {
+			return nil, fmt.Errorf("request validation failed:-> %v", err)
 		}
 	}
 
@@ -177,6 +186,15 @@ func (s *ClientService) UpdateClient(interfaceID, serverID, clientID string, req
 		return nil, err
 	}
 
+	if err := utils.IsSafeName(req.Name); err != nil {
+		return nil, fmt.Errorf("request validation failed:-> %v", err)
+	}
+	for _, dns := range req.DNS {
+		if err := utils.ValidateIPorDomain(dns); err != nil {
+			return nil, fmt.Errorf("request validation failed:-> %v", err)
+		}
+	}
+
 	needsWGSync := false
 
 	// Update basic fields
@@ -189,6 +207,12 @@ func (s *ClientService) UpdateClient(interfaceID, serverID, clientID string, req
 	if req.Keepalive != nil {
 		client.Keepalive = req.Keepalive
 		needsWGSync = true
+	}
+
+	for _, dns := range req.DNS {
+		if err := utils.ValidateIPorDomain(dns); err != nil {
+			return nil, fmt.Errorf("request validation failed:-> %v", err)
+		}
 	}
 
 	// Update keys

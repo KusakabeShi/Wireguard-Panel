@@ -133,6 +133,12 @@ paths:
           schema:
             type: string
           description: The IP or network offset in CIDR notation
+        - name: netmap_src
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The source network for NETMAP operation in CIDR notation (e.g., "10.0.0.0/24" or "fd00::/64")
       responses:
         '200':
           description: Offset validation successful
@@ -145,6 +151,9 @@ paths:
                     type: string
                     enum: ["SNAT", "NETMAP"]
                     description: The type of NAT mapping
+                  src network:
+                    type: string
+                    description: The source netwotk will be mapped in CIDR notation
                   mapped network:
                     type: string
                     description: The resulting mapped network in CIDR notation

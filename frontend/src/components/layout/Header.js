@@ -10,7 +10,7 @@ const Header = ({ onSettingsClick, onLogoutClick }) => {
     <AppBar position="static" sx={{ backgroundColor: theme.palette.primary.main, height: 64 }}>
       <Toolbar sx={{ minHeight: 64 }}>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
-          WG-Panel
+          { document.title }
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <ThemeModeToggle />

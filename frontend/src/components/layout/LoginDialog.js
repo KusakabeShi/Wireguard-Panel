@@ -49,7 +49,7 @@ const LoginDialog = ({ open, onClose }) => {
         sx: { borderRadius: 2 }
       }}
     >
-      <DialogTitle>Login to WG-Panel</DialogTitle>
+      <DialogTitle>Login to {document.title}</DialogTitle>
       <form onSubmit={handleSubmit}>
         <DialogContent>
           {error && (

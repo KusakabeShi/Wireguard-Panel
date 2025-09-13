@@ -2,6 +2,22 @@
 
 set -e
 
+# Usage: ./install.sh [--install=y]
+# --install=y : Automatically install dependencies without confirmation
+
+# Parse command line arguments
+AUTO_INSTALL=false
+for arg in "$@"; do
+    case $arg in
+        --install=y)
+            AUTO_INSTALL=true
+            shift
+            ;;
+        *)
+            ;;
+    esac
+done
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -19,6 +35,67 @@ print_warn() {
 
 print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Function to ask for confirmation
+ask_confirmation() {
+    local message="$1"
+    if [[ "$AUTO_INSTALL" == true ]]; then
+        print_info "Auto-install mode enabled, proceeding with: $message"
+        return 0
+    fi
+    
+    echo -e "${YELLOW}[CONFIRM]${NC} $message"
+    read -p "Do you want to continue? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to check if all required tools exist
+check_tools_exist() {
+    local missing_tools=()
+    
+    # Check for ip command (from iproute2)
+    if ! command -v ip &> /dev/null; then
+        missing_tools+=("iproute2 (ip command)")
+    fi
+    
+    # Check for wg and wg-quick (from wireguard-tools)
+    if ! command -v wg &> /dev/null; then
+        missing_tools+=("wireguard-tools (wg command)")
+    fi
+    if ! command -v wg-quick &> /dev/null; then
+        missing_tools+=("wireguard-tools (wg-quick command)")
+    fi
+    
+    # Check for iptables commands
+    if ! command -v iptables &> /dev/null; then
+        missing_tools+=("iptables (iptables command)")
+    fi
+    if ! command -v ip6tables &> /dev/null; then
+        missing_tools+=("iptables (ip6tables command)")
+    fi
+    if ! command -v iptables-save &> /dev/null; then
+        missing_tools+=("iptables (iptables-save command)")
+    fi
+    if ! command -v ip6tables-save &> /dev/null; then
+        missing_tools+=("iptables (ip6tables-save command)")
+    fi
+    
+    if [[ ${#missing_tools[@]} -eq 0 ]]; then
+        print_info "All required tools are already installed"
+        return 0
+    else
+        print_warn "Missing required tools:"
+        for tool in "${missing_tools[@]}"; do
+            print_warn "  - $tool"
+        done
+        return 1
+    fi
 }
 
 # Check if running as root
@@ -47,35 +124,56 @@ detect_os() {
 
 # Function to install system requirements
 install_requirements() {
-    print_info "Installing required system tools..."
+    # First check if all tools already exist
+    if check_tools_exist; then
+        return 0
+    fi
     
     detect_os
     
     if [[ "$OS_FAMILY" == *"debian"* ]] || [[ "$OS" == "ubuntu" ]] || [[ "$OS" == "debian" ]]; then
         print_info "Detected Debian/Ubuntu system"
-        apt-get update
-        if ! apt-get install -y iproute2 wireguard-tools iptables; then
-            print_error "Failed to install required packages. Please install manually:"
-            print_error "apt-get install iproute2 wireguard-tools iptables"
-            exit 1
+        if ask_confirmation "Install required packages: iproute2 wireguard-tools iptables"; then
+            print_info "Installing required system tools..."
+            apt-get update
+            if ! apt-get install -y iproute2 wireguard-tools iptables; then
+                print_error "Failed to install required packages. Please install manually:"
+                print_error "apt-get install iproute2 wireguard-tools iptables"
+                exit 1
+            fi
+            print_info "System tools installation completed"
+        else
+            print_warn "Skipping dependency installation. Please ensure the following are installed:"
+            print_warn "  - iproute2 (ip command)"
+            print_warn "  - wireguard-tools (wg, wg-quick)"
+            print_warn "  - iptables (iptables, ip6tables, iptables-save, ip6tables-save)"
         fi
     elif [[ "$OS_FAMILY" == *"rhel"* ]] || [[ "$OS" == "rhel" ]] || [[ "$OS" == "centos" ]] || [[ "$OS" == "rocky" ]] || [[ "$OS" == "almalinux" ]] || [[ "$OS" == "fedora" ]]; then
         print_info "Detected RHEL/CentOS/Rocky/Fedora system"
-        if command -v dnf &> /dev/null; then
-            if ! dnf install -y iproute wireguard-tools iptables; then
-                print_error "Failed to install required packages. Please install manually:"
-                print_error "dnf install iproute wireguard-tools iptables"
+        if ask_confirmation "Install required packages: iproute wireguard-tools iptables"; then
+            print_info "Installing required system tools..."
+            if command -v dnf &> /dev/null; then
+                if ! dnf install -y iproute wireguard-tools iptables; then
+                    print_error "Failed to install required packages. Please install manually:"
+                    print_error "dnf install iproute wireguard-tools iptables"
+                    exit 1
+                fi
+            elif command -v yum &> /dev/null; then
+                if ! yum install -y iproute wireguard-tools iptables; then
+                    print_error "Failed to install required packages. Please install manually:"
+                    print_error "yum install iproute wireguard-tools iptables"
+                    exit 1
+                fi
+            else
+                print_error "Neither dnf nor yum found"
                 exit 1
             fi
-        elif command -v yum &> /dev/null; then
-            if ! yum install -y iproute wireguard-tools iptables; then
-                print_error "Failed to install required packages. Please install manually:"
-                print_error "yum install iproute wireguard-tools iptables"
-                exit 1
-            fi
+            print_info "System tools installation completed"
         else
-            print_error "Neither dnf nor yum found"
-            exit 1
+            print_warn "Skipping dependency installation. Please ensure the following are installed:"
+            print_warn "  - iproute2 (ip command)"
+            print_warn "  - wireguard-tools (wg, wg-quick)"
+            print_warn "  - iptables (iptables, ip6tables, iptables-save, ip6tables-save)"
         fi
     else
         print_warn "Unknown operating system: $OS"
@@ -84,8 +182,6 @@ install_requirements() {
         print_warn "  - wireguard-tools (wg, wg-quick)"
         print_warn "  - iptables (iptables, ip6tables, iptables-save, ip6tables-save)"
     fi
-    
-    print_info "System tools installation completed"
 }
 
 # Function to show IP forwarding warning

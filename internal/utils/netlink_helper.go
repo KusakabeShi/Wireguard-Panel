@@ -4,11 +4,8 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"regexp"
 	"sort"
-	"strings"
 	"syscall"
-	"unicode/utf8"
 	"wg-panel/internal/models"
 
 	"github.com/vishvananda/netlink"
@@ -250,42 +247,6 @@ func isPrivate(ip net.IP) bool {
 func isULA(ip net.IP) bool {
 	// fc00::/7
 	return ip.To16() != nil && ip[0]&0xfe == 0xfc
-}
-
-// isValidIfName checks whether the input string is a valid Linux interface name.
-var ifNameRegexp = regexp.MustCompile("^[A-Za-z0-9_-]{1,15}$")
-
-func IsValidIfname(prefix, ifname string) error {
-	if !strings.HasPrefix(ifname, prefix) {
-		return fmt.Errorf("interface name must start with prefix %q", prefix)
-	}
-	if len(ifname) > 15 {
-		return fmt.Errorf("interface name %q is too long: got %d characters, max allowed is 15", ifname, len(ifname))
-	}
-	if !ifNameRegexp.MatchString(ifname) {
-		return fmt.Errorf("interface name %q contains invalid characters: allowed are letters, digits, '_', '-'", ifname)
-	}
-	return nil
-}
-
-var allowedIfNameChars = regexp.MustCompile(`^[A-Za-z0-9._@-]+$`)
-
-// IsValidPhyIfName validates a Linux interface name and returns a detailed error if invalid.
-func IsValidPhyIfName(ifname string) error {
-	if ifname == "" {
-		return fmt.Errorf("interface name cannot be empty")
-	}
-
-	length := utf8.RuneCountInString(ifname)
-	if length > 15 {
-		return fmt.Errorf("interface name %q is too long: got %d characters, max allowed is 15", ifname, length)
-	}
-
-	if !allowedIfNameChars.MatchString(ifname) {
-		return fmt.Errorf("interface name %q contains invalid characters: allowed are letters, digits, '.', '_', '-', '@'", ifname)
-	}
-
-	return nil
 }
 
 func IsIfExists(ifname string) error {

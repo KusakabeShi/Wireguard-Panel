@@ -47,3 +47,24 @@ func GenerateRandomString(prefix string, length int) (string, error) {
 	}
 	return string(b), nil
 }
+
+func StringPointerEqual(str1, str2 *string, emptyIsNull bool) bool {
+	if emptyIsNull {
+		if str1 != nil && *str1 == "" {
+			str1 = nil
+		}
+		if str2 != nil && *str2 == "" {
+			str2 = nil
+		}
+	}
+	if str1 == nil && str2 == nil {
+		return true
+	}
+	if str1 == nil && str2 != nil {
+		return false
+	}
+	if str1 != nil && str2 == nil {
+		return false
+	}
+	return *str1 == *str2
+}

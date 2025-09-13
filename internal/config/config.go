@@ -39,6 +39,7 @@ type Config struct {
 	BasePath            string                       `json:"basePath"`
 	APIPrefix           string                       `json:"apiPrefix"`
 	WGPanelId           string                       `json:"serverId"`
+	WGPanelTitle        string                       `json:"frontendTitle"`
 	Interfaces          map[string]*models.Interface `json:"interfaces"`
 	Sessions            map[string]*Session          `json:"sessions"`
 
@@ -89,6 +90,9 @@ func LoadConfig(path string) (*Config, error) {
 			return nil, fmt.Errorf("failed to save config with new server ID:-> %v", err)
 		}
 		logging.LogInfo("Saved configuration with new server ID")
+	}
+	if cfg.WGPanelTitle == "" {
+		cfg.WGPanelTitle = "Wireguard Server Panel"
 	}
 
 	return &cfg, nil

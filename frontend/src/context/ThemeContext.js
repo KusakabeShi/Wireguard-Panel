@@ -31,7 +31,8 @@ const createAppTheme = (mode, prefersDarkMode) => {
         main: '#d32f2f',
       },
       background: {
-        default: isDark ? '#121212' : '#ffffff',
+        default: isDark ? '#19181d' : '#e8fffe',
+        background: isDark ? '#121212' : '#ffffff',
         paper: isDark ? '#1e1e1e' : '#ffffff',
         sidebar: isDark ? '#1a1a1a' : '#fafafa',
       },
