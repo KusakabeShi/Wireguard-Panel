@@ -238,7 +238,8 @@ func (s *Server) injectRuntimeConfig(html string) string {
   window.FIREWALL_DEFAULT_VALUE = %v;
   window.WG_PANEL_ID = "%v";
   window.INIT_WARNING_MESSAGE = %v;
-</script>`, apiprefix, s.cfg.FendMsg.Firewalldefault, s.cfg.WGPanelId, string(warnmsg_escaped))
+  window.WG_PANEL_TITLE = "%v";
+</script>`, apiprefix, s.cfg.FendMsg.Firewalldefault, s.cfg.WGPanelId, string(warnmsg_escaped), s.cfg.WGPanelTitle)
 
 	// Add base tag for static assets
 	baseTag := fmt.Sprintf(`<base href="%s">`, basePath)

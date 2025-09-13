@@ -46,6 +46,10 @@ func (s *ClientService) CreateClient(interfaceID, serverID string, req ClientCre
 		return nil, err
 	}
 
+	if err := utils.IsSafeName(req.Name); err != nil {
+		return nil, fmt.Errorf("request validation failed:-> %v", err)
+	}
+
 	// Validate that at least one IP is requested
 	if (req.IP == nil || *req.IP == "") && (req.IPv6 == nil || *req.IPv6 == "") {
 		return nil, fmt.Errorf("at least one of IPv4 or IPv6 must be specified")
@@ -175,6 +179,10 @@ func (s *ClientService) UpdateClient(interfaceID, serverID, clientID string, req
 	client, err := s.cfg.GetClient(interfaceID, serverID, clientID)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := utils.IsSafeName(req.Name); err != nil {
+		return nil, fmt.Errorf("request validation failed:-> %v", err)
 	}
 
 	needsWGSync := false

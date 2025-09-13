@@ -286,6 +286,10 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 		return nil, fmt.Errorf("at least one of IPv4 or IPv6 must be enabled")
 	}
 
+	if err := utils.IsSafeName(req.Name); err != nil {
+		return nil, fmt.Errorf("request validation failed:-> %v", err)
+	}
+
 	routedNetworkPool := []string{}
 	if ipv4 != nil {
 		routedNetworkPool = append(routedNetworkPool, ipv4.RoutedNetworks...)
@@ -317,7 +321,7 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 			return nil, fmt.Errorf("IPv4 validation failed:-> %v", err)
 		}
 	} else if ipv4.Enabled {
-		return nil, fmt.Errorf("ipv4 Enabled but network is nil")
+		return nil, fmt.Errorf("IPv4 Enabled but network is nil")
 	}
 
 	// 3. Validate IPv6 configuration if filled
@@ -326,7 +330,7 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 			return nil, fmt.Errorf("IPv6 validation failed:-> %v", err)
 		}
 	} else if ipv6.Enabled {
-		return nil, fmt.Errorf("ipv6 Enabled but network is nil")
+		return nil, fmt.Errorf("IPv6 Enabled but network is nil")
 	}
 
 	var server *models.Server

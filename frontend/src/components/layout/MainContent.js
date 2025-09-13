@@ -40,7 +40,8 @@ const EmptyState = ({ onAddInterface }) => {
 const MainContent = ({ 
   selectedInterface, 
   onAddInterface,
-  children 
+  children,
+  sx = {}
 }) => {
   const theme = useTheme();
   
@@ -50,7 +51,8 @@ const MainContent = ({
         flexGrow: 1, 
         height: 'calc(100vh - 64px)',
         overflow: 'auto',
-        backgroundColor: theme.palette.background.default
+        backgroundColor: theme.palette.background.background,
+        ...sx
       }}
     >
       {!selectedInterface ? (

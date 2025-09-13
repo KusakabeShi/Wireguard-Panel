@@ -144,6 +144,7 @@ func loadOrCreateConfig(configPath, newPassword string) (*config.Config, bool, e
 			BasePath:            "/",
 			APIPrefix:           "/api",
 			WGPanelId:           serverId,
+			WGPanelTitle:        "Wireguard Server Panel",
 			Interfaces:          make(map[string]*models.Interface),
 			Sessions:            make(map[string]*config.Session),
 		}

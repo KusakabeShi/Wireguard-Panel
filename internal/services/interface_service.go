@@ -5,8 +5,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
 
 	"wg-panel/internal/config"
@@ -372,7 +370,7 @@ func (s *InterfaceService) ValidateEndpoint(endpoint string) (string, error) {
 	}
 
 	// Check if it's a valid domain name
-	if s.isValidDomain(endpoint) {
+	if utils.IsValidDomain(endpoint) {
 		return endpoint, nil
 	}
 
@@ -430,35 +428,6 @@ func (s *InterfaceService) GetInterfaceClientsState(id string) (map[string]map[s
 	}
 
 	return result, milliseconds, nil
-}
-
-func (s *InterfaceService) isValidDomain(domain string) bool {
-	// Basic domain validation
-	if len(domain) == 0 || len(domain) > 253 {
-		return false
-	}
-
-	// Domain regex pattern
-	domainRegex := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$`)
-
-	// Check basic format
-	if !domainRegex.MatchString(domain) {
-		return false
-	}
-
-	// Additional checks
-	labels := strings.Split(domain, ".")
-	for _, label := range labels {
-		if len(label) == 0 || len(label) > 63 {
-			return false
-		}
-		// Label cannot start or end with hyphen
-		if strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
-			return false
-		}
-	}
-
-	return true
 }
 
 type InterfaceCreateRequest struct {

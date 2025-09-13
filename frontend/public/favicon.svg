@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" fill="#88171A" rx="6"/>
+  <g fill="white">
+    <circle cx="16" cy="7" r="2.5" fill="none" stroke="white" stroke-width="1.8"/>
+    <circle cx="8" cy="17" r="2.5" fill="none" stroke="white" stroke-width="1.8"/>
+    <circle cx="24" cy="17" r="2.5" fill="none" stroke="white" stroke-width="1.8"/>
+    <path d="M16 9.5 L16 14.5 M8 14.5 L24 14.5 M10.5 17 L21.5 17" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <text x="16" y="28" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="white" font-weight="bold">WG</text>
+  </g>
+</svg>

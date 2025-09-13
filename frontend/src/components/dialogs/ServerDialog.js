@@ -290,9 +290,10 @@ const ServerDialog = ({
     }
 
     const addressFamily = ipVersion === 'ipv4' ? '4' : '6';
+    const netmapsrc = formData[ipVersion].network; // Get the IP/Network value for netmapsrc
     
     try {
-      const result = await apiService.validateSNATRoamingOffset(masterInterface, snatIpNet, addressFamily);
+      const result = await apiService.validateSNATRoamingOffset(masterInterface, snatIpNet, addressFamily, netmapsrc);
       
       // Clear any previous errors for this IP version
       setValidationErrors(prev => ({
@@ -309,7 +310,7 @@ const ServerDialog = ({
         ...prev,
         [ipVersion]: {
           snatIpNet: result?.['mapped network'] && serverNetwork
-            ? `Will ${result.type} ${serverNetwork} to ${result['mapped network']} on interface ${masterInterface}`
+            ? `Will ${result.type} ${result['src network']} to ${result['mapped network']} on interface ${masterInterface}`
             : 'Valid'
         }
       }));
