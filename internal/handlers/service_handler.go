@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"wg-panel/internal/config"
@@ -43,6 +44,7 @@ func (h *ServiceHandler) CheckSNATRoamingOffsetValid(c *gin.Context) {
 	masterInterface := c.Query("ifname")
 	netmapsrc_str := c.Query("netmapsrc")
 	offsetstr := c.Query("offset")
+	vrfstr := c.Query("vrf")
 	afstr := c.Query("af")
 	var baseipnet *models.IPNetWrapper
 	var af int
@@ -75,6 +77,20 @@ func (h *ServiceHandler) CheckSNATRoamingOffsetValid(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid address family, must be 4 or 6", "error_params": "af"})
 		return
 	}
+	if baseipnet == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("There is no IPv%v address found on interface %v", af, masterInterface), "error_params": "ifname"})
+		return
+	}
+	ifVrf, err := utils.GetInterfaceVRF(&masterInterface)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to get interface VRF: " + err.Error(), "error_params": "ifname"})
+		return
+	}
+	if vrfstr != ifVrf {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Interface VRF does not match, wireguard interface on \"%v\", %v on \"%v\"", vrfstr, masterInterface, ifVrf), "error_params": "ifname"})
+		return
+	}
+
 	netmapsrc, err := models.ParseCIDRFromIPAf(af, netmapsrc_str)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse netmapsrc: " + err.Error(), "error_params": "ifname"})

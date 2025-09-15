@@ -357,12 +357,16 @@ func (s *WireGuardService) generatePostUpCommands(iface *models.Interface, ifnam
 
 		// IPv4 firewall rules
 		if server.IPv4 != nil && server.IPv4.Enabled {
-			commands = append(commands, utils.GenerateServerFirewallRules(ifacename, server.IPv4, 4)...)
+			for _, innerSlice := range utils.GenerateServerFirewallRules(ifacename, iface.VRFName, server.IPv4, 4) {
+				commands = append(commands, utils.ShellquoteJoin(innerSlice...))
+			}
 		}
 
 		// IPv6 firewall rules
 		if server.IPv6 != nil && server.IPv6.Enabled {
-			commands = append(commands, utils.GenerateServerFirewallRules(ifacename, server.IPv6, 6)...)
+			for _, innerSlice := range utils.GenerateServerFirewallRules(ifacename, iface.VRFName, server.IPv6, 6) {
+				commands = append(commands, utils.ShellquoteJoin(innerSlice...))
+			}
 		}
 	}
 

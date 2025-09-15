@@ -210,12 +210,16 @@ class ApiService {
     });
   }
 
-  async validateSNATRoamingOffset(ifname, offset, addressFamily, netmapsrc) {
+  async validateSNATRoamingOffset(ifname, offset, addressFamily, netmapsrc,vrf) {
+    if (vrf === null || vrf === undefined) {
+      vrf = '';
+    }
     const params = new URLSearchParams({
       af: addressFamily,
       ifname: ifname,
       offset: offset,
-      netmapsrc: netmapsrc
+      netmapsrc: netmapsrc,
+      vrf: vrf
     });
     return this.request(`/service/snatroamingoffsetvalid?${params}`);
   }

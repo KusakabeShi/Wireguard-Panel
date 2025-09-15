@@ -15,7 +15,7 @@ func NewFirewallService() *FirewallService {
 	return &FirewallService{}
 }
 
-func (f *FirewallService) AddIpAndFwRules(interfaceName string, config *models.ServerNetworkConfig) error {
+func (f *FirewallService) AddIpAndFwRules(interfaceName string, vrf *string, config *models.ServerNetworkConfig) error {
 	if config == nil || !config.Enabled {
 		return nil
 	}
@@ -36,7 +36,7 @@ func (f *FirewallService) AddIpAndFwRules(interfaceName string, config *models.S
 		if config.Snat.RoamingMasterInterface != nil && *config.Snat.RoamingMasterInterface != "" {
 			// If roaming is enabled, SNAT rules must managed by the roaming service
 		} else {
-			if err := f.AddSnatRules(config, comment); err != nil {
+			if err := f.AddSnatRules(vrf, config, comment); err != nil {
 				return fmt.Errorf("failed to add SNAT rules:-> %v", err)
 			}
 		}
@@ -73,7 +73,7 @@ func (f *FirewallService) RemoveIpAndFwRules(interfaceName string, config *model
 	}
 }
 
-func (f *FirewallService) AddSnatRules(config *models.ServerNetworkConfig, comment string) error {
+func (f *FirewallService) AddSnatRules(vrf *string, config *models.ServerNetworkConfig, comment string) error {
 	if config == nil || !config.Enabled || config.Network == nil || config.Snat == nil {
 		return nil
 	}
@@ -88,11 +88,11 @@ func (f *FirewallService) AddSnatRules(config *models.ServerNetworkConfig, comme
 		return fmt.Errorf("cannot add SNAT rules: roaming is enabled, rules must be managed by the roaming service")
 	}
 	// Generate SNAT rules using shared function
-	rules := utils.GenerateSNATRules(iptablesCmd, config, comment)
+	rules := utils.GenerateSNATRules(iptablesCmd, vrf, config, comment)
 
 	// Apply each rule
 	for _, rule := range rules {
-		ruleArgs := strings.Fields(rule)
+		ruleArgs := rule
 		// Remove the iptables command from the beginning since we pass it separately
 		if len(ruleArgs) > 0 && ruleArgs[0] == iptablesCmd {
 			ruleArgs = ruleArgs[1:]
@@ -127,7 +127,7 @@ func (f *FirewallService) addRoutedNetworksRules(interfaceDevice string, config 
 
 	// Apply each rule
 	for _, rule := range rules {
-		ruleArgs := strings.Fields(rule)
+		ruleArgs := rule
 		// Remove the iptables command from the beginning since we pass it separately
 		if len(ruleArgs) > 0 && ruleArgs[0] == iptablesCmd {
 			ruleArgs = ruleArgs[1:]

@@ -29,6 +29,7 @@ type SNATRoamingSynced struct {
 type InterfaceIPNetListener struct {
 	interfaceName       string
 	configs             map[string]*models.ServerNetworkConfig
+	vrfmaps             map[string]*string
 	stopCh              chan struct{}
 	ifIPs               map[int]*models.IPNetWrapper
 	fw                  *FirewallService
@@ -50,7 +51,7 @@ func NewSNATRoamingService(pseudoBridgeService *PseudoBridgeService, firewallSer
 	return s
 }
 
-func (s *SNATRoamingService) UpdateConfiguration(waitnigInterface map[string]map[string]*models.ServerNetworkConfig) {
+func (s *SNATRoamingService) UpdateConfiguration(waitnigInterface map[string]map[string]*models.ServerNetworkConfig, vrfmapss map[string]map[string]*string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -88,11 +89,11 @@ func (s *SNATRoamingService) UpdateConfiguration(waitnigInterface map[string]map
 		}
 		s.listeners[ifname] = NewInterfaceIPNetListener(ifname, s.pseudoBridgeService, s.fw)
 		s.listeners[ifname].SyncIpFromIface()
-		s.listeners[ifname].UpdateConfigsAndSyncFw(configs, true)
+		s.listeners[ifname].UpdateConfigsAndSyncFw(configs, vrfmapss[ifname], true)
 	}
 	for ifname, configs := range updateIF {
 		s.listeners[ifname].SyncIpFromIface()
-		s.listeners[ifname].UpdateConfigsAndSyncFw(configs, true)
+		s.listeners[ifname].UpdateConfigsAndSyncFw(configs, vrfmapss[ifname], true)
 	}
 
 }
@@ -152,7 +153,7 @@ func (s *SNATRoamingService) mainLoop() {
 					ipchanged := listener.SyncIpFromIface()
 					if ipchanged {
 						logging.LogInfo("IP change detected for interface: %s, updating firewall rules", ifname)
-						listener.UpdateConfigsAndSyncFw(listener.configs, true)
+						listener.UpdateConfigsAndSyncFw(listener.configs, listener.vrfmaps, true)
 					}
 				} else {
 					logging.LogVerbose("No SNAT roaming listener found for interface: %s, ignoring", ifname)
@@ -178,7 +179,7 @@ func (s *SNATRoamingService) mainLoop() {
 					ipchanged := listener.SyncIpFromIface()
 					if ipchanged {
 						logging.LogInfo("IP change detected for interface: %s, updating firewall rules", ifname)
-						listener.UpdateConfigsAndSyncFw(listener.configs, true)
+						listener.UpdateConfigsAndSyncFw(listener.configs, listener.vrfmaps, true)
 					}
 				} else {
 					logging.LogVerbose("No SNAT roaming listener found for interface: %s", ifname)
@@ -233,7 +234,7 @@ func NewInterfaceIPNetListener(interfaceName string, pseudoBridgeService *Pseudo
 	return r
 }
 
-func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*models.ServerNetworkConfig, forceUpdateAll bool) {
+func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*models.ServerNetworkConfig, vrfmap map[string]*string, forceUpdateAll bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if configs == nil {
@@ -283,7 +284,12 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 		if err != nil {
 			logging.LogError("Failed to calculate target_network: %v", err)
 		}
-		if err := l.fw.AddSnatRules(simulatedConfig, config.CommentString); err != nil {
+		var vrf *string
+		var ok bool
+		if vrf, ok = vrfmap[config.CommentString]; !ok {
+			logging.LogError("vrf %s not found in vrfmap", config.CommentString)
+		}
+		if err := l.fw.AddSnatRules(vrf, simulatedConfig, config.CommentString); err != nil {
 			logging.LogError("Failed to add firewall rules: %v", err)
 		} else {
 			logging.LogVerbose("Successfully added SNAT roaming rules for %s on interface %s", key, l.interfaceName)
@@ -296,13 +302,19 @@ func (l *InterfaceIPNetListener) UpdateConfigsAndSyncFw(configs map[string]*mode
 			logging.LogError("Failed to calculate target_network: %v", err)
 		}
 		l.fw.RemoveSnatRules(config.Network.Version, config.CommentString)
-		if err := l.fw.AddSnatRules(simulatedConfig, config.CommentString); err != nil {
+		var vrf *string
+		var ok bool
+		if vrf, ok = vrfmap[config.CommentString]; !ok {
+			logging.LogError("vrf %s not found in vrfmap", config.CommentString)
+		}
+		if err := l.fw.AddSnatRules(vrf, simulatedConfig, config.CommentString); err != nil {
 			logging.LogError("Failed to add firewall rules: %v", err)
 		} else {
 			logging.LogVerbose("Successfully updated SNAT roaming rules for %s on interface %s", key, l.interfaceName)
 		}
 	}
 	l.configs = configs
+	l.vrfmaps = vrfmap
 }
 
 func (l *InterfaceIPNetListener) getSimulatedConfig(config *models.ServerNetworkConfig) (simulatedIfConfig *models.ServerNetworkConfig, err error) {

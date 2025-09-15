@@ -407,6 +407,7 @@ function AppContent() {
         onClose={() => setServerDialog({ open: false, server: null, interface: null })}
         onSave={handleSaveServer}
         onDelete={handleDeleteServer}
+        wgvrf={selectedInterface?.vrfName}
         server={serverDialog.server}
       />
 

@@ -76,7 +76,7 @@ func (s *StartupService) initializeInterface(iface *models.Interface) error {
 			continue
 		}
 
-		if err := s.initializeServerFirewallRules(iface.Ifname, server); err != nil {
+		if err := s.initializeServerFirewallRules(iface.Ifname, iface.VRFName, server); err != nil {
 			logging.LogError("Failed to initialize firewall rules for server %s: %v", server.Name, err)
 			// Continue with other servers
 			continue
@@ -86,17 +86,17 @@ func (s *StartupService) initializeInterface(iface *models.Interface) error {
 	return nil
 }
 
-func (s *StartupService) initializeServerFirewallRules(ifname string, server *models.Server) error {
+func (s *StartupService) initializeServerFirewallRules(ifname string, vrf *string, server *models.Server) error {
 	// Apply IPv4 firewall rules
 	if server.IPv4 != nil && server.IPv4.Enabled {
-		if err := s.fw.AddIpAndFwRules(ifname, server.IPv4); err != nil {
+		if err := s.fw.AddIpAndFwRules(ifname, vrf, server.IPv4); err != nil {
 			return fmt.Errorf("failed to add IPv4 firewall rules:-> %v", err)
 		}
 	}
 
 	// Apply IPv6 firewall rules
 	if server.IPv6 != nil && server.IPv6.Enabled {
-		if err := s.fw.AddIpAndFwRules(ifname, server.IPv6); err != nil {
+		if err := s.fw.AddIpAndFwRules(ifname, vrf, server.IPv6); err != nil {
 			return fmt.Errorf("failed to add IPv6 firewall rules:-> %v", err)
 		}
 	}

@@ -70,6 +70,29 @@ After installation, access the web panel at `http://your-server:5000`
 2. Make it executable: `chmod +x wg-panel`
 3. Run it once to generate initial configuration: `./wg-panel`
 
+## Command Line Arguments
+
+WG-Panel supports the following command line arguments:
+
+- `-c [configpath]`: Optional. Specifies the path to the configuration file. If not provided, defaults to `./config.json`. If the file does not exist, it will be created with a random password, which is then printed to the console.
+- `-p [new_password]`: Sets a new password in the configuration file.
+
+### Examples
+
+```bash
+# Run with default config file (./config.json)
+./wg-panel
+
+# Run with custom config file
+./wg-panel -c /etc/wireguard-panel/config.json
+
+# Reset password
+./wg-panel -p mynewpassword
+
+# Reset password for custom config
+./wg-panel -c /etc/wireguard-panel/config.json -p mynewpassword
+```
+
 ## Usage
 
 WG-Panel organizes your WireGuard setup into three levels: **Interfaces**, **Servers**, and **Clients**.

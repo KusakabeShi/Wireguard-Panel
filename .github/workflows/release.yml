@@ -9,14 +9,44 @@ on:
       version:
         description: 'Release version (e.g., v1.0.0)'
         required: true
-        default: 'v1.0.9'
+        default: 'v1.0.10'
 
 jobs:
+  frontend:
+    name: Build frontend (once)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+          if-no-files-found: error
+
   build:
-    name: Build and Release
+    name: Build and Package (matrix)
+    needs: frontend
     runs-on: ${{ matrix.goarch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     container: ubuntu:20.04
-    
+
     strategy:
       matrix:
         include:
@@ -30,75 +60,74 @@ jobs:
             goarch: arm64
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Install dependencies
-      run: |
-        apt-get update
-        apt-get install -y wget curl libpcap-dev gcc libc6-dev git
-        
-        # Install Go 1.25.1
-        wget https://go.dev/dl/go1.25.1.linux-${{ matrix.goarch }}.tar.gz
-        tar -C /usr/local -xzf go1.25.1.linux-${{ matrix.goarch }}.tar.gz
-        echo "/usr/local/go/bin" >> $GITHUB_PATH
-        
-        # Install latest Node.js
-        curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
-        apt-get install -y nodejs
+      # Bring the prebuilt frontend into the repo so go:embed can see it
+      - name: Download frontend build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
 
-    - name: Get version from tag or input
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-        else
-          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-        fi
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y wget curl libpcap-dev gcc libc6-dev git
+          # Install Go 1.25.1
+          wget https://go.dev/dl/go1.25.1.linux-${{ matrix.goarch }}.tar.gz
+          tar -C /usr/local -xzf go1.25.1.linux-${{ matrix.goarch }}.tar.gz
+          echo "/usr/local/go/bin" >> $GITHUB_PATH
 
-    - name: Build frontend
-      run: |
-        cd frontend
-        npm ci
-        npm run build
+      - name: Get version from tag or input
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          fi
 
-    - name: Set build variables
-      run: |
-        echo "COMMIT=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
-        echo "BUILD_DATE=$(date -u '+%Y-%m-%d_%H:%M:%S')" >> $GITHUB_ENV
-        echo "BUILD_USER=github-actions" >> $GITHUB_ENV
+      - name: Set build variables
+        run: |
+          echo "COMMIT=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(date -u '+%Y-%m-%d_%H:%M:%S')" >> $GITHUB_ENV
+          echo "BUILD_USER=github-actions" >> $GITHUB_ENV
 
-    - name: Build Go binary
-      env:
-        CGO_ENABLED: 1
-      run: |
-        BINARY_NAME="wg-panel-${{ matrix.os }}-${{ matrix.arch }}"
-        
-        # Debug: Print environment variables
-        echo "VERSION: ${{ env.VERSION }}"
-        echo "COMMIT: ${{ env.COMMIT }}"
-        echo "BUILD_DATE: ${{ env.BUILD_DATE }}"
-        echo "BUILD_USER: ${{ env.BUILD_USER }}"
-        
-        LDFLAGS="-X wg-panel/internal/version.Version=${{ env.VERSION }} \
-        -X wg-panel/internal/version.GitCommit=${{ env.COMMIT }} \
-        -X wg-panel/internal/version.BuildDate=${{ env.BUILD_DATE }} \
-        -X wg-panel/internal/version.BuildUser=${{ env.BUILD_USER }} \
-        -w -s"
-        
-        export PATH="/usr/local/go/bin:$PATH"
-        echo "LDFLAGS: ${LDFLAGS}"
-        go build -ldflags "${LDFLAGS}" -o ${BINARY_NAME} .
-        
-        echo "ASSET_PATH=${BINARY_NAME}" >> $GITHUB_ENV
-        echo "ASSET_NAME=${BINARY_NAME}" >> $GITHUB_ENV
+      - name: Build Go binary
+        env:
+          CGO_ENABLED: 1
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          export PATH="/usr/local/go/bin:$PATH"
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ env.ASSET_NAME }}
-        path: ${{ env.ASSET_PATH }}
+          BINARY_NAME="wg-panel-${{ matrix.os }}-${{ matrix.arch }}"
+
+          echo "VERSION: ${{ env.VERSION }}"
+          echo "COMMIT: ${{ env.COMMIT }}"
+          echo "BUILD_DATE: ${{ env.BUILD_DATE }}"
+          echo "BUILD_USER: ${{ env.BUILD_USER }}"
+
+          LDFLAGS="-X wg-panel/internal/version.Version=${{ env.VERSION }} \
+          -X wg-panel/internal/version.GitCommit=${{ env.COMMIT }} \
+          -X wg-panel/internal/version.BuildDate=${{ env.BUILD_DATE }} \
+          -X wg-panel/internal/version.BuildUser=${{ env.BUILD_USER }} \
+          -w -s"
+
+          echo "LDFLAGS: ${LDFLAGS}"
+          go version
+          go build -ldflags "${LDFLAGS}" -o "${BINARY_NAME}" .
+
+          echo "ASSET_PATH=${BINARY_NAME}" >> $GITHUB_ENV
+          echo "ASSET_NAME=${BINARY_NAME}" >> $GITHUB_ENV
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET_NAME }}
+          path: ${{ env.ASSET_PATH }}
 
   release:
     name: Create Release
@@ -107,55 +136,54 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Get version from tag or input
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-        else
-          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-        fi
+      - name: Get version from tag or input
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          fi
 
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: ./artifacts
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
 
-    - name: Display structure of downloaded files
-      run: ls -la artifacts/
+      - name: Display structure of downloaded files
+        run: ls -la artifacts/
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ env.VERSION }}
-        name: WG-Panel ${{ env.VERSION }}
-        draft: false
-        prerelease: ${{ contains(env.VERSION, 'alpha') || contains(env.VERSION, 'beta') || contains(env.VERSION, 'rc') }}
-        files: artifacts/*/*
-        body: |
-          ## WG-Panel ${{ env.VERSION }}
-          
-          ### Features
-          - WireGuard VPN panel with web interface
-          - Multi-interface support with SNAT roaming
-          - Pseudo-bridge networking
-          - VLAN filtering for improved performance
-          
-          ### Downloads
-          **Linux-only**: This application requires Linux due to netlink and libpcap dependencies.
-          - **Linux AMD64**: `wg-panel-linux-amd64`
-          - **Linux ARM64**: `wg-panel-linux-arm64`
-          
-          ### Installation
-          1. Download the appropriate binary for your platform
-          2. Make it executable: `chmod +x wg-panel-linux-*`
-          3. Run `./wg-panel-linux-* -v` to verify the installation
-          4. Run `./wg-panel-linux-*` to start the application
-          
-          ### Changes in this release
-          - Built from commit: ${{ github.sha }}
-          - Build date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: WG-Panel ${{ env.VERSION }}
+          draft: false
+          prerelease: ${{ contains(env.VERSION, 'alpha') || contains(env.VERSION, 'beta') || contains(env.VERSION, 'rc') }}
+          files: artifacts/*/*
+          body: |
+            ## WG-Panel ${{ env.VERSION }}
+
+            ### Features
+            - WireGuard VPN panel with web interface
+            - Multi-interface support with SNAT roaming
+            - Pseudo-bridge networking
+
+            ### Downloads
+            **Linux-only**: This application requires Linux due to netlink and libpcap dependencies.
+            - **Linux AMD64**: `wg-panel-linux-amd64`
+            - **Linux ARM64**: `wg-panel-linux-arm64`
+
+            ### Installation
+            1. Download the appropriate binary for your platform
+            2. Make it executable: `chmod +x wg-panel-linux-*`
+            3. Run `./wg-panel-linux-* -v` to verify the installation
+            4. Run `./wg-panel-linux-*` to start the application
+
+            ### Changes in this release
+            - Built from commit: ${{ github.sha }}
+            - Build date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')

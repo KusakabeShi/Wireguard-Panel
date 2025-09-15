@@ -69,6 +69,29 @@ curl -fsSL https://raw.githubusercontent.com/KusakabeShi/Wireguard-Panel/refs/he
 2. 設定可執行權限：`chmod +x wg-panel`
 3. 執行一次以產生初始設定：`./wg-panel`
 
+## CLI 參數
+
+WG-Panel 支援以下指令行參數：
+
+- `-c [configpath]`：可選。指定設定檔的路徑。如果未提供，預設為 `./config.json`。如果檔案不存在，將會建立一個包含隨機密碼的設定檔，並將密碼顯示在控制台中。
+- `-p [new_password]`：在設定檔中設定新密碼。
+
+### 範例
+
+```bash
+# 使用預設設定檔執行（./config.json）
+./wg-panel
+
+# 使用自訂設定檔執行
+./wg-panel -c /etc/wireguard-panel/config.json
+
+# 重設密碼
+./wg-panel -p mynewpassword
+
+# 將指定的 config 重設密碼
+./wg-panel -c /etc/wireguard-panel/config.json -p mynewpassword
+```
+
 ## 使用方法
 
 WG-Panel 將設定分成成三個層級：**Interfaces**、**Servers** 和 **Clients**。

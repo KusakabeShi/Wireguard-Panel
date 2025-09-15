@@ -45,6 +45,7 @@ const ServerDialog = ({
   onSave, 
   onDelete,
   server,
+  wgvrf,
   title 
 }) => {
   const [formData, setFormData] = useState({
@@ -293,7 +294,7 @@ const ServerDialog = ({
     const netmapsrc = formData[ipVersion].network; // Get the IP/Network value for netmapsrc
     
     try {
-      const result = await apiService.validateSNATRoamingOffset(masterInterface, snatIpNet, addressFamily, netmapsrc);
+      const result = await apiService.validateSNATRoamingOffset(masterInterface, snatIpNet, addressFamily, netmapsrc,wgvrf);
       
       // Clear any previous errors for this IP version
       setValidationErrors(prev => ({

@@ -8,12 +8,12 @@ import (
 	"wg-panel/internal/models"
 )
 
-func GenerateServerFirewallRules(interfaceName string, config *models.ServerNetworkConfig, version int) []string {
+func GenerateServerFirewallRules(interfaceName string, vrf *string, config *models.ServerNetworkConfig, version int) [][]string {
 	if config == nil || !config.Enabled {
-		return []string{}
+		return [][]string{}
 	}
 
-	var rules []string
+	var rules [][]string
 	comment := config.CommentString
 	iptablesCmd := "iptables"
 	if version == 6 {
@@ -25,7 +25,7 @@ func GenerateServerFirewallRules(interfaceName string, config *models.ServerNetw
 		if config.Snat.RoamingMasterInterface != nil && *config.Snat.RoamingMasterInterface != "" {
 			// If roaming is enabled, SNAT rules must managed by the roaming service
 		} else {
-			rules = append(rules, GenerateSNATRules(iptablesCmd, config, comment)...)
+			rules = append(rules, GenerateSNATRules(iptablesCmd, vrf, config, comment)...)
 		}
 	}
 
@@ -37,12 +37,12 @@ func GenerateServerFirewallRules(interfaceName string, config *models.ServerNetw
 	return rules
 }
 
-func GenerateSNATRules(iptablesCmd string, config *models.ServerNetworkConfig, comment string) []string {
+func GenerateSNATRules(iptablesCmd string, vrf *string, config *models.ServerNetworkConfig, comment string) [][]string {
 	if config.Network == nil || config.Snat == nil {
-		return []string{}
+		return [][]string{}
 	}
 
-	var rules []string
+	var rules [][]string
 	sourceNet := config.Network.NetworkStr()
 	excludedNet := sourceNet
 	if config.Snat.SnatExcludedNetwork != nil {
@@ -53,61 +53,85 @@ func GenerateSNATRules(iptablesCmd string, config *models.ServerNetworkConfig, c
 		}
 	}
 
-	destExclusion := ""
+	// ✅ slices instead of strings
+	var destExclusion []string
 	if excludedNet != "" {
-		destExclusion = fmt.Sprintf("! -d %s ", excludedNet)
+		destExclusion = []string{"!", "-d", excludedNet}
+	}
+
+	var vrfi []string
+	if vrf != nil && *vrf != "" {
+		vrfi = []string{"-i", *vrf}
+	}
+	var vrfo []string
+	if vrf != nil && *vrf != "" {
+		vrfo = []string{"-o", *vrf}
 	}
 
 	if config.Snat.RoamingMasterInterface != nil && *config.Snat.RoamingMasterInterface != "" {
-		// If roaming is enabled, SNAT rules must managed by the roaming service
-		return []string{}
+		// If roaming is enabled, SNAT rules must be managed by the roaming service
+		return [][]string{}
 	}
 
 	if config.Snat.SnatIPNet == nil {
 		// MASQUERADE mode
-		rules = append(rules, fmt.Sprintf("%s -t nat -A POSTROUTING -s %s %s -j MASQUERADE -m comment --comment %s",
-			iptablesCmd, sourceNet, destExclusion, comment))
+		rule := []string{iptablesCmd, "-t", "nat", "-A", "POSTROUTING", "-s", sourceNet}
+		rule = append(rule, destExclusion...)
+		rule = append(rule, vrfo...)
+		rule = append(rule, "-j", "MASQUERADE", "-m", "comment", "--comment", comment)
+		rules = append(rules, rule)
+
 	} else if config.Network.Version == 4 {
 		if config.Snat.SnatIPNet.Masklen() != 32 {
-			// Error, invalid IPv4 SNAT configuration, masklen must be /32
-			return []string{}
+			return [][]string{}
 		} else if config.Snat.SnatIPNet.EqualZero(4) {
-			// Error, invalid IPv4 SNAT configuration, can't be 0.0.0.0/32
-			return []string{}
+			return [][]string{}
 		}
-		rules = append(rules, fmt.Sprintf("%s -t nat -A POSTROUTING -s %s %s -j SNAT --to-source %s -m comment --comment %s",
-			iptablesCmd, sourceNet, destExclusion, config.Snat.SnatIPNet.IP.String(), comment))
+		rule := []string{iptablesCmd, "-t", "nat", "-A", "POSTROUTING", "-s", sourceNet}
+		rule = append(rule, destExclusion...)
+		rule = append(rule, vrfo...)
+		rule = append(rule, "-j", "SNAT", "--to-source", config.Snat.SnatIPNet.IP.String(), "-m", "comment", "--comment", comment)
+		rules = append(rules, rule)
+
 	} else if config.Network.Version == 6 && config.Snat.SnatIPNet.Masklen() == 128 {
 		if config.Snat.SnatIPNet.EqualZero(6) {
-			// Error, invalid IPv6 SNAT configuration, can't be ::/128
-			return []string{}
+			return [][]string{}
 		}
-		// SNAT mode (IPv4 /32 or IPv6 /128)
-		rules = append(rules, fmt.Sprintf("%s -t nat -A POSTROUTING -s %s %s -j SNAT --to-source %s -m comment --comment %s",
-			iptablesCmd, sourceNet, destExclusion, config.Snat.SnatIPNet.IP.String(), comment))
+		rule := []string{iptablesCmd, "-t", "nat", "-A", "POSTROUTING", "-s", sourceNet}
+		rule = append(rule, destExclusion...)
+		rule = append(rule, vrfo...)
+		rule = append(rule, "-j", "SNAT", "--to-source", config.Snat.SnatIPNet.IP.String(), "-m", "comment", "--comment", comment)
+		rules = append(rules, rule)
+
 	} else {
 		// IPv6 NETMAP mode
 		serverNetwork := config.Network.NetworkStr()
 		targetNetwork := config.Snat.SnatIPNet.NetworkStr()
 
-		rules = append(rules, fmt.Sprintf("%s -t nat -A POSTROUTING -s %s %s -j NETMAP --to %s -m comment --comment %s",
-			iptablesCmd, serverNetwork, destExclusion, targetNetwork, comment))
-		rules = append(rules, fmt.Sprintf("%s -t nat -A PREROUTING -d %s -j NETMAP --to %s -m comment --comment %s",
-			iptablesCmd, targetNetwork, serverNetwork, comment))
+		rule1 := []string{iptablesCmd, "-t", "nat", "-A", "POSTROUTING", "-s", serverNetwork}
+		rule1 = append(rule1, destExclusion...)
+		rule1 = append(rule1, vrfo...)
+		rule1 = append(rule1, "-j", "NETMAP", "--to", targetNetwork, "-m", "comment", "--comment", comment)
+		rules = append(rules, rule1)
+
+		rule2 := []string{iptablesCmd, "-t", "nat", "-A", "PREROUTING", "-d", targetNetwork}
+		rule2 = append(rule2, vrfi...)
+		rule2 = append(rule2, "-j", "NETMAP", "--to", serverNetwork, "-m", "comment", "--comment", comment)
+		rules = append(rules, rule2)
 	}
 
 	return rules
 }
 
-func GenerateRoutedNetworksRules(iptablesCmd string, ifname string, config *models.ServerNetworkConfig, comment string) []string {
+func GenerateRoutedNetworksRules(iptablesCmd string, ifname string, config *models.ServerNetworkConfig, comment string) [][]string {
 	if config.Network == nil || len(config.RoutedNetworks) == 0 {
-		return []string{}
+		return [][]string{}
 	}
 
-	var rules []string
+	var rules [][]string
 	sourceNet := config.Network.NetworkStr()
 
-	// Check if we have a "allow all" network
+	// Check if we have an "allow all" network
 	hasAllowAll := false
 	for _, routedNet := range config.RoutedNetworks {
 		if (config.Network.Version == 4 && routedNet.String() == "0.0.0.0/0") ||
@@ -119,13 +143,12 @@ func GenerateRoutedNetworksRules(iptablesCmd string, ifname string, config *mode
 
 	// Add specific allow rules for each routed network
 	for _, routedNet := range config.RoutedNetworks {
-		rules = append(rules, fmt.Sprintf("%s -A FORWARD -i %s -s %s -d %s -j ACCEPT -m comment --comment %s",
-			iptablesCmd, ifname, sourceNet, routedNet.NetworkStr(), comment))
+		rules = append(rules, []string{iptablesCmd, "-A", "FORWARD", "-i", ifname, "-s", sourceNet, "-d", routedNet.NetworkStr(), "-j", "ACCEPT", "-m", "comment", "--comment", comment})
 	}
+
+	// Add deny rule for other destinations if no allow-all
 	if !hasAllowAll {
-		// Add deny rule for other destinations
-		rules = append(rules, fmt.Sprintf("%s -A FORWARD -i %s -s %s -j REJECT -m comment --comment %s",
-			iptablesCmd, ifname, sourceNet, comment))
+		rules = append(rules, []string{iptablesCmd, "-A", "FORWARD", "-i", ifname, "-s", sourceNet, "-j", "REJECT", "-m", "comment", "--comment", comment})
 	}
 
 	return rules

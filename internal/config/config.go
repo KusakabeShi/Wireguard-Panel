@@ -369,6 +369,7 @@ func (c *Config) CheckSnatOffsetOverlapsInRoamingMasterInterface(ifname string, 
 func (c *Config) SyncToInternalService() {
 	c.mu.RLock()
 	srsConfig := make(map[string]map[string]*models.ServerNetworkConfig)
+	srsVrfmapss := make(map[string]map[string]*string)
 	pbsConfig := make(map[string]internalservice.ResponderNetworks)
 	for _, iface := range c.GetAllInterfaces() {
 		// Check for network overlaps among child servers
@@ -376,6 +377,7 @@ func (c *Config) SyncToInternalService() {
 			continue
 		}
 		for _, server := range iface.Servers {
+			vrf := iface.VRFName
 			if !server.Enabled {
 				continue
 			}
@@ -391,7 +393,7 @@ func (c *Config) SyncToInternalService() {
 					}
 					addPbsConf(pbsConfig, "v4", ifname, &base_net)
 					addPbsSkipIP(pbsConfig, "v4", ifname, &server.IPv4.Network.IP)
-					addSrsConf(srsConfig, ifname, nil)
+					addSrsConf(srsConfig, srsVrfmapss, ifname, nil, vrf)
 				}
 				if server.IPv4.Snat != nil && server.IPv4.Snat.Enabled &&
 					server.IPv4.Snat.SnatIPNet != nil &&
@@ -401,7 +403,7 @@ func (c *Config) SyncToInternalService() {
 					network := server.IPv4.Snat.SnatIPNet
 					if network.EqualZero(4) && !server.IPv4.Snat.RoamingPseudoBridge {
 						//addPbsConf(pbsConfig, "v4o", ifname, network)
-						addSrsConf(srsConfig, ifname, server.IPv4)
+						addSrsConf(srsConfig, srsVrfmapss, ifname, server.IPv4, vrf)
 					} else {
 						logging.LogError("Non 0.0.0.0/32 address for snat roaming for interface: %v server: %v at interface %v", iface.Ifname, server.Name, ifname)
 					}
@@ -420,7 +422,7 @@ func (c *Config) SyncToInternalService() {
 					}
 					addPbsConf(pbsConfig, "v6", ifname, &base_net)
 					addPbsSkipIP(pbsConfig, "v6", ifname, &server.IPv6.Network.IP)
-					addSrsConf(srsConfig, ifname, nil)
+					addSrsConf(srsConfig, srsVrfmapss, ifname, nil, vrf)
 				}
 				if server.IPv6.Snat != nil && server.IPv6.Snat.Enabled &&
 					server.IPv6.Snat.SnatIPNet != nil &&
@@ -435,7 +437,7 @@ func (c *Config) SyncToInternalService() {
 						if !server.IPv6.Snat.RoamingPseudoBridge {
 							// No Roaming pseudo bridge
 							//addPbsConf(pbsConfig, "v6o", ifname, network)
-							addSrsConf(srsConfig, ifname, server.IPv6)
+							addSrsConf(srsConfig, srsVrfmapss, ifname, server.IPv6, vrf)
 						} else {
 							// Roaming pseudo bridge
 							logging.LogError("Roaming pseudo bridge for SNAT mode is not supported, use NETMAP mode instead for interface: %v server: %v at interface %v", iface.Ifname, server.Name, ifname)
@@ -448,7 +450,7 @@ func (c *Config) SyncToInternalService() {
 								addPbsConf(pbsConfig, "v6o", ifname, network)
 							}
 							// Pure NETMAP Roaming
-							addSrsConf(srsConfig, ifname, server.IPv6)
+							addSrsConf(srsConfig, srsVrfmapss, ifname, server.IPv6, vrf)
 						} else {
 							logging.LogError("Error to set snat roaming for interface: %v server: %v at interface %v, network.Masklen= %v which is not /128 for SNAT mode, nor same as server network: %v for NETMAP mode", iface.Ifname, server.Name, ifname, network.Masklen(), server.IPv6.Network.String())
 						}
@@ -459,12 +461,13 @@ func (c *Config) SyncToInternalService() {
 	}
 	c.mu.RUnlock()
 	c.pbs.UpdateConfiguration(pbsConfig)
-	c.srs.UpdateConfiguration(srsConfig)
+	c.srs.UpdateConfiguration(srsConfig, srsVrfmapss)
 }
 
-func addSrsConf(srsConfig map[string]map[string]*models.ServerNetworkConfig, ifname string, network *models.ServerNetworkConfig) {
+func addSrsConf(srsConfig map[string]map[string]*models.ServerNetworkConfig, srsVrfmapss map[string]map[string]*string, ifname string, network *models.ServerNetworkConfig, vrf *string) {
 	if network == nil {
 		srsConfig[ifname] = nil
+		srsVrfmapss[ifname] = nil
 		return
 	}
 	key := network.CommentString
@@ -477,9 +480,16 @@ func addSrsConf(srsConfig map[string]map[string]*models.ServerNetworkConfig, ifn
 		oldrn = make(map[string]*models.ServerNetworkConfig)
 		srsConfig[ifname] = oldrn
 	}
+	oldrnv, ok := srsVrfmapss[ifname]
+	if !ok || oldrnv == nil {
+		oldrnv = make(map[string]*string)
+		srsVrfmapss[ifname] = oldrnv
+	}
 
 	oldrn[key] = network.Copy()
+	oldrnv[key] = vrf
 	srsConfig[ifname] = oldrn
+	srsVrfmapss[ifname] = oldrnv
 }
 
 func addPbsConf(pbsConfig map[string]internalservice.ResponderNetworks, target string, ifname string, network *models.IPNetWrapper) {

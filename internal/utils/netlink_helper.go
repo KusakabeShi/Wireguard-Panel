@@ -76,6 +76,32 @@ func GetInterfaceIP(ifname string) (*models.IPNetWrapper, *models.IPNetWrapper, 
 	return bestV4, bestV6, nil
 }
 
+func GetInterfaceVRF(ifnamep *string) (string, error) {
+	if ifnamep == nil {
+		return "", nil
+	}
+	ifname := *ifnamep
+	link, err := netlink.LinkByName(ifname)
+	if err != nil {
+		return "", fmt.Errorf("failed to get %s:-> %w", ifname, err)
+	}
+
+	if link.Attrs().MasterIndex != 0 {
+		master, err := netlink.LinkByIndex(link.Attrs().MasterIndex)
+		if err != nil {
+			return "", fmt.Errorf("failed to get master link:-> %w", err)
+		}
+		if master.Type() == "vrf" {
+			vrfName := master.Attrs().Name
+			return vrfName, nil
+		} else if master.Type() == "bridge" {
+			return GetInterfaceVRF(&master.Attrs().Name) // Get VRF of master bridge
+		}
+	}
+
+	return "", nil
+}
+
 func GetInterfaceIPs(ifname string) ([]net.IP, []net.IP, error) {
 	link, err := netlink.LinkByName(ifname)
 	if err != nil {

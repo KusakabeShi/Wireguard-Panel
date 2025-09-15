@@ -135,13 +135,13 @@ func (s *ServerService) SetServerEnabled(interfaceID, serverID string, enabled b
 		// Enable: add IP addresses, firewall rules, and sync config
 		logging.LogInfo("Enabling server %s - adding firewall rules", serverID)
 		if iface.Enabled && server.IPv4 != nil && server.IPv4.Enabled {
-			if err := s.fw.AddIpAndFwRules(iface.Ifname, server.IPv4); err != nil {
+			if err := s.fw.AddIpAndFwRules(iface.Ifname, iface.VRFName, server.IPv4); err != nil {
 				logging.LogError("Failed to add IPv4 firewall rules for server %s: %v", serverID, err)
 				return fmt.Errorf("failed to add IPv4 firewall rules:-> %v", err)
 			}
 		}
 		if iface.Enabled && server.IPv6 != nil && server.IPv6.Enabled {
-			if err := s.fw.AddIpAndFwRules(iface.Ifname, server.IPv6); err != nil {
+			if err := s.fw.AddIpAndFwRules(iface.Ifname, iface.VRFName, server.IPv6); err != nil {
 				logging.LogError("Failed to add IPv6 firewall rules for server %s: %v", serverID, err)
 				return fmt.Errorf("failed to add IPv6 firewall rules:-> %v", err)
 			}
@@ -341,8 +341,8 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 	var server *models.Server
 	prefix := s.cfg.WGPanelId + "-"
 	CommentString, _ := utils.GenerateRandomString(prefix, 12)
-	ipv4CommentString := prefix + "-v4-" + CommentString
-	ipv6CommentString := prefix + "-v6-" + CommentString
+	ipv4CommentString := prefix + "v4-" + CommentString
+	ipv6CommentString := prefix + "v6-" + CommentString
 
 	if oldServer == nil {
 		// Generate comment strings for firewall rules with server ID prefix
@@ -483,6 +483,26 @@ func (s *ServerService) validateSingleServerNetworkConfig(af int, iface *models.
 
 	if err := s.cfg.CheckNetworkOverlapsInVRF(iface.VRFName, nil, excludeServerID, network); err != nil {
 		return err
+	}
+
+	// 3. Check all associted physical interface are in same VRF
+	wgvrf := ""
+	if iface.VRFName != nil {
+		wgvrf = *iface.VRFName
+	}
+	if cfg.PseudoBridgeMasterInterface != nil {
+		if pbvrf, err := utils.GetInterfaceVRF(cfg.PseudoBridgeMasterInterface); err != nil {
+			return err
+		} else if pbvrf != wgvrf {
+			return fmt.Errorf("PseudoBridgeMasterInterface(vrf: %v) and %v(vrf: %v) are not in same vrf", pbvrf, iface.Ifname, wgvrf)
+		}
+	}
+	if cfg.Snat != nil && cfg.Snat.RoamingMasterInterface != nil {
+		if srvrf, err := utils.GetInterfaceVRF(cfg.Snat.RoamingMasterInterface); err != nil {
+			return err
+		} else if srvrf != wgvrf {
+			return fmt.Errorf("RoamingMasterInterface(vrf: %v) and %v(vrf: %v) are not in same vrf", srvrf, iface.Ifname, wgvrf)
+		}
 	}
 
 	// 4. Validate routed networks don't overlap with each other
