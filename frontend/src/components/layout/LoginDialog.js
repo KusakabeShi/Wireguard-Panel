@@ -14,7 +14,7 @@ import {
 import { GitHub } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 
-const LoginDialog = ({ open, onClose }) => {
+const LoginDialog = ({ open, onClose, suppressFocusTrap = false }) => {
   const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -45,6 +45,8 @@ const LoginDialog = ({ open, onClose }) => {
       disableEscapeKeyDown // Prevent closing with escape key
       maxWidth="sm"
       fullWidth
+      disableEnforceFocus={suppressFocusTrap}
+      disableAutoFocus={suppressFocusTrap}
       PaperProps={{
         sx: { borderRadius: 2 }
       }}
@@ -58,7 +60,7 @@ const LoginDialog = ({ open, onClose }) => {
             </Alert>
           )}
           <TextField
-            autoFocus
+            autoFocus={!suppressFocusTrap}
             margin="dense"
             label="Username"
             type="text"

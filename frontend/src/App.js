@@ -391,6 +391,7 @@ function AppContent() {
       <LoginDialog 
         open={loginDialogOpen} 
         onClose={() => setLoginDialogOpen(false)} 
+        suppressFocusTrap={errorDialog.open}
       />
 
       <InterfaceDialog

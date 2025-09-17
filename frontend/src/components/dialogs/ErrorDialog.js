@@ -68,7 +68,7 @@ const ErrorDialog = ({ open, onClose, error, title = "Error" }) => {
     <Dialog 
       open={open} 
       onClose={handleClose}
-      maxWidth="sm"
+      maxWidth="md"
       fullWidth
       sx={{ zIndex: 2000 }}
     >

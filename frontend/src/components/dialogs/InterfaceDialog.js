@@ -63,9 +63,9 @@ const InterfaceDialog = ({
     } else if (open && !interface_) {
       // New interface
       setFormData({
-        ifname: '',
-        endpoint: '',
-        port: '',
+        ifname: serviceConfig?.wgIfPrefix,
+        endpoint: window.location.hostname,
+        port: ( Math.floor(Math.random() * 10000)+50000).toString(),
         mtu: '1420',
         privateKey: '',
         vrfName: '',
@@ -81,6 +81,10 @@ const InterfaceDialog = ({
     
     if (name && !name.startsWith(serviceConfig.wgIfPrefix)) {
       return `Interface name must start with "${serviceConfig.wgIfPrefix}"`;
+    } else if (name && name.length > 15) {// len > 15
+      return 'Interface name must be 15 characters or less';
+    } else if (name && !/^[a-zA-Z0-9_-]*$/.test(name)) {// contains invalid charactor, only 0-9a-zA-Z_-
+      return 'Interface name must contain only 0-9a-zA-Z_-';
     }
     return '';
   };

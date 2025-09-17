@@ -40,19 +40,20 @@ const Sidebar = ({
           p: 2, 
           borderBottom: `1px solid ${theme.palette.divider}`,
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: isOpen ? 'space-between' : 'center',
+          alignItems: 'left',
+          justifyContent: 'left',
           minHeight: 56
         }}
       >
+        <IconButton size="small" onClick={onToggle}>
+          <MenuIcon />
+        </IconButton>
         {isOpen && (
           <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
             Interfaces
           </Typography>
         )}
-        <IconButton size="small" onClick={onToggle}>
-          <MenuIcon />
-        </IconButton>
+
       </Box>
       
       <List sx={{ flexGrow: 1, p: 0 }}>
