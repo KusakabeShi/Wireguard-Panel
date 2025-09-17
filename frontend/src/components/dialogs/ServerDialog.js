@@ -456,7 +456,7 @@ const ServerDialog = ({
           pseudoBridgeMasterInterface: formData.ipv4.pseudoBridgeMasterInterfaceEnabled ? 
             formData.ipv4.pseudoBridgeMasterInterface : null,
           routedNetworks: formData.ipv4.routedNetworks ? 
-            formData.ipv4.routedNetworks.split('\n').map(s => s.trim()).filter(s => s) : null,
+            formData.ipv4.routedNetworks.split(/[,\n]/).map(s => s.trim()).filter(s => s) : null,
           routedNetworksFirewall: formData.ipv4.routedNetworksFirewall,
           snat: {
             enabled: formData.ipv4.snat.enabled,
@@ -478,7 +478,7 @@ const ServerDialog = ({
           pseudoBridgeMasterInterface: formData.ipv6.pseudoBridgeMasterInterfaceEnabled ? 
             formData.ipv6.pseudoBridgeMasterInterface : null,
           routedNetworks: formData.ipv6.routedNetworks ? 
-            formData.ipv6.routedNetworks.split('\n').map(s => s.trim()).filter(s => s) : null,
+            formData.ipv6.routedNetworks.split(/[,\n]/).map(s => s.trim()).filter(s => s) : null,
           routedNetworksFirewall: formData.ipv6.routedNetworksFirewall,
           snat: {
             enabled: formData.ipv6.snat.enabled,

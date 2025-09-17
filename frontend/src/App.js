@@ -353,7 +353,7 @@ function AppContent() {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' ,minWidth: '800px'}}>
       <Header onSettingsClick={handleSettingsClick} onLogoutClick={handleLogoutClick} />
       
       <Box sx={{ display: 'flex', flexGrow: 1, maxWidth: '1280px', width: '100%',margin: '0 auto'}}>
