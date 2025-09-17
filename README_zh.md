@@ -2,7 +2,15 @@
 
 # WG-Panel
 
-WG-Panel 是一個 WireGuard Server 網頁管理面板，用於簡化 Wireguard VPN 伺服器的設定和管理。
+WG-Panel 是一個基於 Go 和 React 的 WireGuard VPN Server 網頁管理面板，用於簡化基於 Wireguard 的 VPN Server 設定和管理。  
+和 [WGDashboard](https://github.com/WGDashboard/WGDashboard) 這個純粹用於管理 Wireguard 的工具取向不相同  
+
+WG-Panel 的目標是著重在更加方便的管理 WireGuard VPN server ，因此有下列和配套功能:  
+
+1. 防火牆控制: 只允許 VPN 客戶端訪問設定好的內網網段，也可以全部允許
+2. Pseudo-Bridge: 如啟用，自動回應 ARP/ND 協議。無須在主路由器設定，即可和 master interface 上的其他內網設備互通
+3. SNAT Roaming: 基於 netlink 監聽 master interface 的 IPv6 地址變化，動態更新 NATMAP 的映射網段。適用於 ISP 只提供浮動 IPv6 地址時，又想用 1:1 NAT 的特性使 VPN 客戶端能夠使用全部端口
+
 ![main](screenshots/main.png)
 
 ## 系統需求
@@ -164,10 +172,12 @@ SNAT 功能對客戶端的 Source IP 進行轉換，允許用戶端使用伺服�
     * 將使用以下 iptables 於伺服器新增防火牆規則:
         * `ip6tables -t nat -A POSTROUTING -s {server network} ! -d {snat excluded network} -j NETMAP --to {snat ipnet}`
         * `ip6tables -t nat -A PREROUTING -d {snat ipnet} -j NETMAP --to {server network}`
-4. `SNAT Excluded network`: 排除於 SNAT 的網段
+4. `SNAT Excluded Network`: 排除於 SNAT 的網段
     * 適用於需要同時訪問內網和外網的環境
     * 對內網排除 SNAT，使用 Client 自身 IP
     * 對外網使用 SNAT，使用 Server IP
+    * 預設值: 和 Server IP/Network 相同，對內網通訊不執行 SNAT，對外通訊執行 SNAT
+    * 特殊值: `0.0.0.0/0` 或 `::/0`，不啟用 SNAT Excluded Network，對來自此 Server 的所有封包執行 SNAT
 5. `SNAT Roaming Checkbox`: 若勾選，則啟用 SNAT Roaming 功能
     * SNAT Roaming 啟用時，後端會自動計算出口 IP，更新到 `-j SNAT --to-source {snat ip}` 和 `-j NETMAP --to {snat ipnet}`規則內部
         * 啟用 SNAT Roaming 後，後端將會使用 `SNAT Roaming master interface` 上面綁定的 IP 地址為基礎，計算出**應該使用的出口 IP**

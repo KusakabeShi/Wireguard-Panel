@@ -2,7 +2,12 @@
 
 # WG-Panel
 
-WG-Panel is a web-based management panel for WireGuard Server, designed to simplify the setup and administration of your VPN server. 
+WG-Panel is a Go and React powered web management panel for WireGuard VPN servers, designed to simplify deployment and day-to-day operations.
+Unlike [WGDashboard](https://github.com/WGDashboard/WGDashboard), which focuses solely on raw WireGuard configuration, WG-Panel ships with companion services that streamline running a WireGuard VPN in production:
+
+1. **Firewall controls** – allow VPN clients to reach only the internal networks you approve or open full access when needed.
+2. **Pseudo-Bridge** – automatically answers ARP/ND for mapped addresses so clients can talk to devices on the master interface without extra router tweaks.
+3. **SNAT Roaming** – monitors the master interface with netlink and refreshes SNAT/NETMAP rules when dynamic IPv6 addresses change, keeping 1:1 NAT working even with shifting prefixes.
 
 ![main](screenshots/main.png)
 
@@ -169,6 +174,8 @@ The mode used is determined by the **SNAT IP/Net** field:
     * Suitable for environments that require simultaneous access to both internal and external networks.
     * Exclude SNAT for the internal network, using the client's own IP.
     * Use SNAT for the external network, using the server's IP.
+    * Default: matches the `Server IP/Network`, so traffic inside the server subnet keeps the client IP while other traffic is translated.
+    * Special values `0.0.0.0/0` or `::/0`: disable the exclusion list and apply SNAT to all packets originating from this server.
 5. **Enable SNAT Roaming**: If checked, enables the SNAT Roaming feature.
     * When SNAT Roaming is enabled, the backend automatically calculates the outgoing IP and updates the `-j SNAT --to-source {snat ip}` and `-j NETMAP --to {snat ipnet}` rules.
         * After enabling SNAT Roaming, the backend will use the IP address bound to the `SNAT Roaming master interface` as a basis to calculate the **correct outgoing IP to use**.

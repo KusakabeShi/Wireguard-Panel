@@ -343,6 +343,8 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 	CommentString, _ := utils.GenerateRandomString(prefix, 12)
 	ipv4CommentString := prefix + "v4-" + CommentString
 	ipv6CommentString := prefix + "v6-" + CommentString
+	var oldv4 *models.IPNetWrapper
+	var oldv6 *models.IPNetWrapper
 
 	if oldServer == nil {
 		// Generate comment strings for firewall rules with server ID prefix
@@ -354,16 +356,7 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 
 			Clients: []*models.Client{},
 		}
-		newIPv4, err := s.prepareNetworkConfig(4, req.IPv4, ipv4CommentString)
-		if err != nil {
-			return nil, err
-		}
-		newIPv6, err := s.prepareNetworkConfig(6, req.IPv6, ipv6CommentString)
-		if err != nil {
-			return nil, err
-		}
-		server.IPv4 = newIPv4
-		server.IPv6 = newIPv6
+
 	} else {
 		server = &models.Server{}
 		*server = *oldServer
@@ -392,72 +385,22 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 
 		server.Name = req.Name
 		server.DNS = req.DNS
-
-		newIPv4, err := s.prepareNetworkConfig(4, req.IPv4, utils.If(server.IPv4 == nil, ipv4CommentString, server.IPv4.CommentString))
-		if err != nil {
-			return nil, err
-		}
-		newIPv6, err := s.prepareNetworkConfig(6, req.IPv6, utils.If(server.IPv6 == nil, ipv6CommentString, server.IPv6.CommentString))
-		if err != nil {
-			return nil, err
-		}
-
-		server.IPv4 = newIPv4
-		if server.IPv4 != nil && server.IPv4.Network != nil && oldServer.IPv4 != nil && oldServer.IPv4.Network != nil {
-			oldServerBaseNet := oldServer.IPv4.Network.Network()
-			newServerBaseNet := server.IPv4.Network.Network()
-			if !oldServerBaseNet.Equal(&newServerBaseNet) {
-				// if oldServerBaseNet exists in server.IPv4.RoutedNetworks, and newserverbasenet not exisis, replace it with newServerBaseNet
-				newnetexisisinrns := false
-				for _, rn := range server.IPv4.RoutedNetworks {
-					if rn.Contains(oldServerBaseNet.IP) || oldServerBaseNet.Contains(rn.IP) {
-						newnetexisisinrns = true
-						break
-					}
-				}
-				if !newnetexisisinrns {
-					// replace oldServerBaseNet with newServerBaseNet in server.IPv4.RoutedNetworks
-					for i, rn := range server.IPv4.RoutedNetworks {
-						if oldServerBaseNet.Equal(&rn) {
-							server.IPv4.RoutedNetworks[i] = newServerBaseNet
-						}
-					}
-				}
-			}
-			if server.IPv4.Snat != nil && server.IPv4.Snat.SnatExcludedNetwork != nil {
-				if server.IPv4.Snat.SnatExcludedNetwork.Equal(&oldServerBaseNet) {
-					server.IPv4.Snat.SnatExcludedNetwork = &newServerBaseNet
-				}
-			}
-		}
-		server.IPv6 = newIPv6
-		if server.IPv6 != nil && server.IPv6.Network != nil && oldServer.IPv6 != nil && oldServer.IPv6.Network != nil {
-			oldserverbasenet := oldServer.IPv6.Network.Network()
-			newserverbasenet := server.IPv6.Network.Network()
-			if !oldserverbasenet.Equal(&newserverbasenet) {
-				// if oldserverbasenet exists in server.IPv6.RoutedNetworks, and newserverbasenet not exisis, replace it with newserverbasenet
-				newnetexisisinrns := false
-				for _, rn := range server.IPv6.RoutedNetworks {
-					if rn.Contains(oldserverbasenet.IP) || oldserverbasenet.Contains(rn.IP) {
-						newnetexisisinrns = true
-						break
-					}
-				}
-				if !newnetexisisinrns {
-					for i, rn := range server.IPv6.RoutedNetworks {
-						if oldserverbasenet.Equal(&rn) {
-							server.IPv6.RoutedNetworks[i] = newserverbasenet
-						}
-					}
-				}
-			}
-			if server.IPv6.Snat != nil && server.IPv6.Snat.SnatExcludedNetwork != nil {
-				if server.IPv6.Snat.SnatExcludedNetwork.Equal(&oldserverbasenet) {
-					server.IPv6.Snat.SnatExcludedNetwork = &newserverbasenet
-				}
-			}
-		}
+		ipv4CommentString = utils.If(server.IPv4 == nil, ipv4CommentString, server.IPv4.CommentString)
+		ipv6CommentString = utils.If(server.IPv6 == nil, ipv6CommentString, server.IPv6.CommentString)
+		oldv4 = utils.If(server.IPv4 == nil, nil, server.IPv4.Network)
+		oldv6 = utils.If(server.IPv6 == nil, nil, server.IPv6.Network)
 	}
+
+	newIPv4, err := s.prepareNetworkConfig(4, req.IPv4, oldv4, ipv4CommentString)
+	if err != nil {
+		return nil, err
+	}
+	newIPv6, err := s.prepareNetworkConfig(6, req.IPv6, oldv6, ipv6CommentString)
+	if err != nil {
+		return nil, err
+	}
+	server.IPv4 = newIPv4
+	server.IPv6 = newIPv6
 
 	return server, nil
 }
@@ -650,7 +593,7 @@ func (s *ServerService) validateSnatConfiguration(af int, serverNetwork *models.
 	return nil
 }
 
-func (s *ServerService) prepareNetworkConfig(af int, req *ServerNetworkConfigRequest, commentString string) (*models.ServerNetworkConfig, error) {
+func (s *ServerService) prepareNetworkConfig(af int, req *ServerNetworkConfigRequest, oldIPNetwork *models.IPNetWrapper, commentString string) (*models.ServerNetworkConfig, error) {
 	if req == nil {
 		return nil, nil
 	}
@@ -730,6 +673,42 @@ func (s *ServerService) prepareNetworkConfig(af int, req *ServerNetworkConfigReq
 			// Default to server's own network, normalized
 			normalizedNetwork := config.Network.Network()
 			config.Snat.SnatExcludedNetwork = &normalizedNetwork
+		}
+	}
+
+	if oldIPNetwork != nil {
+		if config.Network != nil {
+			oldServerBaseNet := oldIPNetwork.Network()
+			newServerBaseNet := config.Network.Network()
+			if !oldServerBaseNet.Equal(&newServerBaseNet) {
+				// if oldServerBaseNet exists in RoutedNetworks, and newserverbasenet not exisis, replace it with newServerBaseNet
+				oldetexisisinrns := false
+				newetexisisinrns := false
+				for _, rn := range config.RoutedNetworks {
+					if rn.Contains(oldServerBaseNet.IP) || oldServerBaseNet.Contains(rn.IP) {
+						oldetexisisinrns = true
+					}
+					if rn.Contains(newServerBaseNet.IP) || newServerBaseNet.Contains(rn.IP) {
+						newetexisisinrns = true
+					}
+					if oldetexisisinrns && newetexisisinrns {
+						break
+					}
+				}
+				if oldetexisisinrns && !newetexisisinrns {
+					// replace oldServerBaseNet with newServerBaseNet in server.IPv4.RoutedNetworks
+					for i, rn := range config.RoutedNetworks {
+						if oldServerBaseNet.Equal(&rn) {
+							config.RoutedNetworks[i] = newServerBaseNet
+						}
+					}
+				}
+			}
+			if config.Snat != nil && config.Snat.SnatExcludedNetwork != nil {
+				if config.Snat.SnatExcludedNetwork.Equal(&oldServerBaseNet) {
+					config.Snat.SnatExcludedNetwork = &newServerBaseNet
+				}
+			}
 		}
 	}
 

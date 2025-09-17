@@ -7,6 +7,7 @@ set -e
 
 # Parse command line arguments
 AUTO_INSTALL=false
+PASSWORD=""
 for arg in "$@"; do
     case $arg in
         --install=y)
@@ -186,11 +187,41 @@ install_requirements() {
 
 # Function to show IP forwarding warning
 show_ip_forwarding_warning() {
-    print_warn "IMPORTANT: IP forwarding must be enabled for WireGuard to function properly"
-    print_warn "Please manually configure IP forwarding by running:"
-    print_warn "  echo 'net.ipv4.ip_forward = 1' > /etc/sysctl.d/99-wireguard.conf"
-    print_warn "  echo 'net.ipv6.conf.all.forwarding = 1' >> /etc/sysctl.d/99-wireguard.conf"
-    print_warn "  sysctl -p /etc/sysctl.d/99-wireguard.conf"
+    local ipv4_status="unknown"
+    local ipv6_status="unknown"
+    local needs_warning=false
+
+    if [[ -r /proc/sys/net/ipv4/ip_forward ]]; then
+        if [[ "$(cat /proc/sys/net/ipv4/ip_forward)" == "1" ]]; then
+            ipv4_status="enabled"
+        else
+            ipv4_status="disabled"
+            needs_warning=true
+        fi
+    else
+        needs_warning=true
+    fi
+
+    if [[ -r /proc/sys/net/ipv6/conf/all/forwarding ]]; then
+        if [[ "$(cat /proc/sys/net/ipv6/conf/all/forwarding)" == "1" ]]; then
+            ipv6_status="enabled"
+        else
+            ipv6_status="disabled"
+            needs_warning=true
+        fi
+    else
+        # Some systems may not have IPv6 enabled; warn only if IPv4 is also disabled.
+        [[ "$ipv4_status" != "enabled" ]] && needs_warning=true
+    fi
+
+    if [[ "$needs_warning" == true ]]; then
+        print_warn "IMPORTANT: IP forwarding must be enabled for WireGuard to function properly"
+        print_warn "Detected state -> IPv4: $ipv4_status, IPv6: $ipv6_status"
+        print_warn "Please configure IP forwarding by running:"
+        print_warn "  echo 'net.ipv4.ip_forward = 1' > /etc/sysctl.d/99-wireguard.conf"
+        print_warn "  echo 'net.ipv6.conf.all.forwarding = 1' >> /etc/sysctl.d/99-wireguard.conf"
+        print_warn "  sysctl -p /etc/sysctl.d/99-wireguard.conf"
+    fi
 }
 
 # Detect architecture
@@ -321,4 +352,8 @@ print_info "  - Restart service: systemctl restart wireguard-panel"
 sleep 2
 systemctl status wireguard-panel --no-pager --lines=10 || true
 print_info "Access the panel via http://[your-server-ip]:5000"
-print_info "Generated admin password: $PASSWORD"
+if [[ -n "$PASSWORD" ]]; then
+    print_info "Generated admin password: $PASSWORD"
+else
+    print_info "Admin password was not changed or could not be detected automatically. Use existing credentials or inspect the service log for the current value."
+fi
