@@ -40,9 +40,17 @@ const ClientItem = ({
   interfaceId,
   serverId,
   interfaceInfo,
-  serverInfo
+  serverInfo,
+  formatIpAddress = (value) => value
 }) => {
   const theme = useTheme();
+
+  const renderAddress = (value) => {
+    if (!value) {
+      return value;
+    }
+    return value.includes(':') ? formatIpAddress(value) : value;
+  };
 
   const getTrafficText = () => {
     if (trafficDisplayMode === TRAFFIC_DISPLAY_MODES.RATE) {
@@ -106,12 +114,12 @@ const ClientItem = ({
             <Box sx={{ ml: 2, display: 'flex', flexDirection: 'column' }}>
               {client.ip && (
                 <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.75rem' }}>
-                  {client.ip}
+                  {renderAddress(client.ip)}
                 </Typography>
               )}
               {client.ipv6 && (
                 <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.75rem' }}>
-                  {client.ipv6}
+                  {renderAddress(client.ipv6)}
                 </Typography>
               )}
             </Box>

@@ -8,6 +8,7 @@ import {
   Typography, 
   IconButton,
   Divider,
+  Drawer,
   useTheme
 } from '@mui/material';
 import { Menu as MenuIcon, Add as AddIcon, Circle as CircleIcon } from '@mui/icons-material';
@@ -18,20 +19,21 @@ const Sidebar = ({
   onInterfaceSelect, 
   onAddInterface,
   isOpen,
-  onToggle
+  onToggle,
+  onClose,
+  isMobile = false
 }) => {
   const theme = useTheme();
-  
-  return (
+  const content = (
     <Box 
       sx={{ 
-        width: isOpen ? 200 : 60, 
-        height: 'calc(100vh - 64px)',
+        width: isMobile ? '100%' : isOpen ? 240 : 72, 
+        height: '100%',
         borderRight: `2px solid ${theme.palette.divider}`,
         backgroundColor: theme.palette.background.sidebar,
         display: 'flex',
         flexDirection: 'column',
-        transition: 'width 0.3s ease',
+        transition: isMobile ? 'none' : 'width 0.3s ease',
         overflow: 'hidden'
       }}
     >
@@ -40,8 +42,9 @@ const Sidebar = ({
           p: 2, 
           borderBottom: `1px solid ${theme.palette.divider}`,
           display: 'flex',
-          alignItems: 'left',
-          justifyContent: 'left',
+          alignItems: 'center',
+          justifyContent: isOpen ? 'flex-start' : 'center',
+          gap: isOpen ? 1 : 0,
           minHeight: 56
         }}
       >
@@ -53,7 +56,6 @@ const Sidebar = ({
             Interfaces
           </Typography>
         )}
-
       </Box>
       
       <List sx={{ flexGrow: 1, p: 0 }}>
@@ -126,6 +128,29 @@ const Sidebar = ({
       </Box>
     </Box>
   );
+
+  if (isMobile) {
+    return (
+      <Drawer
+        variant="temporary"
+        open={isOpen}
+        onClose={onClose || onToggle}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          '& .MuiDrawer-paper': {
+            width: 'min(70vw, 280px)',
+            backgroundColor: theme.palette.background.sidebar,
+            borderRight: `2px solid ${theme.palette.divider}`
+          }
+        }}
+      >
+        {content}
+      </Drawer>
+    );
+  }
+
+  return content;
 };
 
 export default Sidebar;
+

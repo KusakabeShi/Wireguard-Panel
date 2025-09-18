@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, IconButton, useTheme } from '@mui/material';
+import { Box, Typography, IconButton, useTheme, useMediaQuery } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 
 const EmptyState = ({ onAddInterface }) => {
@@ -44,14 +44,19 @@ const MainContent = ({
   sx = {}
 }) => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
   return (
     <Box 
       sx={{ 
         flexGrow: 1, 
-        height: 'calc(100vh - 64px)',
-        overflow: 'auto',
+        height: '100%',
+        overflowY: 'auto',
         backgroundColor: theme.palette.background.background,
+        paddingTop: isMobile ? theme.spacing(2) : theme.spacing(3),
+        paddingBottom: isMobile ? theme.spacing(2) : theme.spacing(3),
+        paddingLeft: isMobile ? theme.spacing(2) : theme.spacing(3),
+        paddingRight: isMobile ? theme.spacing(2) : theme.spacing(3),
         ...sx
       }}
     >
@@ -65,3 +70,4 @@ const MainContent = ({
 };
 
 export default MainContent;
+

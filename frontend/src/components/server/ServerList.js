@@ -1,7 +1,16 @@
 import React from 'react';
-import { Box, IconButton, CircularProgress } from '@mui/material';
+import { Box, IconButton, CircularProgress, useTheme, useMediaQuery } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import ServerItem from './ServerItem';
+
+const MAX_IP_DISPLAY_LENGTH = 24;
+
+const formatIpSuffix = (value, maxLength = MAX_IP_DISPLAY_LENGTH) => {
+  if (!value) {
+    return value;
+  }
+  return value.length > maxLength ? `…${value.slice(-maxLength)}` : value;
+};
 
 const ServerList = ({ 
   servers,
@@ -28,6 +37,10 @@ const ServerList = ({
   interfaceId,
   interfaceInfo
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const formatAddress = isMobile ? formatIpSuffix : (value) => value;
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -42,6 +55,7 @@ const ServerList = ({
         <ServerItem
           key={server.id}
           server={{...server, clients: serverClients?.[server.id] || []}}
+          formatIpAddress={formatAddress}
           clientsState={clientsState}
           previousClientsState={previousClientsState}
           lastUpdateTime={lastUpdateTime}

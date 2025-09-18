@@ -34,17 +34,25 @@ const ServerItem = ({
   onDeleteClient,
   onToggleClient,
   interfaceId,
-  interfaceInfo
+  interfaceInfo,
+  formatIpAddress = (value) => value
 }) => {
   const theme = useTheme();
   
+  const formatNetwork = (network) => {
+    if (!network) {
+      return '';
+    }
+    return network.includes(':') ? formatIpAddress(network) : network;
+  };
+
   const getNetworkDisplay = (server) => {
     const networks = [];
     if (server.ipv4?.enabled && server.ipv4?.network) {
       networks.push(server.ipv4.network);
     }
     if (server.ipv6?.enabled && server.ipv6?.network) {
-      networks.push(server.ipv6.network);
+      networks.push(formatNetwork(server.ipv6.network));
     }
     return networks.join(', ');
   };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, CssBaseline, CircularProgress } from '@mui/material';
+import { Box, CssBaseline, CircularProgress, useMediaQuery, useTheme } from '@mui/material';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import './App.css';
@@ -22,10 +22,12 @@ import stateManager from './utils/stateManager';
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [interfaces, setInterfaces] = useState([]);
   const [selectedInterface, setSelectedInterface] = useState(null);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => !isMobile);
   
   // Dialog states
   const [interfaceDialog, setInterfaceDialog] = useState({ open: false, interface: null });
@@ -40,6 +42,10 @@ function AppContent() {
       loadInterfaces();
     }
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    setSidebarOpen(isMobile ? false : true);
+  }, [isMobile]);
 
   // Sync interface selection once stateManager is initialized
   useEffect(() => {
@@ -326,10 +332,16 @@ function AppContent() {
     setSettingsDialogOpen(true);
   };
 
+  const closeSidebar = () => setSidebarOpen(false);
+  const toggleSidebar = () => setSidebarOpen(prev => !prev);
+
   const handleInterfaceSelect = (interface_) => {
     setSelectedInterface(interface_);
     if (stateManager.initialized) {
       stateManager.setSelectedInterfaceId(interface_.id);
+    }
+    if (isMobile) {
+      closeSidebar();
     }
   };
 
@@ -353,17 +365,33 @@ function AppContent() {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <Header onSettingsClick={handleSettingsClick} onLogoutClick={handleLogoutClick} />
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' ,minWidth: '600px',}}>
+      <Header 
+        onSettingsClick={handleSettingsClick} 
+        onLogoutClick={handleLogoutClick}
+        showMenuTrigger={isMobile}
+        onMenuClick={toggleSidebar}
+      />
       
-      <Box sx={{ display: 'flex', flexGrow: 1, maxWidth: '1280px', width: '100%',margin: '0 auto'}}>
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          flexGrow: 1, 
+          width: '100%',
+          maxWidth: isMobile ? '100%' : '1280px',
+          margin: '0 auto',
+          position: 'relative'
+        }}
+      >
         <Sidebar
           interfaces={interfaces}
           selectedInterface={selectedInterface}
           onInterfaceSelect={handleInterfaceSelect}
           onAddInterface={handleAddInterface}
           isOpen={sidebarOpen}
-          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          onToggle={toggleSidebar}
+          onClose={closeSidebar}
+          isMobile={isMobile}
         />
         
         <MainContent

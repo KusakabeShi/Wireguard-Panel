@@ -7,7 +7,9 @@ import {
   InputLabel,
   IconButton,
   Typography,
-  Pagination
+  Pagination,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import { 
   Add as AddIcon,
@@ -19,6 +21,14 @@ import stateManager from '../../utils/stateManager';
 import { sortClients, getSortDisplayName, getCurrentSort } from '../../utils/sortUtils';
 
 const DEFAULT_CLIENTS_PER_PAGE = 5;
+const MAX_IP_DISPLAY_LENGTH = 24;
+
+const formatIpSuffix = (value, maxLength = MAX_IP_DISPLAY_LENGTH) => {
+  if (!value) {
+    return value;
+  }
+  return value.length > maxLength ? `…${value.slice(-maxLength)}` : value;
+};
 
 const ClientList = ({ 
   clients,
@@ -39,10 +49,13 @@ const ClientList = ({
   interfaceInfo,
   serverInfo
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [sortOrder, setSortOrder] = useState(['name-a', 'lastHandshake-d', 'totalTraffic-d', 'enabled-a']);
   const [currentPage, setCurrentPage] = useState(1);
   const [stateInitialized, setStateInitialized] = useState(false);
   const [clientsPerPage, setClientsPerPage] = useState(DEFAULT_CLIENTS_PER_PAGE);
+  const formatAddress = isMobile ? formatIpSuffix : (value) => value;
 
   // Listen for stateManager initialization
   useEffect(() => {
@@ -295,6 +308,7 @@ const ClientList = ({
               serverId={serverId}
               interfaceInfo={interfaceInfo}
               serverInfo={serverInfo}
+              formatIpAddress={formatAddress}
             />
           ))
         )}
