@@ -466,8 +466,12 @@ func (c *Config) SyncToInternalService() {
 
 func addSrsConf(srsConfig map[string]map[string]*models.ServerNetworkConfig, srsVrfmapss map[string]map[string]*string, ifname string, network *models.ServerNetworkConfig, vrf *string) {
 	if network == nil {
-		srsConfig[ifname] = nil
-		srsVrfmapss[ifname] = nil
+		if _, ok := srsConfig[ifname]; !ok {
+			srsConfig[ifname] = nil
+		}
+		if _, ok := srsVrfmapss[ifname]; !ok {
+			srsVrfmapss[ifname] = nil
+		}
 		return
 	}
 	key := network.CommentString
