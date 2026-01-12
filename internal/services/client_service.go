@@ -204,7 +204,7 @@ func (s *ClientService) UpdateClient(interfaceID, serverID, clientID string, req
 	if req.DNS != nil {
 		client.DNS = req.DNS
 	}
-	if req.Keepalive != nil {
+	if req.Keepalive != client.Keepalive {
 		client.Keepalive = req.Keepalive
 		needsWGSync = true
 	}
@@ -599,10 +599,16 @@ func (s *ClientService) generateClientConfig(iface *models.Interface, server *mo
 		config.WriteString(fmt.Sprintf("AllowedIPs = %s\n", strings.Join(allowedIPs, ", ")))
 	}
 
+	// Endpoint
 	config.WriteString(fmt.Sprintf("Endpoint = %s:%d\n", iface.Endpoint, iface.Port))
 
-	if client.Keepalive != nil && *client.Keepalive > 0 {
-		config.WriteString(fmt.Sprintf("PersistentKeepalive = %d\n", *client.Keepalive))
+	// PersistentKeepalive
+	keepalive := server.Keepalive                          // Use server value first
+	if client.Keepalive != nil && *client.Keepalive >= 0 { // if not nil, overwrite by client value
+		keepalive = client.Keepalive
+	}
+	if keepalive != nil && *keepalive > 0 { // if 0, disable. if >0. use the value
+		config.WriteString(fmt.Sprintf("PersistentKeepalive = %d\n", *keepalive))
 	}
 
 	return config.String()
@@ -617,7 +623,7 @@ type ClientCreateRequest struct {
 	PrivateKey   *string  `json:"privateKey"`
 	PublicKey    *string  `json:"publicKey"`
 	PresharedKey *string  `json:"presharedKey"`
-	Keepalive    *uint    `json:"keepalive"`
+	Keepalive    *int     `json:"keepalive"`
 }
 
 type ClientUpdateRequest struct {
@@ -628,7 +634,7 @@ type ClientUpdateRequest struct {
 	PrivateKey   *string  `json:"privateKey"`
 	PublicKey    *string  `json:"publicKey"`
 	PresharedKey *string  `json:"presharedKey"`
-	Keepalive    *uint    `json:"keepalive"`
+	Keepalive    *int     `json:"keepalive"`
 }
 
 type ClientWithState struct {

@@ -81,7 +81,8 @@ const ServerDialog = ({
         roamingMasterInterfaceEnabled: false,
         roamingPseudoBridge: false
       }
-    }
+    },
+    keepalive: '',
   });
   const [warnings, setWarnings] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -143,7 +144,8 @@ const ServerDialog = ({
             roamingMasterInterfaceEnabled: Boolean(server.ipv6?.snat?.roamingMasterInterface),
             roamingPseudoBridge: server.ipv6?.snat?.roamingPseudoBridge || false
           }
-        }
+        },
+        keepalive: server.keepalive || '',
       });
     } else {
       setFormData({
@@ -179,7 +181,8 @@ const ServerDialog = ({
             roamingMasterInterfaceEnabled: false,
             roamingPseudoBridge: false
           }
-        }
+        },
+        keepalive: '',
       });
     }
     setWarnings([]);
@@ -445,9 +448,11 @@ const ServerDialog = ({
     try {
       const data = {
         name: formData.name,
-        dns: formData.dns ? formData.dns.split(',').map(s => s.trim()).filter(s => s) : null
+        dns: formData.dns ? formData.dns.split(',').map(s => s.trim()).filter(s => s) : null,
       };
-
+      if (formData.keepalive) {
+        data.keepalive = parseInt(formData.keepalive) >= -1? parseInt(formData.keepalive) : null;
+      }
       // IPv4 configuration
       if (formData.ipv4.enabled) {
         data.ipv4 = {
@@ -741,6 +746,19 @@ const ServerDialog = ({
           <Divider />
           
           {renderIPSection('ipv6')}
+
+          <Divider />
+
+          <TextField
+            label="Keepalive"
+            type="number"
+            value={formData.keepalive}
+            onChange={(e) => handleChange('keepalive', e.target.value)}
+            fullWidth
+            variant="outlined"
+            helperText="PersistentKeepalive interval in seconds"
+            placeholder="25"
+          />
         </Box>
       </DialogContent>
       

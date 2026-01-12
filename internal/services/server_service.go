@@ -349,12 +349,12 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 	if oldServer == nil {
 		// Generate comment strings for firewall rules with server ID prefix
 		server = &models.Server{
-			ID:      s.cfg.GetAvailableServerID(iface.ID),
-			Name:    req.Name,
-			Enabled: false, // Always start disabled
-			DNS:     req.DNS,
-
-			Clients: []*models.Client{},
+			ID:        s.cfg.GetAvailableServerID(iface.ID),
+			Name:      req.Name,
+			Enabled:   false, // Always start disabled
+			DNS:       req.DNS,
+			Keepalive: req.Keepalive,
+			Clients:   []*models.Client{},
 		}
 
 	} else {
@@ -385,6 +385,7 @@ func (s *ServerService) validateAndGenerateServerConfig(iface *models.Interface,
 
 		server.Name = req.Name
 		server.DNS = req.DNS
+		server.Keepalive = req.Keepalive
 		ipv4CommentString = utils.If(server.IPv4 == nil, ipv4CommentString, server.IPv4.CommentString)
 		ipv6CommentString = utils.If(server.IPv6 == nil, ipv6CommentString, server.IPv6.CommentString)
 		oldv4 = utils.If(server.IPv4 == nil, nil, server.IPv4.Network)
@@ -717,10 +718,11 @@ func (s *ServerService) prepareNetworkConfig(af int, req *ServerNetworkConfigReq
 
 // Request types
 type ServerCreateRequest struct {
-	Name string                      `json:"name" binding:"required"`
-	DNS  []string                    `json:"dns"`
-	IPv4 *ServerNetworkConfigRequest `json:"ipv4"`
-	IPv6 *ServerNetworkConfigRequest `json:"ipv6"`
+	Name      string                      `json:"name" binding:"required"`
+	DNS       []string                    `json:"dns"`
+	Keepalive *int                        `json:"keepalive"`
+	IPv4      *ServerNetworkConfigRequest `json:"ipv4"`
+	IPv6      *ServerNetworkConfigRequest `json:"ipv6"`
 }
 
 type ServerNetworkConfigRequest struct {

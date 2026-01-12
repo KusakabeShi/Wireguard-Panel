@@ -77,13 +77,14 @@ type Interface struct {
 }
 
 type Server struct {
-	ID      string               `json:"id"`
-	Name    string               `json:"name"`
-	Enabled bool                 `json:"enabled"`
-	DNS     []string             `json:"dns"`
-	IPv4    *ServerNetworkConfig `json:"ipv4"`
-	IPv6    *ServerNetworkConfig `json:"ipv6"`
-	Clients []*Client            `json:"clients,omitempty"`
+	ID        string               `json:"id"`
+	Name      string               `json:"name"`
+	Enabled   bool                 `json:"enabled"`
+	DNS       []string             `json:"dns"`
+	IPv4      *ServerNetworkConfig `json:"ipv4"`
+	IPv6      *ServerNetworkConfig `json:"ipv6"`
+	Keepalive *int                 `json:"keepalive"`
+	Clients   []*Client            `json:"clients,omitempty"`
 }
 
 type Client struct {
@@ -96,7 +97,7 @@ type Client struct {
 	PrivateKey   *string   `json:"privateKey,omitempty"`
 	PublicKey    string    `json:"publicKey"`
 	PresharedKey *string   `json:"presharedKey,omitempty"`
-	Keepalive    *uint     `json:"keepalive"`
+	Keepalive    *int      `json:"keepalive"`
 }
 
 type ClientFrontend struct {
@@ -109,7 +110,7 @@ type ClientFrontend struct {
 	PrivateKey   *string  `json:"privateKey,omitempty"`
 	PublicKey    string   `json:"publicKey"`
 	PresharedKey *string  `json:"presharedKey,omitempty"`
-	Keepalive    *uint    `json:"keepalive"`
+	Keepalive    *int     `json:"keepalive"`
 }
 
 func (c *Client) ToClientFrontend(server *Server) (*ClientFrontend, error) {

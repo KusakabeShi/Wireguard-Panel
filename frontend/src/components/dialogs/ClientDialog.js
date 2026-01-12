@@ -98,7 +98,7 @@ const ClientDialog = ({
 
       // Keepalive
       if (formData.keepalive) {
-        data.keepalive = parseInt(formData.keepalive) || null;
+        data.keepalive = parseInt(formData.keepalive) >= -1? parseInt(formData.keepalive) : null;
       }
 
       await onSave(data);
